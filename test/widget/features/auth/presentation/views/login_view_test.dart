@@ -33,7 +33,7 @@ Widget buildLoginViewUnderTest({FakeAuthNotifier? notifier}) {
     overrides: [
       authNotifierProvider.overrideWith(() => notifier ?? FakeAuthNotifier()),
     ],
-    child: const MaterialApp(home: LoginView()),
+    child: buildTestMaterialApp(const LoginView()),
   );
 }
 
@@ -49,6 +49,25 @@ void main() {
       expect(find.text('Email address'), findsOneWidget);
       expect(find.text('Password'), findsWidgets);
       expect(find.widgetWithText(ElevatedButton, 'Login'), findsOneWidget);
+    });
+
+    testWidgets('header prompts users without an account to sign up', (
+      tester,
+    ) async {
+      await tester.binding.setSurfaceSize(const Size(1440, 1024));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      await tester.pumpWidget(buildLoginViewUnderTest());
+      await tester.pump();
+
+      expect(
+        find.text("Don't have an account? Sign up", findRichText: true),
+        findsOneWidget,
+      );
+      expect(
+        find.text('Already have an account? Sign up', findRichText: true),
+        findsNothing,
+      );
     });
 
     testWidgets('shows loading spinner when auth status is unknown', (
@@ -119,6 +138,92 @@ void main() {
 
       expect(capturedEmail, 'user@example.com');
       expect(capturedPassword, 'Secret123');
+    });
+
+    Finder socialButton(String label) => find.descendant(
+      of: find.byWidgetPredicate(
+        (widget) => widget is SocialAuthButton && widget.label == label,
+      ),
+      matching: find.byType(OutlinedButton),
+    );
+
+    testWidgets('google button shows a spinner and is disabled while loading', (
+      tester,
+    ) async {
+      await tester.binding.setSurfaceSize(const Size(1440, 1024));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      await tester.pumpWidget(
+        buildLoginViewUnderTest(
+          notifier: FakeAuthNotifier(
+            initial: const AuthState(
+              status: AuthStatus.unauthenticated,
+              isLoading: true,
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      final googleButton = socialButton('Sign up with Google');
+      expect(tester.widget<OutlinedButton>(googleButton).onPressed, isNull);
+      expect(
+        find.descendant(
+          of: googleButton,
+          matching: find.byType(CircularProgressIndicator),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        tester
+            .widget<OutlinedButton>(socialButton('Sign up with Apple'))
+            .onPressed,
+        isNotNull,
+      );
+    });
+
+    testWidgets('loading google button keeps its label for screen readers', (
+      tester,
+    ) async {
+      await tester.binding.setSurfaceSize(const Size(1440, 1024));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final semantics = tester.ensureSemantics();
+
+      await tester.pumpWidget(
+        buildLoginViewUnderTest(
+          notifier: FakeAuthNotifier(
+            initial: const AuthState(
+              status: AuthStatus.unauthenticated,
+              isLoading: true,
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(
+        find.bySemanticsLabel('Sign up with Google, loading'),
+        findsOneWidget,
+      );
+      semantics.dispose();
+    });
+
+    testWidgets('google button is enabled when not loading', (tester) async {
+      await tester.binding.setSurfaceSize(const Size(1440, 1024));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      await tester.pumpWidget(buildLoginViewUnderTest());
+      await tester.pump();
+
+      final googleButton = socialButton('Sign up with Google');
+      expect(tester.widget<OutlinedButton>(googleButton).onPressed, isNotNull);
+      expect(
+        find.descendant(
+          of: googleButton,
+          matching: find.byType(CircularProgressIndicator),
+        ),
+        findsNothing,
+      );
     });
   });
 }
