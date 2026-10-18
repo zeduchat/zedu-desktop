@@ -36,17 +36,20 @@ class _HomeViewState extends ConsumerState<HomeView> {
                 AppSidebarRail(activeType: ref.watch(homeSidebarProvider)),
                 const _MainSidebarSwitcher(),
                 Expanded(
-                  child: Stack(
-                    children: [
-                      const Positioned.fill(child: _ChatAreaSwitcher()),
-                      if (showProfile)
-                        const Positioned(
-                          right: 0,
-                          top: 0,
-                          bottom: 0,
-                          child: PersonalProfilePanel(),
-                        ),
-                    ],
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final profileWidth = (constraints.maxWidth * 0.4)
+                          .clamp(0.0, 360.0)
+                          .toDouble();
+
+                      return Row(
+                        children: [
+                          const Expanded(child: _ChatAreaSwitcher()),
+                          if (showProfile)
+                            PersonalProfilePanel(width: profileWidth),
+                        ],
+                      );
+                    },
                   ),
                 ),
               ],
@@ -308,21 +311,21 @@ class _AddChannelButton extends StatelessWidget {
   }
 }
 
-class _ChatArea extends StatelessWidget {
+class _ChatArea extends ConsumerWidget {
   const _ChatArea();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Column(
       children: [
-        _buildChatHeader(context),
+        _buildChatHeader(context, ref),
         Expanded(child: _buildWelcomeScreen(context)),
         _buildMessageInput(context),
       ],
     );
   }
 
-  Widget _buildChatHeader(BuildContext context) {
+  Widget _buildChatHeader(BuildContext context, WidgetRef ref) {
     final colors = context.colors;
 
     return Container(
@@ -344,10 +347,18 @@ class _ChatArea extends StatelessWidget {
           const Spacer(),
           _HeaderAction(icon: Icons.headphones_outlined, label: 'Start Buzz'),
           const SizedBox(width: 12),
-          CircleAvatar(
-            radius: 14,
-            backgroundColor: colors.accent,
-            child: Icon(Icons.person, size: 18, color: colors.onPrimary),
+          Tooltip(
+            message: 'Open profile',
+            child: InkWell(
+              onTap: () => ref
+                  .read(personalProfilePanelProvider.notifier)
+                  .state = true,
+              child: CircleAvatar(
+                radius: 14,
+                backgroundColor: colors.accent,
+                child: Icon(Icons.person, size: 18, color: colors.onPrimary),
+              ),
+            ),
           ),
           const SizedBox(width: 8),
           Icon(Icons.more_vert, color: colors.textHint),
