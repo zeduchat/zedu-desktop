@@ -30,20 +30,35 @@ class DmListTile extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final colors = context.colors;
     final selected = ref.watch(selectedDmProvider);
-    final isSelected = selected?.channelId == conversation.channelId;
+    final activeChat = ref.watch(activeChatProvider);
+    final isSelected =
+        (selected != null &&
+            (selected.channelId == conversation.channelId ||
+                (selected.channelId.isEmpty &&
+                    selected.participantId == conversation.participantId))) ||
+        (activeChat.type == ActiveChatType.directMessage &&
+            activeChat.id == conversation.participantId);
     final hasUnread = conversation.unreadCount > 0;
 
     return InkWell(
       onTap: () {
         ref.read(selectedDmProvider.notifier).select(conversation);
+        ref
+            .read(activeChatProvider.notifier)
+            .selectDirectMessage(conversation.participantId);
       },
+      hoverColor: colors.onPrimary.withValues(alpha: 0.08),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
         decoration: BoxDecoration(
           color: isSelected
-              ? colors.onPrimary.withValues(alpha: 0.08)
+              ? colors.onPrimary.withValues(alpha: 0.16)
               : Colors.transparent,
           border: Border(
+            left: BorderSide(
+              color: isSelected ? colors.accent : Colors.transparent,
+              width: 3.5,
+            ),
             top: BorderSide(color: colors.onPrimary.withValues(alpha: 0.18)),
             bottom: BorderSide(color: colors.onPrimary.withValues(alpha: 0.18)),
           ),
@@ -77,7 +92,9 @@ class DmListTile extends ConsumerWidget {
                     style: TextStyle(
                       color: colors.onPrimary,
                       fontSize: 13,
-                      fontWeight: FontWeight.w500,
+                      fontWeight: isSelected
+                          ? FontWeight.w600
+                          : FontWeight.w500,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
