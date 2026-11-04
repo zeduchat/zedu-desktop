@@ -47,6 +47,35 @@ class UserModel {
   final bool profileUpdated;
   final String userId;
 
+  static DateTime _parseDate(Object? raw) {
+    if (raw == null) {
+      return DateTime.fromMillisecondsSinceEpoch(0);
+    }
+    if (raw is int) {
+      return raw > 100000000000
+          ? DateTime.fromMillisecondsSinceEpoch(raw)
+          : DateTime.fromMillisecondsSinceEpoch(raw * 1000);
+    }
+    if (raw is num) {
+      final val = raw.toInt();
+      return val > 100000000000
+          ? DateTime.fromMillisecondsSinceEpoch(val)
+          : DateTime.fromMillisecondsSinceEpoch(val * 1000);
+    }
+    if (raw is String) {
+      final trimmed = raw.trim();
+      final seconds = int.tryParse(trimmed);
+      if (seconds != null) {
+        return seconds > 100000000000
+            ? DateTime.fromMillisecondsSinceEpoch(seconds)
+            : DateTime.fromMillisecondsSinceEpoch(seconds * 1000);
+      }
+      final iso = DateTime.tryParse(trimmed);
+      if (iso != null) return iso;
+    }
+    return DateTime.fromMillisecondsSinceEpoch(0);
+  }
+
   factory UserModel.fromJson(Map<String, dynamic> json) {
     return UserModel(
       id: json['id'] as String,
@@ -58,19 +87,13 @@ class UserModel {
       username: json['username'] as String,
       isVerified: json['is_verified'] as bool,
       isOnboarded: json['is_onboarded'] as bool,
-      createdAt: DateTime.fromMillisecondsSinceEpoch(
-        int.parse(json['created_at'] as String) * 1000,
-      ),
-      updatedAt: DateTime.fromMillisecondsSinceEpoch(
-        int.parse(json['updated_at'] as String) * 1000,
-      ),
+      createdAt: _parseDate(json['created_at']),
+      updatedAt: _parseDate(json['updated_at']),
       avatarUrl: json['avatar_url'] as String,
       currentOrg: json['current_org'] as String,
       currentOrganisationSlug: json['current_organisation_slug'] as String,
       defaultAvatarUrl: json['default_avatar_url'] as String,
-      expiresIn: DateTime.fromMillisecondsSinceEpoch(
-        int.parse(json['expires_in'] as String) * 1000,
-      ),
+      expiresIn: _parseDate(json['expires_in']),
       isActive: json['is_active'] as bool,
       online: json['online'] as bool,
       organisation: OrganisationModel.fromJson(
