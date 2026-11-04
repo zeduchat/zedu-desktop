@@ -311,10 +311,20 @@ class DmMessageComposerState extends ConsumerState<DmMessageComposer> {
     if (result == null) return;
     final picked = result.files
         .where((PlatformFile f) => f.path != null)
-        .map(
-          (PlatformFile f) =>
-              XFile(f.path!, name: f.name, mimeType: f.extension),
-        )
+        .map((PlatformFile f) {
+      // Validate file path to prevent path traversal and invalid files
+      if (f.path == null ||
+          f.path!.contains('..') ||
+          f.path!.startsWith('/')) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Invalid file path: ${f.path}')),
+          );
+        }
+        return null;
+      }
+      return XFile(f.path!, name: f.name, mimeType: f.extension);
+    }).whereType<XFile>()
         .toList();
     await addFiles(picked);
   }
