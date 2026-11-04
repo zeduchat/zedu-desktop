@@ -1,3 +1,4 @@
+import 'package:zedu/core/core.dart';
 import 'package:zedu/features/features.dart';
 
 import '../../../../../../helpers/helpers.dart';
@@ -12,7 +13,7 @@ Widget buildSecuritySection(List<SecuritySession> sessions) {
             ({
               required String currentPassword,
               required String newPassword,
-            }) async {},
+            }) async => const Success(null),
       ),
     ),
   );
