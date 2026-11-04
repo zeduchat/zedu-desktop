@@ -325,4 +325,35 @@ void main() {
       expect(controller.selection, const TextSelection.collapsed(offset: 5));
     });
   });
+
+  group('DmMessageComposer send button with attachments (#1570)', () {
+    testWidgets('send icon is dimmed when text and attachments are empty', (
+      tester,
+    ) async {
+      await tester.pumpWidget(buildComposerUnderTest());
+      final context = tester.element(find.byType(DmMessageComposer));
+      final colors = context.colors;
+
+      final icon = tester.widget<Icon>(find.byIcon(Icons.send_rounded));
+      expect(icon.color, colors.textHint.withValues(alpha: 0.55));
+    });
+
+    testWidgets(
+      'send icon is enabled with primary color when files are attached without text',
+      (tester) async {
+        await tester.pumpWidget(buildComposerUnderTest());
+        final context = tester.element(find.byType(DmMessageComposer));
+        final colors = context.colors;
+
+        final state = tester.state<DmMessageComposerState>(
+          find.byType(DmMessageComposer),
+        );
+        await state.addFiles([XFile('test_spec.pdf')]);
+        await tester.pump();
+
+        final icon = tester.widget<Icon>(find.byIcon(Icons.send_rounded));
+        expect(icon.color, colors.primary);
+      },
+    );
+  });
 }

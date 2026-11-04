@@ -1055,7 +1055,10 @@ class DmMessageComposerState extends ConsumerState<DmMessageComposer> {
                         onTap: _handleSend,
                         child: Icon(
                           Icons.send_rounded,
-                          color: _controller.text.trim().isEmpty
+                          color:
+                              (_controller.text.trim().isEmpty &&
+                                  _pendingFiles.isEmpty &&
+                                  _voiceNote == null)
                               ? colors.textHint.withValues(alpha: 0.55)
                               : colors.primary,
                           size: 22,
