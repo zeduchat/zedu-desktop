@@ -118,6 +118,9 @@ class UserProfileNotifier extends Notifier<UserProfileState> {
           isSaving: false,
           successMessage: 'Account deleted successfully.',
         );
+        // The account is gone, so the session must go with it: logout clears the
+        // token, drafts and user state before the screen can do anything else.
+        await ref.read(authNotifierProvider.notifier).logout();
       case Failure<void>():
         state = state.copyWith(
           isSaving: false,
