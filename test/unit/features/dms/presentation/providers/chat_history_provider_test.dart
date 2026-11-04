@@ -43,7 +43,9 @@ void main() {
       container = ProviderContainer(
         overrides: [dmRepositoryProvider.overrideWithValue(mockRepository)],
       );
-      notifier = container.listen(chatHistoryProvider('ch-1'), (_, __) {}).read();
+      notifier = container
+          .listen(chatHistoryProvider('ch-1'), (_, _) {})
+          .read();
       await pumpEventQueue();
     });
 
@@ -289,7 +291,9 @@ void _deleteTests() {
       container = ProviderContainer(
         overrides: [dmRepositoryProvider.overrideWithValue(mockRepository)],
       );
-      notifier = container.listen(chatHistoryProvider('ch-1'), (_, __) {}).read();
+      notifier = container
+          .listen(chatHistoryProvider('ch-1'), (_, _) {})
+          .read();
       await pumpEventQueue();
     });
 
@@ -464,7 +468,9 @@ void _retryTests() {
           authNotifierProvider.overrideWith(_FakeAuthNotifier.new),
         ],
       );
-      notifier = container.listen(chatHistoryProvider('channel-xyz'), (_, __) {}).read();
+      notifier = container
+          .listen(chatHistoryProvider('channel-xyz'), (_, _) {})
+          .read();
       await pumpEventQueue();
     });
 
@@ -564,14 +570,23 @@ void _retryTests() {
     );
 
     test('auto-disposes ChatHistoryNotifier when listener closes', () async {
-      final sub = container.listen(chatHistoryProvider('ch-auto'), (_, __) {});
+      final sub = container.listen(chatHistoryProvider('ch-auto'), (_, _) {});
       final autoNotifier = sub.read();
-      expect(autoNotifier.hasListeners, isTrue);
+      expect(
+        // hasListeners is protected; the test only asserts the notifier is
+        // still held, which is exactly what the protected getter reports.
+        // ignore: invalid_use_of_protected_member
+        autoNotifier.hasListeners,
+        isTrue,
+      );
 
       sub.close();
       await pumpEventQueue();
 
-      expect(() => autoNotifier.notifyListeners(), throwsA(isA<FlutterError>()));
+      expect(
+        () => autoNotifier.notifyListeners(),
+        throwsA(isA<FlutterError>()),
+      );
     });
   });
 }
