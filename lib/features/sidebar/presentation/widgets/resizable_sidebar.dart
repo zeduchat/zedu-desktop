@@ -37,13 +37,7 @@ class _ResizableSidebarState extends State<ResizableSidebar> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.minWidth != widget.minWidth ||
         oldWidget.maxWidth != widget.maxWidth) {
-      final clamped =
-          _width.clamp(widget.minWidth, widget.maxWidth).toDouble();
-      if (clamped != _width) {
-        setState(() {
-          _width = clamped;
-        });
-      }
+      _width = _width.clamp(widget.minWidth, widget.maxWidth).toDouble();
     }
   }
 
