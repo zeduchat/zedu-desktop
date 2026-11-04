@@ -67,29 +67,32 @@ void main() {
       expect(response.data, {'ok': true});
     });
 
-    test('FormData upload does not force application/json Content-Type header', () async {
-      String? contentType;
-      server.listen((request) {
-        contentType = request.headers.value(HttpHeaders.contentTypeHeader);
-        request.response
-          ..headers.contentType = ContentType.json
-          ..write('{"uploaded":true}');
-        request.response.close();
-      });
+    test(
+      'FormData upload does not force application/json Content-Type header',
+      () async {
+        String? contentType;
+        server.listen((request) {
+          contentType = request.headers.value(HttpHeaders.contentTypeHeader);
+          request.response
+            ..headers.contentType = ContentType.json
+            ..write('{"uploaded":true}');
+          request.response.close();
+        });
 
-      final api = ApiBaseService(
-        config: AppConfig(apiBaseUrl: baseUrl, usesMockData: false),
-      );
+        final api = ApiBaseService(
+          config: AppConfig(apiBaseUrl: baseUrl, usesMockData: false),
+        );
 
-      final formData = FormData.fromMap({'field': 'value'});
-      final response = await api.post<Map<String, dynamic>>(
-        path: 'upload',
-        data: formData,
-      );
+        final formData = FormData.fromMap({'field': 'value'});
+        final response = await api.post<Map<String, dynamic>>(
+          path: 'upload',
+          data: formData,
+        );
 
-      expect(response.statusCode, 200);
-      expect(contentType, startsWith('multipart/form-data; boundary='));
-    });
+        expect(response.statusCode, 200);
+        expect(contentType, startsWith('multipart/form-data; boundary='));
+      },
+    );
 
     test('leading slash does not strip baseUrl prefix', () async {
       String? requestedPath;
