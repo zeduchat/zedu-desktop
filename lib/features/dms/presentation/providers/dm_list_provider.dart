@@ -103,7 +103,7 @@ class DmListNotifier extends AsyncNotifier<List<DmConversation>> {
       _hasMore = false;
     }
 
-    if (results.isEmpty && page == 1) {
+    if (locator<AppConfig>().usesMockData && results.isEmpty && page == 1) {
       return [
         DmConversation(
           channelId: 'mock-channel-id-123',
