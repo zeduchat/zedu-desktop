@@ -14,7 +14,7 @@ final notificationServiceProvider = Provider<NotificationService>((ref) {
   return NotificationService(ref);
 });
 
-class NotificationService {
+class NotificationService implements DesktopNotifier {
   final Ref _ref;
   final GoRouter? _router;
   final Future<void> Function()? _bringToFront;
@@ -43,6 +43,7 @@ class NotificationService {
     }
   }
 
+  @override
   Future<void> init() async {
     await localNotifier.setup(
       appName: 'Zedu',

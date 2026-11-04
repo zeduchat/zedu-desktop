@@ -1,7 +1,6 @@
 import 'dart:io';
 
 import 'package:zedu/core/core.dart';
-import 'package:zedu/features/dms/domain/notification_service.dart';
 
 class DesktopManager extends ConsumerStatefulWidget {
   final Widget child;
@@ -55,7 +54,7 @@ class _DesktopManagerState extends ConsumerState<DesktopManager>
     }
 
     try {
-      await ref.read(notificationServiceProvider).init();
+      await ref.read(desktopNotifierProvider).init();
     } catch (e) {
       debugPrint('Local notifier setup failed: $e');
     }
