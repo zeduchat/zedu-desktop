@@ -27,6 +27,9 @@ class _MessageComposerState extends ConsumerState<MessageComposer> {
   @override
   void initState() {
     super.initState();
+    _controller.addListener(() {
+      setState(() {});
+    });
     _focusNode.addListener(() {
       setState(() {
         _isFocused = _focusNode.hasFocus;
@@ -324,7 +327,9 @@ class _MessageComposerState extends ConsumerState<MessageComposer> {
                     ),
                   ),
                 ),
-                if (_controller.text.isEmpty && !_isRecording)
+                if (_controller.text.isEmpty &&
+                    !_isRecording &&
+                    _attachedFiles.isEmpty)
                   IconButton(
                     onPressed: _startRecording,
                     icon: Icon(Icons.mic_none, color: colors.textHint),
