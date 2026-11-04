@@ -1,5 +1,3 @@
-import 'dart:io' show File;
-
 import 'package:zedu/core/core.dart';
 import 'package:zedu/features/features.dart';
 
@@ -185,13 +183,9 @@ class ChatHistoryNotifier extends ChangeNotifier {
   /// Deletes voice recordings this app made once their message is sent. Files
   /// the user picked are never deleted.
   Future<void> _deleteRecordings(List<XFile>? files) async {
-    for (final file in files ?? const <XFile>[]) {
-      if (appRecordedPaths.remove(file.path)) {
-        try {
-          await File(file.path).delete();
-        } catch (_) {}
-      }
-    }
+    await ref
+        .read(voiceNoteStoreProvider)
+        .deleteAll(files?.map((file) => file.path) ?? const <String>[]);
   }
 
   Future<void> sendMessage(

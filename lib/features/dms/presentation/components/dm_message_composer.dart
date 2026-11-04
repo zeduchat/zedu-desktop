@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io' show Directory, File, Platform;
 
 import 'package:audioplayers/audioplayers.dart'
     show AudioPlayer, DeviceFileSource;
@@ -71,6 +70,10 @@ class DmMessageComposerState extends ConsumerState<DmMessageComposer> {
   /// was typed against.
   late DmDraftStore _drafts;
 
+  /// Owns where a recording is written and when it may be deleted, so this
+  /// widget never touches the filesystem itself.
+  late VoiceNoteStore _voiceNotes;
+
   /// Set when this conversation is deleted, so closing the composer doesn't
   /// save its text back as a draft.
   bool _channelDeleted = false;
@@ -79,6 +82,7 @@ class DmMessageComposerState extends ConsumerState<DmMessageComposer> {
   void initState() {
     super.initState();
     _drafts = ref.read(dmDraftStoreProvider);
+    _voiceNotes = ref.read(voiceNoteStoreProvider);
     _controller = RichTextController();
     _controller.addListener(_onTextChanged);
     _draftChannelId = widget.channelId;
@@ -534,12 +538,11 @@ class DmMessageComposerState extends ConsumerState<DmMessageComposer> {
         _showVoiceError('Allow microphone access to record a voice message.');
         return;
       }
-      final path =
-          '${Directory.systemTemp.path}${Platform.pathSeparator}zedu-voice-${DateTime.now().millisecondsSinceEpoch}.m4a';
+      final path = _voiceNotes.newRecordingPath();
       _activeRecordingPath = path;
       await _audioRecorder.start(const RecordConfig(), path: path);
       // Only remember the file once recording really started.
-      appRecordedPaths.add(path);
+      _voiceNotes.track(path);
       if (!mounted) {
         // dispose() is already stopping and cleaning up the recorder.
         await _deleteOwnRecording(path);
@@ -632,16 +635,13 @@ class DmMessageComposerState extends ConsumerState<DmMessageComposer> {
   /// always comes from the recorder itself, never from a file the user picked.
   Future<void> _deleteOwnRecording(String? path) async {
     if (path == null) return;
-    appRecordedPaths.add(path);
-    await _deleteRecording(path);
+    _voiceNotes.track(path);
+    await _voiceNotes.delete(path);
   }
 
   /// Deletes a recording this app made. Never used on files the user picked.
   Future<void> _deleteRecording(String? path) async {
-    if (path == null || !appRecordedPaths.remove(path)) return;
-    try {
-      await File(path).delete();
-    } catch (_) {}
+    await _voiceNotes.delete(path);
   }
 
   String _formatSeconds(int total) {
