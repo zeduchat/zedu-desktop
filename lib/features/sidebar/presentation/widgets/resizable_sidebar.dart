@@ -33,6 +33,21 @@ class _ResizableSidebarState extends State<ResizableSidebar> {
   }
 
   @override
+  void didUpdateWidget(covariant ResizableSidebar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.minWidth != widget.minWidth ||
+        oldWidget.maxWidth != widget.maxWidth) {
+      final clamped =
+          _width.clamp(widget.minWidth, widget.maxWidth).toDouble();
+      if (clamped != _width) {
+        setState(() {
+          _width = clamped;
+        });
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return SizedBox(
       key: const ValueKey('resizable-sidebar'),
