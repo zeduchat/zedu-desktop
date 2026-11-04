@@ -53,22 +53,24 @@ class ActiveCallState {
   }
 }
 
-class ActiveCallNotifier extends ChangeNotifier {
+class ActiveCallNotifier extends Notifier<ActiveCallState> {
   static const Duration defaultRingTimeout = Duration(seconds: 30);
 
-  final Ref _ref;
-  final Duration ringTimeout;
-  ActiveCallState _state = const ActiveCallState();
+  /// How long an outgoing call rings before it is cancelled. A subclass may
+  /// override it (the tests use a short ring to keep the suite fast).
+  Duration get ringTimeout => defaultRingTimeout;
+
   StreamSubscription<Map<String, dynamic>>? _callEventsSub;
   Timer? _ringTimer;
 
-  ActiveCallNotifier(this._ref, {this.ringTimeout = defaultRingTimeout});
-
-  ActiveCallState get state => _state;
+  @override
+  ActiveCallState build() {
+    ref.onDispose(_cancelTimersAndSubscriptions);
+    return const ActiveCallState();
+  }
 
   void setFullPage(bool isFullPage) {
-    _state = _state.copyWith(isFullPage: isFullPage);
-    notifyListeners();
+    state = state.copyWith(isFullPage: isFullPage);
   }
 
   Future<void> initiateCall({
@@ -78,7 +80,7 @@ class ActiveCallNotifier extends ChangeNotifier {
     String? remoteAvatarUrl,
   }) async {
     _cancelTimersAndSubscriptions();
-    _state = ActiveCallState(
+    state = ActiveCallState(
       status: CallStatus.calling,
       channelId: channelId,
       remoteUserId: remoteUserId,
@@ -86,25 +88,23 @@ class ActiveCallNotifier extends ChangeNotifier {
       remoteAvatarUrl: remoteAvatarUrl,
       lastCallAt: DateTime.now(),
     );
-    notifyListeners();
 
     try {
-      final repo = _ref.read(buzzRepositoryProvider);
+      final repo = ref.read(buzzRepositoryProvider);
       final res = await repo.initiateDirectCall(remoteUserId);
-      if (_state.status != CallStatus.calling ||
-          _state.remoteUserId != remoteUserId) {
+      if (state.status != CallStatus.calling ||
+          state.remoteUserId != remoteUserId) {
         return;
       }
 
       final buzzId = res['buzzId'] as String?;
       final token = res['token'] as String?;
 
-      _state = _state.copyWith(buzzId: buzzId, token: token);
-      notifyListeners();
+      state = state.copyWith(buzzId: buzzId, token: token);
 
       _callEventsSub = repo.callEvents.listen(_handleCallSignal);
       _ringTimer = Timer(ringTimeout, () {
-        if (_state.status == CallStatus.calling && _state.buzzId == buzzId) {
+        if (state.status == CallStatus.calling && state.buzzId == buzzId) {
           unawaited(cancelCall());
         }
       });
@@ -145,26 +145,25 @@ class ActiveCallNotifier extends ChangeNotifier {
   }
 
   void onRemoteCallAccepted({String? buzzId, String? token}) {
-    if (_state.status != CallStatus.calling) return;
-    if (_state.buzzId != null && buzzId != null && _state.buzzId != buzzId) {
+    if (state.status != CallStatus.calling) return;
+    if (state.buzzId != null && buzzId != null && state.buzzId != buzzId) {
       return;
     }
 
     _ringTimer?.cancel();
     _ringTimer = null;
-    _state = _state.copyWith(
+    state = state.copyWith(
       status: CallStatus.active,
-      token: token ?? _state.token,
+      token: token ?? state.token,
     );
-    notifyListeners();
   }
 
   void onRemoteCallDeclined({String? buzzId}) {
-    if (_state.status != CallStatus.calling &&
-        _state.status != CallStatus.active) {
+    if (state.status != CallStatus.calling &&
+        state.status != CallStatus.active) {
       return;
     }
-    if (_state.buzzId != null && buzzId != null && _state.buzzId != buzzId) {
+    if (state.buzzId != null && buzzId != null && state.buzzId != buzzId) {
       return;
     }
 
@@ -178,12 +177,12 @@ class ActiveCallNotifier extends ChangeNotifier {
     required String channelId,
     String? remoteAvatarUrl,
   }) {
-    if (_state.status != CallStatus.none) {
-      _ref.read(buzzRepositoryProvider).respondToInvitation(buzzId, false);
+    if (state.status != CallStatus.none) {
+      ref.read(buzzRepositoryProvider).respondToInvitation(buzzId, false);
       return;
     }
 
-    _state = ActiveCallState(
+    state = ActiveCallState(
       status: CallStatus.incoming,
       buzzId: buzzId,
       channelId: channelId,
@@ -193,51 +192,46 @@ class ActiveCallNotifier extends ChangeNotifier {
       isFullPage: false,
       lastCallAt: DateTime.now(),
     );
-    notifyListeners();
   }
 
   Future<void> acceptCall() async {
-    if (_state.status != CallStatus.incoming) return;
+    if (state.status != CallStatus.incoming) return;
 
-    if (_state.buzzId != null) {
-      await _ref
+    if (state.buzzId != null) {
+      await ref
           .read(buzzRepositoryProvider)
-          .respondToInvitation(_state.buzzId!, true);
-      _state = _state.copyWith(
+          .respondToInvitation(state.buzzId!, true);
+      state = state.copyWith(
         status: CallStatus.active,
         token: 'mock-agora-token',
       );
-      notifyListeners();
     }
   }
 
   Future<void> declineCall() async {
-    if (_state.status != CallStatus.incoming) return;
+    if (state.status != CallStatus.incoming) return;
 
-    if (_state.buzzId != null) {
-      await _ref
+    if (state.buzzId != null) {
+      await ref
           .read(buzzRepositoryProvider)
-          .respondToInvitation(_state.buzzId!, false);
+          .respondToInvitation(state.buzzId!, false);
     }
     endCall();
   }
 
   Future<void> cancelCall() async {
-    if (_state.status != CallStatus.calling) return;
+    if (state.status != CallStatus.calling) return;
 
-    final String? buzzId = _state.buzzId;
+    final String? buzzId = state.buzzId;
     if (buzzId != null) {
-      await _ref
-          .read(buzzRepositoryProvider)
-          .respondToDirectCall(buzzId, false);
+      await ref.read(buzzRepositoryProvider).respondToDirectCall(buzzId, false);
     }
     endCall();
   }
 
   void endCall() {
     _cancelTimersAndSubscriptions();
-    _state = ActiveCallState(lastCallAt: _state.lastCallAt);
-    notifyListeners();
+    state = ActiveCallState(lastCallAt: state.lastCallAt);
   }
 
   void _cancelTimersAndSubscriptions() {
@@ -246,14 +240,9 @@ class ActiveCallNotifier extends ChangeNotifier {
     unawaited(_callEventsSub?.cancel());
     _callEventsSub = null;
   }
-
-  @override
-  void dispose() {
-    _cancelTimersAndSubscriptions();
-    super.dispose();
-  }
 }
 
-final activeCallProvider = ChangeNotifierProvider<ActiveCallNotifier>((ref) {
-  return ActiveCallNotifier(ref);
-});
+final activeCallProvider =
+    NotifierProvider<ActiveCallNotifier, ActiveCallState>(
+      ActiveCallNotifier.new,
+    );

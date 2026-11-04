@@ -27,6 +27,13 @@ class FakeBuzzRepository extends BuzzRepository {
   }
 }
 
+/// The ring timeout is a getter so a test subclass can shorten it without the
+/// provider needing a constructor argument.
+class _ShortRingActiveCallNotifier extends ActiveCallNotifier {
+  @override
+  Duration get ringTimeout => const Duration(milliseconds: 250);
+}
+
 void main() {
   group('ActiveCallNotifier.initiateCall (#1281)', () {
     late FakeBuzzRepository repository;
@@ -37,12 +44,7 @@ void main() {
       container = ProviderContainer(
         overrides: [
           buzzRepositoryProvider.overrideWithValue(repository),
-          activeCallProvider.overrideWith(
-            (ref) => ActiveCallNotifier(
-              ref,
-              ringTimeout: const Duration(milliseconds: 250),
-            ),
-          ),
+          activeCallProvider.overrideWith(_ShortRingActiveCallNotifier.new),
         ],
       );
       addTearDown(container.dispose);
@@ -52,19 +54,11 @@ void main() {
       'remains in calling status when no remote accept signal arrives',
       () async {
         final localContainer = ProviderContainer(
-          overrides: [
-            buzzRepositoryProvider.overrideWithValue(repository),
-            activeCallProvider.overrideWith(
-              (ref) => ActiveCallNotifier(
-                ref,
-                ringTimeout: const Duration(seconds: 30),
-              ),
-            ),
-          ],
+          overrides: [buzzRepositoryProvider.overrideWithValue(repository)],
         );
         addTearDown(localContainer.dispose);
 
-        final notifier = localContainer.read(activeCallProvider);
+        final notifier = localContainer.read(activeCallProvider.notifier);
         await notifier.initiateCall(
           remoteUserId: 'user-2',
           remoteUserName: 'Bob',
@@ -82,7 +76,7 @@ void main() {
     test(
       'transitions to active only on matching buzzId accept signal',
       () async {
-        final notifier = container.read(activeCallProvider);
+        final notifier = container.read(activeCallProvider.notifier);
         await notifier.initiateCall(
           remoteUserId: 'user-2',
           remoteUserName: 'Bob',
@@ -113,7 +107,7 @@ void main() {
     test(
       'ends the call when the remote user declines or ring timeout elapses',
       () async {
-        final notifier = container.read(activeCallProvider);
+        final notifier = container.read(activeCallProvider.notifier);
         await notifier.initiateCall(
           remoteUserId: 'user-2',
           remoteUserName: 'Bob',

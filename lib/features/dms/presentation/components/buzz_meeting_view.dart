@@ -18,12 +18,12 @@ class _BuzzMeetingViewState extends ConsumerState<BuzzMeetingView> {
     final colors = context.colors;
     final activeCall = ref.watch(activeCallProvider);
 
-    if (activeCall.state.status != CallStatus.active) {
+    if (activeCall.status != CallStatus.active) {
       return const SizedBox.shrink();
     }
 
-    final bool isFullPage = activeCall.state.isFullPage;
-    final remoteName = activeCall.state.remoteUserName ?? 'Unknown';
+    final bool isFullPage = activeCall.isFullPage;
+    final remoteName = activeCall.remoteUserName ?? 'Unknown';
 
     if (!isFullPage) {
       return Positioned(
@@ -109,7 +109,7 @@ class _BuzzMeetingViewState extends ConsumerState<BuzzMeetingView> {
                         child: _buildVideoFeed(
                           Colors.grey.shade800,
                           remoteName,
-                          activeCall.state.remoteAvatarUrl,
+                          activeCall.remoteAvatarUrl,
                           80,
                         ),
                       ),
@@ -227,7 +227,7 @@ class _BuzzMeetingViewState extends ConsumerState<BuzzMeetingView> {
                     child: _buildVideoFeed(
                       const Color(0xFF4A2B1D),
                       remoteName,
-                      activeCall.state.remoteAvatarUrl,
+                      activeCall.remoteAvatarUrl,
                       double.infinity,
                     ),
                   ),

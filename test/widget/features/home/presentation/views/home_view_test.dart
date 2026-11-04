@@ -80,10 +80,12 @@ void main() {
               _EmptyChannelRepository(),
             ),
             dmDraftStoreProvider.overrideWith(
-              (ref) => DmDraftStore(
-                FakeSecureStorageService(),
-                userId: 'user-1',
-                orgId: 'org-1',
+              () => DmDraftNotifier(
+                DmDraftStore(
+                  FakeSecureStorageService(),
+                  userId: 'user-1',
+                  orgId: 'org-1',
+                ),
               ),
             ),
           ],

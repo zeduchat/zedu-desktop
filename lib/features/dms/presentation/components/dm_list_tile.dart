@@ -44,7 +44,7 @@ class DmListTile extends ConsumerWidget {
     if (draftEntry == null && !draftStore.hasLoaded(conversation.channelId)) {
       scheduleMicrotask(() {
         if (context.mounted) {
-          ref.read(dmDraftStoreProvider).load(conversation.channelId);
+          ref.read(dmDraftStoreProvider.notifier).load(conversation.channelId);
         }
       });
     }

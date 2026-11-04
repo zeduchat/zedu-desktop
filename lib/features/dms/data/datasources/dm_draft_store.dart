@@ -24,7 +24,7 @@ class DraftEntry {
   );
 }
 
-class DmDraftStore extends ChangeNotifier {
+class DmDraftStore {
   final SecureStorageService _storage;
 
   /// Storage key prefix scoped to the signed-in user and org, so a DM's draft
@@ -39,22 +39,8 @@ class DmDraftStore extends ChangeNotifier {
   /// Channel ids already read from storage at least once.
   final Set<String> _loaded = {};
 
-  bool _disposed = false;
-
   DmDraftStore(this._storage, {required String userId, required String orgId})
     : _keyPrefix = 'dm_draft_${userId}_${orgId}_';
-
-  @override
-  void dispose() {
-    _disposed = true;
-    super.dispose();
-  }
-
-  /// A composer may still flush into a store the provider has replaced (user
-  /// or org changed), so notifying after dispose must be a no-op.
-  void _notify() {
-    if (!_disposed) notifyListeners();
-  }
 
   /// Cached entry without triggering any IO. Null means "no draft" — either
   /// known-absent or not-yet-loaded (check [hasLoaded]).
@@ -82,7 +68,6 @@ class DmDraftStore extends ChangeNotifier {
       }
     }
     _cache[channelId] = entry;
-    _notify();
     return entry;
   }
 
@@ -98,7 +83,6 @@ class DmDraftStore extends ChangeNotifier {
       updatedAt: updatedAt ?? DateTime.now().millisecondsSinceEpoch,
     );
     _cache[channelId] = entry;
-    _notify();
     try {
       await _storage.writeData(
         '$_keyPrefix$channelId',
@@ -111,22 +95,75 @@ class DmDraftStore extends ChangeNotifier {
 
   Future<void> clear(String channelId) async {
     _cache[channelId] = null;
-    _notify();
     try {
       await _storage.deleteValue('$_keyPrefix$channelId');
     } catch (_) {}
   }
 }
 
-final dmDraftStoreProvider = ChangeNotifierProvider<DmDraftStore>((ref) {
-  // Rebuilding on a user or org change also drops the previous in-memory cache.
-  final userId = ref.watch(
-    authNotifierProvider.select((state) => state.user?.id ?? ''),
-  );
-  final orgId = ref.watch(currentOrgIdProvider);
-  return DmDraftStore(
-    locator<SecureStorageService>(),
-    userId: userId,
-    orgId: orgId,
-  );
-});
+/// Immutable snapshot handed to widgets. It exposes the cache read helpers and
+/// is replaced after every write so `ref.watch` rebuilds the draft indicators.
+class DmDraftState {
+  const DmDraftState(this.store);
+
+  final DmDraftStore store;
+
+  /// Cached entry without triggering any IO. Null means "no draft" — either
+  /// known-absent or not-yet-loaded (check [hasLoaded]).
+  DraftEntry? peek(String channelId) => store.peek(channelId);
+
+  /// True when this conversation's storage has been read at least once.
+  bool hasLoaded(String channelId) => store.hasLoaded(channelId);
+}
+
+class DmDraftNotifier extends Notifier<DmDraftState> {
+  /// [store] is only passed by tests, which inject a fake-backed store.
+  DmDraftNotifier([DmDraftStore? store]) : _injectedStore = store;
+
+  final DmDraftStore? _injectedStore;
+
+  late DmDraftStore _store;
+
+  @override
+  DmDraftState build() {
+    final injected = _injectedStore;
+    if (injected != null) {
+      _store = injected;
+      return DmDraftState(_store);
+    }
+    // Rebuilding on a user or org change also drops the previous in-memory
+    // cache, because a fresh store is created for the new scope.
+    final userId = ref.watch(
+      authNotifierProvider.select((state) => state.user?.id ?? ''),
+    );
+    final orgId = ref.watch(currentOrgIdProvider);
+    _store = DmDraftStore(
+      locator<SecureStorageService>(),
+      userId: userId,
+      orgId: orgId,
+    );
+    return DmDraftState(_store);
+  }
+
+  Future<DraftEntry?> load(String channelId) async {
+    final entry = await _store.load(channelId);
+    _publish();
+    return entry;
+  }
+
+  Future<void> save(String channelId, String text, {int? updatedAt}) async {
+    await _store.save(channelId, text, updatedAt: updatedAt);
+    _publish();
+  }
+
+  Future<void> clear(String channelId) async {
+    await _store.clear(channelId);
+    _publish();
+  }
+
+  void _publish() => state = DmDraftState(_store);
+}
+
+final dmDraftStoreProvider = NotifierProvider<DmDraftNotifier, DmDraftState>(
+  DmDraftNotifier.new,
+);

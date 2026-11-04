@@ -18,7 +18,7 @@ Widget buildComposerUnderTest() {
     overrides: [
       authNotifierProvider.overrideWith(FakeAuthNotifier.new),
       dmDraftStoreProvider.overrideWith(
-        (ref) => DmDraftStore(storage, userId: 'u', orgId: 'o'),
+        () => DmDraftNotifier(DmDraftStore(storage, userId: 'u', orgId: 'o')),
       ),
     ],
     child: buildTestMaterialApp(

@@ -118,7 +118,7 @@ class _DmChatAreaState extends ConsumerState<DmChatArea> {
         );
         if (confirmed && mounted) {
           ref
-              .read(chatHistoryProvider(conversation.channelId))
+              .read(chatHistoryProvider(conversation.channelId).notifier)
               .clearLocalHistory();
           _showActionNotice('Loaded history cleared locally.');
         }
@@ -293,7 +293,7 @@ class _DmChatAreaState extends ConsumerState<DmChatArea> {
                                 .read(
                                   chatHistoryProvider(
                                     widget.conversation.channelId,
-                                  ),
+                                  ).notifier,
                                 )
                                 .loadMore();
                           }
@@ -364,8 +364,8 @@ class _DmChatAreaState extends ConsumerState<DmChatArea> {
             Consumer(
               builder: (context, ref, child) {
                 final activeCall = ref.watch(activeCallProvider);
-                if (activeCall.state.status == CallStatus.active &&
-                    activeCall.state.isFullPage) {
+                if (activeCall.status == CallStatus.active &&
+                    activeCall.isFullPage) {
                   return const Positioned.fill(child: BuzzMeetingView());
                 }
                 return const SizedBox.shrink();
@@ -376,8 +376,8 @@ class _DmChatAreaState extends ConsumerState<DmChatArea> {
             Consumer(
               builder: (context, ref, child) {
                 final activeCall = ref.watch(activeCallProvider);
-                if (activeCall.state.status == CallStatus.active &&
-                    !activeCall.state.isFullPage) {
+                if (activeCall.status == CallStatus.active &&
+                    !activeCall.isFullPage) {
                   return const BuzzMeetingView();
                 }
                 return const SizedBox.shrink();
@@ -391,7 +391,7 @@ class _DmChatAreaState extends ConsumerState<DmChatArea> {
             Consumer(
               builder: (context, ref, child) {
                 final activeCall = ref.watch(activeCallProvider);
-                if (activeCall.state.status == CallStatus.calling) {
+                if (activeCall.status == CallStatus.calling) {
                   return Positioned(
                     top: 24,
                     right: 24,
@@ -431,8 +431,7 @@ class _DmChatAreaState extends ConsumerState<DmChatArea> {
                                     ),
                                   ),
                                   Text(
-                                    activeCall.state.remoteUserName ??
-                                        'Unknown',
+                                    activeCall.remoteUserName ?? 'Unknown',
                                     style: TextStyle(
                                       color: colors.textPrimary,
                                       fontWeight: FontWeight.bold,
@@ -914,15 +913,17 @@ class _MessageBubble extends ConsumerWidget {
       ),
     );
     if (confirmed == true) {
-      await ref.read(chatHistoryProvider(channelId)).deleteMessage(messageId);
+      await ref
+          .read(chatHistoryProvider(channelId).notifier)
+          .deleteMessage(messageId);
     }
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final colors = context.colors;
-    final history = ref.watch(chatHistoryProvider(channelId));
-    final isMe = history.isMyMessage(message);
+    final historyNotifier = ref.watch(chatHistoryProvider(channelId).notifier);
+    final isMe = historyNotifier.isMyMessage(message);
     final rawContent = message['content'] as String? ?? '';
     // A voice note or file sent without text carries an empty paragraph
     // (`<p></p>`). Show no text bubble for it instead of the literal tags.
@@ -943,11 +944,11 @@ class _MessageBubble extends ConsumerWidget {
     final timeString = '$hour:$minute $period';
 
     final senderName = isMe
-        ? history.currentUserName
+        ? historyNotifier.currentUserName
         : conversation.displayName;
 
     final senderAvatarUrl = isMe
-        ? history.currentUserAvatarUrl
+        ? historyNotifier.currentUserAvatarUrl
         : conversation.effectiveAvatarUrl;
 
     final senderInitial = senderName.isNotEmpty
@@ -1062,7 +1063,7 @@ class _MessageBubble extends ConsumerWidget {
                         ? GestureDetector(
                             onTap: () {
                               ref
-                                  .read(chatHistoryProvider(channelId))
+                                  .read(chatHistoryProvider(channelId).notifier)
                                   .retryMessage(messageId);
                             },
                             child: Row(

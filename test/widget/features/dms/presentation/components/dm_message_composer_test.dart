@@ -22,10 +22,12 @@ Future<TextField> pumpComposer(WidgetTester tester) async {
     ProviderScope(
       overrides: [
         dmDraftStoreProvider.overrideWith(
-          (ref) => DmDraftStore(
-            FakeSecureStorageService(),
-            userId: 'user-1',
-            orgId: 'org-1',
+          () => DmDraftNotifier(
+            DmDraftStore(
+              FakeSecureStorageService(),
+              userId: 'user-1',
+              orgId: 'org-1',
+            ),
           ),
         ),
       ],
@@ -73,10 +75,12 @@ Widget buildComposerUnderTest() {
   return ProviderScope(
     overrides: [
       dmDraftStoreProvider.overrideWith(
-        (ref) => DmDraftStore(
-          FakeSecureStorageService(),
-          userId: 'user-1',
-          orgId: 'org-1',
+        () => DmDraftNotifier(
+          DmDraftStore(
+            FakeSecureStorageService(),
+            userId: 'user-1',
+            orgId: 'org-1',
+          ),
         ),
       ),
     ],

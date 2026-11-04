@@ -3,7 +3,14 @@ import 'package:zedu/features/features.dart';
 
 import '../../../../../helpers/helpers.dart';
 
-class MockChatHistory extends Mock implements ChatHistoryNotifier {}
+class FakeChatHistory extends ChatHistoryNotifier {
+  FakeChatHistory(this._state) : super('chat-1');
+
+  final ChatHistoryState _state;
+
+  @override
+  ChatHistoryState build() => _state;
+}
 
 class MockDraftStore extends Mock implements DmDraftStore {}
 
@@ -36,10 +43,9 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
-    final history = MockChatHistory();
-    when(() => history.messages).thenReturn([]);
-    when(() => history.isLoading).thenReturn(false);
-    when(() => history.hasMore).thenReturn(false);
+    final history = FakeChatHistory(
+      const ChatHistoryState(messages: [], isLoading: false, hasMore: false),
+    );
     final drafts = MockDraftStore();
     when(() => drafts.load(any())).thenAnswer((_) async => null);
 
@@ -47,8 +53,8 @@ void main() {
       ProviderScope(
         overrides: [
           authNotifierProvider.overrideWith(_FakeAuthNotifier.new),
-          chatHistoryProvider('chat-1').overrideWith((ref) => history),
-          dmDraftStoreProvider.overrideWith((ref) => drafts),
+          chatHistoryProvider('chat-1').overrideWith(() => history),
+          dmDraftStoreProvider.overrideWith(() => DmDraftNotifier(drafts)),
         ],
         child: buildTestMaterialApp(
           Scaffold(

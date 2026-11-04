@@ -9,7 +9,7 @@ class IncomingCallModal extends ConsumerWidget {
     final activeCall = ref.watch(activeCallProvider);
 
     // Only show if incoming
-    if (activeCall.state.status != CallStatus.incoming) {
+    if (activeCall.status != CallStatus.incoming) {
       return const SizedBox.shrink();
     }
 
@@ -46,18 +46,17 @@ class IncomingCallModal extends ConsumerWidget {
                     radius: 20,
                     backgroundColor: colors.primary,
                     backgroundImage:
-                        activeCall.state.remoteAvatarUrl != null &&
-                            activeCall.state.remoteAvatarUrl!.isNotEmpty
-                        ? NetworkImage(activeCall.state.remoteAvatarUrl!)
+                        activeCall.remoteAvatarUrl != null &&
+                            activeCall.remoteAvatarUrl!.isNotEmpty
+                        ? NetworkImage(activeCall.remoteAvatarUrl!)
                         : null,
                     child:
-                        activeCall.state.remoteAvatarUrl == null ||
-                            activeCall.state.remoteAvatarUrl!.isEmpty
+                        activeCall.remoteAvatarUrl == null ||
+                            activeCall.remoteAvatarUrl!.isEmpty
                         ? Text(
-                            activeCall.state.remoteUserName != null &&
-                                    activeCall.state.remoteUserName!.isNotEmpty
-                                ? activeCall.state.remoteUserName![0]
-                                      .toUpperCase()
+                            activeCall.remoteUserName != null &&
+                                    activeCall.remoteUserName!.isNotEmpty
+                                ? activeCall.remoteUserName![0].toUpperCase()
                                 : '?',
                             style: const TextStyle(
                               color: Colors.white,
@@ -79,7 +78,7 @@ class IncomingCallModal extends ConsumerWidget {
                           ),
                         ),
                         Text(
-                          activeCall.state.remoteUserName ?? 'Unknown User',
+                          activeCall.remoteUserName ?? 'Unknown User',
                           style: TextStyle(
                             color: colors.textPrimary,
                             fontWeight: FontWeight.bold,

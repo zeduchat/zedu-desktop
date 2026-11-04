@@ -3,7 +3,7 @@ import 'package:zedu/features/features.dart';
 import '../../../../../helpers/helpers.dart';
 
 class FakeActiveCallNotifier extends ActiveCallNotifier {
-  FakeActiveCallNotifier(super.ref, {required bool isFullPage})
+  FakeActiveCallNotifier({required bool isFullPage})
     : _fakeState = ActiveCallState(
         status: CallStatus.active,
         remoteUserName: 'Ruby',
@@ -13,14 +13,14 @@ class FakeActiveCallNotifier extends ActiveCallNotifier {
   final ActiveCallState _fakeState;
 
   @override
-  ActiveCallState get state => _fakeState;
+  ActiveCallState build() => _fakeState;
 }
 
 Widget buildBuzzMeetingViewUnderTest({required bool isFullPage}) {
   return ProviderScope(
     overrides: [
       activeCallProvider.overrideWith(
-        (ref) => FakeActiveCallNotifier(ref, isFullPage: isFullPage),
+        () => FakeActiveCallNotifier(isFullPage: isFullPage),
       ),
     ],
     // The compact view is a Positioned, so it needs a Stack ancestor.

@@ -78,7 +78,7 @@ class DmMessageComposerState extends ConsumerState<DmMessageComposer> {
   @override
   void initState() {
     super.initState();
-    _drafts = ref.read(dmDraftStoreProvider);
+    _drafts = ref.read(dmDraftStoreProvider).store;
     _controller = RichTextController();
     _controller.addListener(_onTextChanged);
     _draftChannelId = widget.channelId;
@@ -103,7 +103,7 @@ class DmMessageComposerState extends ConsumerState<DmMessageComposer> {
       // notify providers, so they're deferred until the build has finished.
       if (wasEditing) {
         final previousHistory = ref.read(
-          chatHistoryProvider(oldWidget.channelId),
+          chatHistoryProvider(oldWidget.channelId).notifier,
         );
         Future.microtask(previousHistory.cancelEditing);
       } else {
@@ -112,7 +112,7 @@ class DmMessageComposerState extends ConsumerState<DmMessageComposer> {
           () => previousDrafts.save(previousChannel, previousText),
         );
       }
-      _drafts = ref.read(dmDraftStoreProvider);
+      _drafts = ref.read(dmDraftStoreProvider).store;
       _draftChannelId = widget.channelId;
       _channelDeleted = false;
 
@@ -270,12 +270,12 @@ class DmMessageComposerState extends ConsumerState<DmMessageComposer> {
 
     if (isEdit) {
       ref
-          .read(chatHistoryProvider(widget.channelId))
+          .read(chatHistoryProvider(widget.channelId).notifier)
           .saveEdit(_editingMessageId!, text);
       _exitEditMode();
     } else {
       ref
-          .read(chatHistoryProvider(widget.channelId))
+          .read(chatHistoryProvider(widget.channelId).notifier)
           .sendMessage(
             text,
             media: [..._pendingFiles, ?_voiceNote],
@@ -314,7 +314,9 @@ class DmMessageComposerState extends ConsumerState<DmMessageComposer> {
       _controller.selection = TextSelection.collapsed(offset: content.length);
     });
     _focusNode.requestFocus();
-    ref.read(chatHistoryProvider(widget.channelId)).startEditing(messageId);
+    ref
+        .read(chatHistoryProvider(widget.channelId).notifier)
+        .startEditing(messageId);
   }
 
   void _exitEditMode() {
@@ -323,7 +325,7 @@ class DmMessageComposerState extends ConsumerState<DmMessageComposer> {
       _editingMessageId = null;
     });
     _controller.clear();
-    ref.read(chatHistoryProvider(widget.channelId)).cancelEditing();
+    ref.read(chatHistoryProvider(widget.channelId).notifier).cancelEditing();
   }
 
   KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
@@ -383,7 +385,7 @@ class DmMessageComposerState extends ConsumerState<DmMessageComposer> {
     }
 
     if (key == LogicalKeyboardKey.arrowUp && _controller.text.isEmpty) {
-      final history = ref.read(chatHistoryProvider(widget.channelId));
+      final history = ref.read(chatHistoryProvider(widget.channelId).notifier);
       final lastId = history.lastSentMessageId;
       final lastContent = history.lastSentMessageContent;
       if (lastId != null && lastContent != null) {
@@ -811,7 +813,7 @@ class DmMessageComposerState extends ConsumerState<DmMessageComposer> {
   Widget build(BuildContext context) {
     final colors = context.colors;
     // A user or org change replaces the store; follow it.
-    ref.listen(dmDraftStoreProvider, (_, next) => _drafts = next);
+    ref.listen(dmDraftStoreProvider, (_, next) => _drafts = next.store);
     ref.listen(
       dmConversationActionsProvider.select(
         (actions) => actions.deletedIds.contains(widget.channelId),

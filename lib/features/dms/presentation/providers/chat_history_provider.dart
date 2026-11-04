@@ -3,27 +3,89 @@ import 'dart:io' show File;
 import 'package:zedu/core/core.dart';
 import 'package:zedu/features/features.dart';
 
-class ChatHistoryNotifier extends ChangeNotifier {
-  final String channelId;
-  final Ref ref;
+/// Everything one conversation's chat area renders from.
+///
+/// It is immutable: the notifier replaces it on every change, and that is what
+/// rebuilds the widgets watching the family provider.
+class ChatHistoryState {
+  const ChatHistoryState({
+    this.messages = const [],
+    this.isLoading = true,
+    this.hasMore = true,
+    this.page = 1,
+    this.editingMessageId,
+  });
 
-  List<Map<String, dynamic>> messages = [];
-  bool isLoading = true;
-  bool hasMore = true;
-  int page = 1;
+  final List<Map<String, dynamic>> messages;
+  final bool isLoading;
+  final bool hasMore;
+  final int page;
+  final String? editingMessageId;
+
+  ChatHistoryState copyWith({
+    List<Map<String, dynamic>>? messages,
+    bool? isLoading,
+    bool? hasMore,
+    int? page,
+    String? editingMessageId,
+    bool clearEditingMessageId = false,
+  }) {
+    return ChatHistoryState(
+      messages: messages ?? this.messages,
+      isLoading: isLoading ?? this.isLoading,
+      hasMore: hasMore ?? this.hasMore,
+      page: page ?? this.page,
+      editingMessageId: clearEditingMessageId
+          ? null
+          : (editingMessageId ?? this.editingMessageId),
+    );
+  }
+}
+
+class ChatHistoryNotifier extends Notifier<ChatHistoryState> {
+  ChatHistoryNotifier(this.channelId);
+
+  final String channelId;
+
+  /// Set of message IDs we have already seen. Used to detect truly-new messages
+  /// so we don't re-fire a notification on every poll cycle.
+  final Set<String> _seenIds = {};
+
+  /// Keep track of the polling timer so we can cancel it on dispose.
+  // ignore: cancel_subscriptions
+  dynamic _pollingTimer;
+
   bool _isHistoryClearedLocally = false;
 
-  String? editingMessageId;
   final Map<String, Future<void>> _saveEditChains = {};
 
-  ChatHistoryNotifier(this.channelId, this.ref) {
-    _loadInitial();
+  /// What each message was sent with, so a retry sends it the same way.
+  final Map<String, ({List<XFile>? media, bool isChannel})> _sendOptions = {};
+
+  /// Ids of messages being deleted or already deleted, so polling and paging
+  /// do not bring them back.
+  final Set<String> _deletedIds = {};
+
+  @override
+  ChatHistoryState build() {
+    ref.onDispose(_dispose);
+    Future<void>.microtask(_loadInitial);
+    return const ChatHistoryState();
   }
 
-  String get _currentUserId {
-    final authState = ref.read(authNotifierProvider);
-    return authState.user?.id ?? '';
+  void _dispose() {
+    _pollingTimer?.cancel();
+    // Recordings kept for messages that never sent are no longer needed.
+    for (final options in _sendOptions.values) {
+      _deleteRecordings(options.media);
+    }
+    _sendOptions.clear();
   }
+
+  /// Publishes the new immutable state.
+  void _set(ChatHistoryState next) => state = next;
+
+  String get _currentUserId => ref.read(authNotifierProvider).user?.id ?? '';
 
   String get currentUserName {
     final user = ref.read(authNotifierProvider).user;
@@ -44,7 +106,7 @@ class ChatHistoryNotifier extends ChangeNotifier {
   }
 
   String? get lastSentMessageContent {
-    for (final msg in messages) {
+    for (final msg in state.messages) {
       if (isMyMessage(msg) && msg['status'] != 'failed') {
         return msg['content'] as String?;
       }
@@ -53,7 +115,7 @@ class ChatHistoryNotifier extends ChangeNotifier {
   }
 
   String? get lastSentMessageId {
-    for (final msg in messages) {
+    for (final msg in state.messages) {
       if (isMyMessage(msg) && msg['status'] != 'failed') {
         return msg['id'] as String?;
       }
@@ -64,32 +126,28 @@ class ChatHistoryNotifier extends ChangeNotifier {
   Future<void> _loadInitial() async {
     try {
       final repository = ref.read(dmRepositoryProvider);
-      messages = await repository.getMessages(channelId, page: 1);
-      hasMore = messages.length >= DmRepository.pageSize;
-      page = 1;
+      final loaded = await repository.getMessages(channelId, page: 1);
+      _set(
+        state.copyWith(
+          messages: loaded,
+          hasMore: loaded.length >= DmRepository.pageSize,
+          page: 1,
+        ),
+      );
     } catch (_) {
     } finally {
-      isLoading = false;
-      notifyListeners();
+      _set(state.copyWith(isLoading: false));
     }
     // Start polling for new messages now that the initial load is done.
     _startPolling();
   }
 
-  // ── Realtime notification polling ────────────────────────────────────────────
-
-  /// Set of message IDs we have already seen. Used to detect truly-new messages
-  /// so we don't re-fire a notification on every poll cycle.
-  final Set<String> _seenIds = {};
-
-  /// Keep track of the polling timer so we can cancel it on dispose.
-  // ignore: cancel_subscriptions
-  dynamic _pollingTimer;
+  // ── Realtime notification polling ──────────────────────────────────────────
 
   void _startPolling() {
     // Record all initially-loaded IDs as "already seen" so we only notify
     // about messages that arrive AFTER the initial load.
-    for (final m in messages) {
+    for (final m in state.messages) {
       final id = m['id']?.toString();
       if (id != null) _seenIds.add(id);
     }
@@ -127,7 +185,9 @@ class ChatHistoryNotifier extends ChangeNotifier {
 
       if (hadNew) {
         // Prepend only the genuinely new messages at the top.
-        final existingIds = messages.map((m) => m['id']?.toString()).toSet();
+        final existingIds = state.messages
+            .map((m) => m['id']?.toString())
+            .toSet();
         final newOnly = fresh
             .where(
               (m) =>
@@ -135,8 +195,7 @@ class ChatHistoryNotifier extends ChangeNotifier {
             )
             .toList();
         if (newOnly.isNotEmpty) {
-          messages = [...newOnly, ...messages];
-          notifyListeners();
+          _set(state.copyWith(messages: [...newOnly, ...state.messages]));
         }
       }
     } catch (_) {
@@ -144,43 +203,34 @@ class ChatHistoryNotifier extends ChangeNotifier {
     }
   }
 
-  @override
-  void dispose() {
-    (_pollingTimer as dynamic)?.cancel();
-    // Recordings kept for messages that never sent are no longer needed.
-    for (final options in _sendOptions.values) {
-      _deleteRecordings(options.media);
-    }
-    _sendOptions.clear();
-    super.dispose();
-  }
-
   Future<void> loadMore() async {
-    if (isLoading || !hasMore) return;
+    if (state.isLoading || !state.hasMore) return;
 
-    isLoading = true;
-    notifyListeners();
+    _set(state.copyWith(isLoading: true));
 
     try {
       final repository = ref.read(dmRepositoryProvider);
-      final nextPage = page + 1;
+      final nextPage = state.page + 1;
       final newMessages = await repository.getMessages(
         channelId,
         page: nextPage,
       );
 
-      messages = [...messages, ...newMessages.where((m) => !_isDeleted(m))];
-      hasMore = newMessages.length >= DmRepository.pageSize;
-      page = nextPage;
+      _set(
+        state.copyWith(
+          messages: [
+            ...state.messages,
+            ...newMessages.where((m) => !_isDeleted(m)),
+          ],
+          hasMore: newMessages.length >= DmRepository.pageSize,
+          page: nextPage,
+        ),
+      );
     } catch (_) {
     } finally {
-      isLoading = false;
-      notifyListeners();
+      _set(state.copyWith(isLoading: false));
     }
   }
-
-  // What each message was sent with, so a retry sends it the same way.
-  final Map<String, ({List<XFile>? media, bool isChannel})> _sendOptions = {};
 
   /// Deletes voice recordings this app made once their message is sent. Files
   /// the user picked are never deleted.
@@ -202,12 +252,13 @@ class ChatHistoryNotifier extends ChangeNotifier {
   }) async {
     _isHistoryClearedLocally = false;
     final tempId = DateTime.now().millisecondsSinceEpoch.toString();
+    final currentUserId = _currentUserId;
     final optimisticMessage = {
       "id": tempId,
       "content": content,
       "channel_id": channelId,
-      "user_id": _currentUserId,
-      "userId": _currentUserId,
+      "user_id": currentUserId,
+      "userId": currentUserId,
       "type": "user",
       "created_at": DateTime.now().toIso8601String(),
       "status": "sending",
@@ -219,8 +270,7 @@ class ChatHistoryNotifier extends ChangeNotifier {
     };
 
     _sendOptions[tempId] = (media: media, isChannel: isChannel);
-    messages = [optimisticMessage, ...messages];
-    notifyListeners();
+    _set(state.copyWith(messages: [optimisticMessage, ...state.messages]));
 
     try {
       final repository = ref.read(dmRepositoryProvider);
@@ -234,40 +284,46 @@ class ChatHistoryNotifier extends ChangeNotifier {
       _sendOptions.remove(tempId);
       _deleteRecordings(media);
 
-      messages = messages.map((m) {
-        if (m['id'] == tempId) {
-          final newMsg = Map<String, dynamic>.from(m);
-          newMsg.remove('status');
-          newMsg['thread_id'] = threadId;
-          return newMsg;
-        }
-        return m;
-      }).toList();
+      _set(
+        state.copyWith(
+          messages: state.messages.map((m) {
+            if (m['id'] == tempId) {
+              final newMsg = Map<String, dynamic>.from(m);
+              newMsg.remove('status');
+              newMsg['thread_id'] = threadId;
+              return newMsg;
+            }
+            return m;
+          }).toList(),
+        ),
+      );
     } catch (_) {
-      messages = messages.map((m) {
-        if (m['id'] == tempId) {
-          final newMsg = Map<String, dynamic>.from(m);
-          newMsg['status'] = 'failed';
-          return newMsg;
-        }
-        return m;
-      }).toList();
-    } finally {
-      notifyListeners();
+      _set(
+        state.copyWith(
+          messages: state.messages.map((m) {
+            if (m['id'] == tempId) {
+              final newMsg = Map<String, dynamic>.from(m);
+              newMsg['status'] = 'failed';
+              return newMsg;
+            }
+            return m;
+          }).toList(),
+        ),
+      );
     }
   }
 
   Future<void> retryMessage(String messageId) async {
-    final idx = messages.indexWhere((m) => m['id'] == messageId);
+    final idx = state.messages.indexWhere((m) => m['id'] == messageId);
     if (idx == -1) return;
 
-    final failedMsg = Map<String, dynamic>.from(messages[idx]);
+    final failedMsg = Map<String, dynamic>.from(state.messages[idx]);
     final content = failedMsg['content'] as String? ?? '';
 
     failedMsg['status'] = 'sending';
-    messages = List<Map<String, dynamic>>.from(messages);
-    messages[idx] = failedMsg;
-    notifyListeners();
+    final sending = List<Map<String, dynamic>>.from(state.messages);
+    sending[idx] = failedMsg;
+    _set(state.copyWith(messages: sending));
 
     try {
       final repository = ref.read(dmRepositoryProvider);
@@ -282,80 +338,83 @@ class ChatHistoryNotifier extends ChangeNotifier {
       _sendOptions.remove(messageId);
       _deleteRecordings(options?.media);
 
-      messages = messages.map((m) {
-        if (m['id'] == messageId) {
-          final newMsg = Map<String, dynamic>.from(m);
-          newMsg.remove('status');
-          newMsg['thread_id'] = threadId;
-          return newMsg;
-        }
-        return m;
-      }).toList();
+      _set(
+        state.copyWith(
+          messages: state.messages.map((m) {
+            if (m['id'] == messageId) {
+              final newMsg = Map<String, dynamic>.from(m);
+              newMsg.remove('status');
+              newMsg['thread_id'] = threadId;
+              return newMsg;
+            }
+            return m;
+          }).toList(),
+        ),
+      );
     } catch (_) {
-      messages = messages.map((m) {
-        if (m['id'] == messageId) {
-          final newMsg = Map<String, dynamic>.from(m);
-          newMsg['status'] = 'failed';
-          return newMsg;
-        }
-        return m;
-      }).toList();
-    } finally {
-      notifyListeners();
+      _set(
+        state.copyWith(
+          messages: state.messages.map((m) {
+            if (m['id'] == messageId) {
+              final newMsg = Map<String, dynamic>.from(m);
+              newMsg['status'] = 'failed';
+              return newMsg;
+            }
+            return m;
+          }).toList(),
+        ),
+      );
     }
   }
 
   void clearLocalHistory() {
     _isHistoryClearedLocally = true;
-    messages = [];
-    hasMore = false;
-    page = 1;
-    notifyListeners();
+    _set(state.copyWith(messages: const [], hasMore: false, page: 1));
   }
 
   void startEditing(String messageId) {
-    final msg = messages.firstWhere(
+    final msg = state.messages.firstWhere(
       (m) => m['id'] == messageId,
       orElse: () => <String, dynamic>{},
     );
     if (msg.isEmpty) return;
 
-    editingMessageId = messageId;
-    notifyListeners();
+    _set(state.copyWith(editingMessageId: messageId));
   }
 
   void cancelEditing() {
-    editingMessageId = null;
-    notifyListeners();
+    _set(state.copyWith(clearEditingMessageId: true));
   }
-
-  /// Ids of messages being deleted or already deleted, so polling and paging
-  /// do not bring them back.
-  final Set<String> _deletedIds = {};
 
   bool _isDeleted(Map<String, dynamic> message) =>
       _deletedIds.contains(message['id']?.toString());
 
   /// Removes the message right away and puts it back if the request fails.
   Future<void> deleteMessage(String messageId) async {
-    final index = messages.indexWhere((m) => m['id'] == messageId);
+    final index = state.messages.indexWhere((m) => m['id'] == messageId);
     if (index == -1) return;
 
-    final removed = messages[index];
+    final removed = state.messages[index];
     final threadId = (removed['thread_id'] ?? removed['id']).toString();
-    if (editingMessageId == messageId) editingMessageId = null;
     _deletedIds.add(messageId);
-    messages = [...messages]..removeAt(index);
-    notifyListeners();
+    _set(
+      state.copyWith(
+        messages: [...state.messages]..removeAt(index),
+        clearEditingMessageId: state.editingMessageId == messageId,
+      ),
+    );
 
     try {
       final repository = ref.read(dmRepositoryProvider);
       await repository.deleteMessage(threadId: threadId, channelId: channelId);
     } catch (_) {
       _deletedIds.remove(messageId);
-      messages = [...messages]
-        ..insert(index.clamp(0, messages.length), removed);
-      notifyListeners();
+      _set(
+        state.copyWith(
+          messages: [...state.messages]
+            ..insert(index.clamp(0, state.messages.length), removed),
+        ),
+      );
     }
   }
 
@@ -373,43 +432,47 @@ class ChatHistoryNotifier extends ChangeNotifier {
     }
 
     final baselineContent =
-        messages.firstWhere(
+        state.messages.firstWhere(
               (m) => m['id'] == messageId,
               orElse: () => <String, dynamic>{},
             )['content']
             as String?;
 
-    messages = messages.map((m) {
-      if (m['id'] == messageId) {
-        final updated = Map<String, dynamic>.from(m);
-        updated['content'] = newContent;
-        return updated;
-      }
-      return m;
-    }).toList();
-    if (editingMessageId == messageId) {
-      editingMessageId = null;
-    }
-    notifyListeners();
+    _set(
+      state.copyWith(
+        messages: state.messages.map((m) {
+          if (m['id'] == messageId) {
+            final updated = Map<String, dynamic>.from(m);
+            updated['content'] = newContent;
+            return updated;
+          }
+          return m;
+        }).toList(),
+        clearEditingMessageId: state.editingMessageId == messageId,
+      ),
+    );
 
     try {
       final repository = ref.read(dmRepositoryProvider);
       await repository.editMessage(channelId, content: newContent);
     } catch (_) {
-      messages = messages.map((m) {
-        if (m['id'] == messageId && m['content'] == newContent) {
-          final reverted = Map<String, dynamic>.from(m);
-          reverted['content'] = baselineContent;
-          return reverted;
-        }
-        return m;
-      }).toList();
-      notifyListeners();
+      _set(
+        state.copyWith(
+          messages: state.messages.map((m) {
+            if (m['id'] == messageId && m['content'] == newContent) {
+              final reverted = Map<String, dynamic>.from(m);
+              reverted['content'] = baselineContent;
+              return reverted;
+            }
+            return m;
+          }).toList(),
+        ),
+      );
     }
   }
 }
 
 final chatHistoryProvider =
-    ChangeNotifierProvider.family<ChatHistoryNotifier, String>(
-      (ref, channelId) => ChatHistoryNotifier(channelId, ref),
+    NotifierProvider.family<ChatHistoryNotifier, ChatHistoryState, String>(
+      ChatHistoryNotifier.new,
     );

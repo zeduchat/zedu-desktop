@@ -67,7 +67,7 @@ class DmConversationActionsNotifier extends Notifier<DmConversationActions> {
       return false;
     }
     state = state.copyWith(deletedIds: {...state.deletedIds, channelId});
-    ref.read(dmDraftStoreProvider).clear(channelId);
+    ref.read(dmDraftStoreProvider.notifier).clear(channelId);
     if (ref.read(selectedDmProvider)?.channelId == channelId) {
       ref.read(selectedDmProvider.notifier).select(null);
     }

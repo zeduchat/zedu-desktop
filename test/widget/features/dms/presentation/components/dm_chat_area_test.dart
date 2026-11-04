@@ -54,7 +54,8 @@ void main() {
           authNotifierProvider.overrideWith(FakeAuthNotifier.new),
           dmRepositoryProvider.overrideWithValue(repository),
           dmDraftStoreProvider.overrideWith(
-            (ref) => DmDraftStore(storage, userId: 'u', orgId: 'o'),
+            () =>
+                DmDraftNotifier(DmDraftStore(storage, userId: 'u', orgId: 'o')),
           ),
         ],
         child: buildTestMaterialApp(
@@ -112,7 +113,9 @@ void main() {
             currentOrgIdProvider.overrideWithValue('org-1'),
             dmRepositoryProvider.overrideWithValue(repository),
             dmDraftStoreProvider.overrideWith(
-              (ref) => DmDraftStore(storage, userId: 'u', orgId: 'org-1'),
+              () => DmDraftNotifier(
+                DmDraftStore(storage, userId: 'u', orgId: 'org-1'),
+              ),
             ),
           ],
           child: buildTestMaterialApp(
@@ -181,7 +184,9 @@ void main() {
             dmRepositoryProvider.overrideWithValue(repository),
             authNotifierProvider.overrideWith(FakeSignedInAuthNotifier.new),
             dmDraftStoreProvider.overrideWith(
-              (ref) => DmDraftStore(storage, userId: 'user-1', orgId: 'org-1'),
+              () => DmDraftNotifier(
+                DmDraftStore(storage, userId: 'user-1', orgId: 'org-1'),
+              ),
             ),
           ],
           child: buildTestMaterialApp(
@@ -239,7 +244,9 @@ void main() {
             authNotifierProvider.overrideWith(FakeSignedInAuthNotifier.new),
             dmRepositoryProvider.overrideWithValue(repository),
             dmDraftStoreProvider.overrideWith(
-              (ref) => DmDraftStore(storage, userId: 'user-1', orgId: 'org-1'),
+              () => DmDraftNotifier(
+                DmDraftStore(storage, userId: 'user-1', orgId: 'org-1'),
+              ),
             ),
           ],
           child: buildTestMaterialApp(
@@ -318,7 +325,9 @@ void main() {
             authNotifierProvider.overrideWith(FakeSignedInAuthNotifier.new),
             dmRepositoryProvider.overrideWithValue(repository),
             dmDraftStoreProvider.overrideWith(
-              (ref) => DmDraftStore(storage, userId: 'user-1', orgId: 'org-1'),
+              () => DmDraftNotifier(
+                DmDraftStore(storage, userId: 'user-1', orgId: 'org-1'),
+              ),
             ),
           ],
           child: buildTestMaterialApp(

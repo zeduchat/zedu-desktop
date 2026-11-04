@@ -30,10 +30,10 @@ class FakeAuthNotifier extends AuthNotifier {
 }
 
 class CallingActiveCallNotifier extends ActiveCallNotifier {
-  CallingActiveCallNotifier(super.ref);
+  CallingActiveCallNotifier();
 
   @override
-  ActiveCallState get state => const ActiveCallState(
+  ActiveCallState build() => const ActiveCallState(
     status: CallStatus.calling,
     remoteUserName: 'Ada Lovelace',
   );
@@ -53,7 +53,9 @@ Widget buildCallingDmChatArea() {
       authNotifierProvider.overrideWith(FakeAuthNotifier.new),
       activeCallProvider.overrideWith(CallingActiveCallNotifier.new),
       dmDraftStoreProvider.overrideWith(
-        (ref) => DmDraftStore(storage, userId: 'user-1', orgId: 'org-1'),
+        () => DmDraftNotifier(
+          DmDraftStore(storage, userId: 'user-1', orgId: 'org-1'),
+        ),
       ),
     ],
     child: buildTestMaterialApp(

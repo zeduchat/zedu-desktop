@@ -29,7 +29,7 @@ void main() {
       container = ProviderContainer(
         overrides: [dmRepositoryProvider.overrideWithValue(mockRepository)],
       );
-      notifier = container.read(chatHistoryProvider('ch-1'));
+      notifier = container.read(chatHistoryProvider('ch-1').notifier);
       await pumpEventQueue();
     });
 
@@ -45,8 +45,8 @@ void main() {
       notifier.startEditing('m1');
       await notifier.saveEdit('m1', 'edited');
 
-      expect(notifier.editingMessageId, isNull);
-      expect(notifier.messages.single['content'], 'edited');
+      expect(notifier.state.editingMessageId, isNull);
+      expect(notifier.state.messages.single['content'], 'edited');
     });
 
     test(
@@ -60,8 +60,8 @@ void main() {
         notifier.startEditing('m1');
         await notifier.saveEdit('m1', 'edited');
 
-        expect(notifier.editingMessageId, isNull);
-        expect(notifier.messages.single['content'], 'hello');
+        expect(notifier.state.editingMessageId, isNull);
+        expect(notifier.state.messages.single['content'], 'hello');
       },
     );
 
@@ -73,15 +73,17 @@ void main() {
               mockRepository.editMessage(any(), content: any(named: 'content')),
         ).thenThrow(Exception('network error'));
 
-        notifier.messages = [
-          {'id': 'm1', 'content': null, 'user_id': 'u1'},
-        ];
+        notifier.state = notifier.state.copyWith(
+          messages: [
+            {'id': 'm1', 'content': null, 'user_id': 'u1'},
+          ],
+        );
 
         notifier.startEditing('m1');
         await notifier.saveEdit('m1', 'edited');
 
-        expect(notifier.editingMessageId, isNull);
-        expect(notifier.messages.single['content'], isNull);
+        expect(notifier.state.editingMessageId, isNull);
+        expect(notifier.state.messages.single['content'], isNull);
       },
     );
 
@@ -108,7 +110,7 @@ void main() {
         await second;
         await first;
 
-        expect(notifier.messages.single['content'], 'edited2');
+        expect(notifier.state.messages.single['content'], 'edited2');
       },
     );
 
@@ -135,7 +137,7 @@ void main() {
         await second;
         await first;
 
-        expect(notifier.messages.single['content'], 'edited');
+        expect(notifier.state.messages.single['content'], 'edited');
       },
     );
 
@@ -153,10 +155,12 @@ void main() {
           return Future.value();
         });
 
-        notifier.messages = [
-          {'id': 'm1', 'content': 'hello', 'user_id': 'u1'},
-          {'id': 'm2', 'content': 'other', 'user_id': 'u1'},
-        ];
+        notifier.state = notifier.state.copyWith(
+          messages: [
+            {'id': 'm1', 'content': 'hello', 'user_id': 'u1'},
+            {'id': 'm2', 'content': 'other', 'user_id': 'u1'},
+          ],
+        );
 
         notifier.startEditing('m1');
         final first = notifier.saveEdit('m1', 'edited1');
@@ -167,8 +171,8 @@ void main() {
         await first;
         await second;
 
-        expect(notifier.editingMessageId, 'm2');
-        expect(notifier.messages.first['content'], 'edited1b');
+        expect(notifier.state.editingMessageId, 'm2');
+        expect(notifier.state.messages.first['content'], 'edited1b');
       },
     );
 
@@ -185,7 +189,7 @@ void main() {
       await first;
       await second;
 
-      expect(notifier.messages.single['content'], 'hello');
+      expect(notifier.state.messages.single['content'], 'hello');
     });
   });
 }
@@ -209,7 +213,7 @@ void _deleteTests() {
       container = ProviderContainer(
         overrides: [dmRepositoryProvider.overrideWithValue(mockRepository)],
       );
-      notifier = container.read(chatHistoryProvider('ch-1'));
+      notifier = container.read(chatHistoryProvider('ch-1').notifier);
       await pumpEventQueue();
     });
 
@@ -225,7 +229,7 @@ void _deleteTests() {
 
       await notifier.deleteMessage('m1');
 
-      expect(notifier.messages.map((m) => m['id']), ['m2']);
+      expect(notifier.state.messages.map((m) => m['id']), ['m2']);
       verify(
         () => mockRepository.deleteMessage(threadId: 'm1', channelId: 'ch-1'),
       ).called(1);
@@ -242,7 +246,10 @@ void _deleteTests() {
       await notifier.deleteMessage('m1');
       await notifier.loadMore();
 
-      expect(notifier.messages.map((m) => m['id']), isNot(contains('m1')));
+      expect(
+        notifier.state.messages.map((m) => m['id']),
+        isNot(contains('m1')),
+      );
     });
 
     test('puts the message back when the request fails', () async {
@@ -255,7 +262,7 @@ void _deleteTests() {
 
       await notifier.deleteMessage('m1');
 
-      expect(notifier.messages.map((m) => m['id']), ['m1', 'm2']);
+      expect(notifier.state.messages.map((m) => m['id']), ['m1', 'm2']);
     });
   });
 }
@@ -300,7 +307,7 @@ void _retryTests() {
           authNotifierProvider.overrideWith(_FakeAuthNotifier.new),
         ],
       );
-      notifier = container.read(chatHistoryProvider('channel-xyz'));
+      notifier = container.read(chatHistoryProvider('channel-xyz').notifier);
       await pumpEventQueue();
     });
 
@@ -321,8 +328,8 @@ void _retryTests() {
 
         await notifier.sendMessage('test content', isChannel: true);
 
-        expect(notifier.messages.isNotEmpty, isTrue);
-        expect(notifier.messages.first['is_channel'], isTrue);
+        expect(notifier.state.messages.isNotEmpty, isTrue);
+        expect(notifier.state.messages.first['is_channel'], isTrue);
       },
     );
 
@@ -339,15 +346,17 @@ void _retryTests() {
           ),
         ).thenAnswer((_) async => 'thread-retry');
 
-        notifier.messages = [
-          {
-            'id': 'failed-msg-1',
-            'content': 'Retrying channel message',
-            'channel_id': 'channel-xyz',
-            'status': 'failed',
-            'is_channel': true,
-          },
-        ];
+        notifier.state = notifier.state.copyWith(
+          messages: [
+            {
+              'id': 'failed-msg-1',
+              'content': 'Retrying channel message',
+              'channel_id': 'channel-xyz',
+              'status': 'failed',
+              'is_channel': true,
+            },
+          ],
+        );
 
         await notifier.retryMessage('failed-msg-1');
 
@@ -359,8 +368,8 @@ void _retryTests() {
             isChannel: true,
           ),
         ).called(1);
-        expect(notifier.messages.first['status'], isNull);
-        expect(notifier.messages.first['thread_id'], 'thread-retry');
+        expect(notifier.state.messages.first['status'], isNull);
+        expect(notifier.state.messages.first['thread_id'], 'thread-retry');
       },
     );
 
@@ -377,14 +386,16 @@ void _retryTests() {
           ),
         ).thenAnswer((_) async => 'thread-dm');
 
-        notifier.messages = [
-          {
-            'id': 'failed-dm-1',
-            'content': 'Retrying DM message',
-            'channel_id': 'channel-xyz',
-            'status': 'failed',
-          },
-        ];
+        notifier.state = notifier.state.copyWith(
+          messages: [
+            {
+              'id': 'failed-dm-1',
+              'content': 'Retrying DM message',
+              'channel_id': 'channel-xyz',
+              'status': 'failed',
+            },
+          ],
+        );
 
         await notifier.retryMessage('failed-dm-1');
 

@@ -140,7 +140,7 @@ class _BuzzRailItem extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final call = ref.watch(activeCallProvider).state;
+    final call = ref.watch(activeCallProvider);
     final tooltip = call.lastCallAt == null
         ? 'Buzz'
         : 'Last Buzz: ${_formatDateTime(call.lastCallAt!)}';
