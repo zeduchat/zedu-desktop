@@ -72,7 +72,9 @@ Future<void> _pumpWithMentionList(
       ),
     ),
   );
+  // Let the focus change rebuild the composer first, or the typed text is lost.
   await tester.tap(find.byType(TextField));
+  await tester.pump();
   await tester.enterText(find.byType(TextField), '@');
   await tester.pump();
 }
