@@ -28,10 +28,18 @@ class Validators {
     ];
   }
 
+  /// Login trims what the user types, so a password saved with a leading or
+  /// trailing space could never be used to sign in.
+  static const passwordEdgeSpaceMessage =
+      "Password can't start or end with a space";
+
+  static bool hasPasswordEdgeSpace(String value) => value != value.trim();
+
   static String? validatePassword(BuildContext context, String? value) {
     if (value == null || value.isEmpty) {
       return 'Password is required';
     }
+    if (hasPasswordEdgeSpace(value)) return passwordEdgeSpaceMessage;
     for (final requirement in passwordRequirements(value)) {
       if (!requirement.isMet) {
         return requirement.errorMessage;

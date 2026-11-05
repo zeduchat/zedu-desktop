@@ -186,5 +186,34 @@ void main() {
         expect(find.text('No people to show'), findsOneWidget);
       },
     );
+
+    testWidgets(
+      'renders fallback initial for person with empty or emoji name without RangeError',
+      (tester) async {
+        const emptyMember = TeamMember(
+          id: 'u-empty',
+          email: 'empty@zedu.test',
+          role: 'Member',
+          dateJoined: '2026-01-01',
+          status: TeamMemberStatus.active,
+          name: '   ',
+        );
+        const emojiMember = TeamMember(
+          id: 'u-emoji',
+          email: 'emoji@zedu.test',
+          role: 'Member',
+          dateJoined: '2026-01-01',
+          status: TeamMemberStatus.active,
+          name: '🚀 Rocket',
+        );
+        await _pumpPeopleCard(
+          tester,
+          const UserProfileState(teamMembers: [emptyMember, emojiMember]),
+        );
+
+        expect(find.text('?'), findsOneWidget);
+        expect(find.text('🚀'), findsOneWidget);
+      },
+    );
   });
 }

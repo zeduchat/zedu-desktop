@@ -15,6 +15,10 @@ class _NewGroupChatViewState extends ConsumerState<NewGroupChatView> {
   bool _isLoading = false;
   String? _errorMessage;
 
+  /// True once the user has picked or removed someone. Until then the member
+  /// hint is plain guidance, not an error.
+  bool _touched = false;
+
   // Filtered members list
   List<TeamMember> _filteredMembers = [];
   bool _showDropdown = false;
@@ -69,6 +73,7 @@ class _NewGroupChatViewState extends ConsumerState<NewGroupChatView> {
 
   void _toggleMemberSelection(TeamMember member) {
     setState(() {
+      _touched = true;
       if (_selectedMembers.any((m) => m.id == member.id)) {
         _selectedMembers.removeWhere((m) => m.id == member.id);
       } else {
@@ -77,6 +82,28 @@ class _NewGroupChatViewState extends ConsumerState<NewGroupChatView> {
       _searchController.clear();
       _onSearchChanged(); // Refresh
     });
+  }
+
+  String _getMemberDisplayName(TeamMember member) {
+    final name = member.name?.trim();
+    if (name != null && name.isNotEmpty) {
+      return name;
+    }
+    final emailPrefix = member.email.split('@').first.trim();
+    if (emailPrefix.isNotEmpty) {
+      return emailPrefix;
+    }
+    return 'Member';
+  }
+
+  String _getMemberInitials(String displayName) {
+    final clean = displayName.trim();
+    if (clean.isEmpty) return '?';
+    final runes = clean.runes.toList();
+    if (runes.length > 1) {
+      return String.fromCharCodes(runes.take(2)).toUpperCase();
+    }
+    return String.fromCharCode(runes.first).toUpperCase();
   }
 
   Future<void> _handleCreate() async {
@@ -184,20 +211,14 @@ class _NewGroupChatViewState extends ConsumerState<NewGroupChatView> {
                                 spacing: 8,
                                 runSpacing: 8,
                                 children: _selectedMembers.map((member) {
-                                  final name =
-                                      member.name ??
-                                      member.email.split('@').first;
+                                  final name = _getMemberDisplayName(member);
+                                  final initials = _getMemberInitials(name);
                                   return Chip(
                                     avatar: CircleAvatar(
                                       backgroundColor: colors.primary
                                           .withValues(alpha: 0.15),
                                       child: Text(
-                                        name
-                                            .substring(
-                                              0,
-                                              name.length > 1 ? 2 : 1,
-                                            )
-                                            .toUpperCase(),
+                                        initials,
                                         style: TextStyle(
                                           color: colors.primary,
                                           fontSize: 10,
@@ -268,9 +289,8 @@ class _NewGroupChatViewState extends ConsumerState<NewGroupChatView> {
                                   itemCount: _filteredMembers.length,
                                   itemBuilder: (context, index) {
                                     final member = _filteredMembers[index];
-                                    final name =
-                                        member.name ??
-                                        member.email.split('@').first;
+                                    final name = _getMemberDisplayName(member);
+                                    final initials = _getMemberInitials(name);
                                     return InkWell(
                                       onTap: () =>
                                           _toggleMemberSelection(member),
@@ -295,12 +315,7 @@ class _NewGroupChatViewState extends ConsumerState<NewGroupChatView> {
                                               backgroundColor: colors.primary
                                                   .withValues(alpha: 0.1),
                                               child: Text(
-                                                name
-                                                    .substring(
-                                                      0,
-                                                      name.length > 1 ? 2 : 1,
-                                                    )
-                                                    .toUpperCase(),
+                                                initials,
                                                 style: TextStyle(
                                                   color: colors.primary,
                                                   fontSize: 12,
@@ -484,7 +499,7 @@ class _NewGroupChatViewState extends ConsumerState<NewGroupChatView> {
       child: Row(
         children: [
           Text(
-            'New Group Chat',
+            'New message',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
@@ -506,22 +521,23 @@ class _NewGroupChatViewState extends ConsumerState<NewGroupChatView> {
       child: Row(
         children: [
           Text(
-            'With: ',
+            'To: ',
             style: TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.bold,
-              color: colors.textHint,
+              color: colors.textPrimary,
             ),
           ),
           Expanded(
             child: TextField(
               controller: _searchController,
               focusNode: _focusNode,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 hintText: '#a-channel, @somebody, or somebody',
+                hintStyle: TextStyle(color: colors.textHint),
                 border: InputBorder.none,
                 isDense: true,
-                contentPadding: EdgeInsets.symmetric(vertical: 8),
+                contentPadding: const EdgeInsets.symmetric(vertical: 8),
               ),
               style: TextStyle(color: colors.textPrimary, fontSize: 15),
             ),
@@ -549,23 +565,28 @@ class _NewGroupChatViewState extends ConsumerState<NewGroupChatView> {
   Widget _buildValidationHelper(AppPalette colors) {
     final count = _selectedMembers.length;
     final isReady = count >= 2;
+    final color = isReady
+        ? colors.success
+        : (_touched ? colors.error : colors.textSecondary);
 
     return Row(
       children: [
         Icon(
           isReady ? Icons.check_circle : Icons.info_outline,
           size: 16,
-          color: isReady ? colors.success : colors.error,
+          color: color,
         ),
         const SizedBox(width: 8),
-        Text(
-          isReady
-              ? 'Ready to create conversation! (Selected: $count members)'
-              : 'Select at least 2 members to start a group DM (Selected: $count/2)',
-          style: TextStyle(
-            color: isReady ? colors.success : colors.error,
-            fontSize: 13,
-            fontWeight: FontWeight.w500,
+        Expanded(
+          child: Text(
+            isReady
+                ? 'Ready to create conversation! (Selected: $count members)'
+                : 'Select at least 2 members to start a group DM (Selected: $count/2)',
+            style: TextStyle(
+              color: color,
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+            ),
           ),
         ),
       ],

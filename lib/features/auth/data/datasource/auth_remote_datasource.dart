@@ -1,4 +1,5 @@
 import 'package:zedu/core/core.dart';
+import 'package:zedu/core/mock/mock.dart';
 import 'package:zedu/features/features.dart';
 
 abstract interface class AuthRemoteDataSource {
@@ -37,6 +38,7 @@ abstract interface class AuthRemoteDataSource {
     required bool clearStatus,
     required bool online,
   });
+  Future<void> setPresence({required bool online});
 }
 
 class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
@@ -351,6 +353,28 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       rethrow;
     } catch (error) {
       AppLogger.e('Failed /profile/change-status', tag: _tag, error: error);
+      throw ApiFailure.unknown(error);
+    }
+  }
+
+  @override
+  Future<void> setPresence({required bool online}) async {
+    try {
+      if (_config.usesMockData) {
+        AppLogger.d('Using mock data for POST /profile/presence', tag: _tag);
+        await Future<void>.delayed(const Duration(milliseconds: 400));
+        return;
+      }
+
+      AppLogger.d('POST /profile/presence', tag: _tag);
+      await _apiBaseService.post<dynamic>(
+        path: 'profile/presence',
+        data: {'online': online},
+      );
+    } on ApiFailure {
+      rethrow;
+    } catch (error) {
+      AppLogger.e('Failed /profile/presence', tag: _tag, error: error);
       throw ApiFailure.unknown(error);
     }
   }

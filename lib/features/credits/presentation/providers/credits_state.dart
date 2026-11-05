@@ -5,6 +5,7 @@ enum CreditsStatus { initial, loading, ready, purchasing, verifying, error }
 class CreditsState {
   const CreditsState({
     this.status = CreditsStatus.initial,
+    this.orgId,
     this.packages = const [],
     this.usage = CreditUsage.empty,
     this.usageReport = CreditUsageReport.empty,
@@ -16,6 +17,9 @@ class CreditsState {
   });
 
   final CreditsStatus status;
+
+  /// The organisation the usage, report and transactions belong to.
+  final String? orgId;
   final List<CreditPackage> packages;
   final CreditUsage usage;
   final CreditUsageReport usageReport;
@@ -30,6 +34,7 @@ class CreditsState {
 
   CreditsState copyWith({
     CreditsStatus? status,
+    String? orgId,
     List<CreditPackage>? packages,
     CreditUsage? usage,
     CreditUsageReport? usageReport,
@@ -44,6 +49,7 @@ class CreditsState {
   }) {
     return CreditsState(
       status: status ?? this.status,
+      orgId: orgId ?? this.orgId,
       packages: packages ?? this.packages,
       usage: usage ?? this.usage,
       usageReport: usageReport ?? this.usageReport,

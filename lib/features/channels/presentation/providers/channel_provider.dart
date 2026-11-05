@@ -133,6 +133,21 @@ class ChannelNotifier extends AsyncNotifier<List<Channel>> {
     }
     return false;
   }
+
+  /// Leaves the channel and, on success, removes it from the list. A failure
+  /// leaves the list as it was and is returned for the caller to show.
+  Future<Result<void>> leaveChannel(String channelId) async {
+    final result = await ref
+        .read(channelRepositoryProvider)
+        .leaveChannel(channelId);
+    if (result is Success<void>) {
+      state = AsyncData([
+        for (final c in state.value ?? const <Channel>[])
+          if (c.id != channelId) c,
+      ]);
+    }
+    return result;
+  }
 }
 
 final channelProvider = AsyncNotifierProvider<ChannelNotifier, List<Channel>>(

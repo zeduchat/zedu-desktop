@@ -236,6 +236,7 @@ class PersonalProfilePanel extends ConsumerWidget {
                         : 'Not provided',
                     colors: colors,
                     context: context,
+                    canCopy: account.phoneNumber.isNotEmpty,
                   ),
                   const SizedBox(height: 8),
 
@@ -246,6 +247,7 @@ class PersonalProfilePanel extends ConsumerWidget {
                     colors: colors,
                     context: context,
                     isLink: true,
+                    canCopy: account.email.isNotEmpty,
                   ),
                 ],
               ),
@@ -319,8 +321,12 @@ class PersonalProfilePanel extends ConsumerWidget {
     WidgetRef ref,
     ProfileAccount account,
   ) {
-    showEditProfileDialog(context, account, (updated) {
-      ref.read(userProfileNotifierProvider.notifier).updateAccount(updated);
+    showEditProfileDialog(context, account, (updated) async {
+      await ref
+          .read(userProfileNotifierProvider.notifier)
+          .updateAccount(updated);
+      // updateAccount clears the error when it starts and sets it on failure.
+      return ref.read(userProfileNotifierProvider).error;
     });
   }
 }
@@ -382,6 +388,7 @@ class _ContactRow extends StatelessWidget {
     required this.label,
     required this.colors,
     required this.context,
+    required this.canCopy,
     this.isLink = false,
   });
 
@@ -390,6 +397,19 @@ class _ContactRow extends StatelessWidget {
   final AppPalette colors;
   final BuildContext context;
   final bool isLink;
+
+  /// False when [label] is a placeholder, which isn't worth copying.
+  final bool canCopy;
+
+  Future<void> _copy(BuildContext buildContext) async {
+    await Clipboard.setData(ClipboardData(text: label));
+    if (!buildContext.mounted) return;
+    AppToastService.show(
+      buildContext,
+      type: AppToastType.success,
+      message: 'Copied $label',
+    );
+  }
 
   @override
   Widget build(BuildContext buildContext) {
@@ -408,11 +428,12 @@ class _ContactRow extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
           ),
         ),
-        InkWell(
-          onTap: () {},
-          borderRadius: BorderRadius.circular(4),
-          child: Icon(Icons.copy_outlined, size: 14, color: colors.textHint),
-        ),
+        if (canCopy)
+          InkWell(
+            onTap: () => _copy(buildContext),
+            borderRadius: BorderRadius.circular(4),
+            child: Icon(Icons.copy_outlined, size: 14, color: colors.textHint),
+          ),
       ],
     );
   }

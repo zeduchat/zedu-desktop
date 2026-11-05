@@ -9,6 +9,22 @@ class ChannelDirectoryView extends ConsumerStatefulWidget {
       _ChannelDirectoryViewState();
 }
 
+/// The channels whose name or description contains [query], ignoring case
+/// and any spaces around the query, so a pasted " general " still finds
+/// #general. An empty or blank query keeps every channel.
+@visibleForTesting
+List<Channel> filterChannels(List<Channel> channels, String query) {
+  final needle = query.trim().toLowerCase();
+  if (needle.isEmpty) return channels;
+  return channels
+      .where(
+        (c) =>
+            c.name.toLowerCase().contains(needle) ||
+            c.description.toLowerCase().contains(needle),
+      )
+      .toList();
+}
+
 class _ChannelDirectoryViewState extends ConsumerState<ChannelDirectoryView> {
   final _searchController = TextEditingController();
   String _searchQuery = '';
@@ -26,11 +42,7 @@ class _ChannelDirectoryViewState extends ConsumerState<ChannelDirectoryView> {
     final textTheme = context.textTheme;
 
     final channels = channelState.value ?? const <Channel>[];
-    final filteredChannels = channels.where((c) {
-      if (_searchQuery.isEmpty) return true;
-      return c.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-          c.description.toLowerCase().contains(_searchQuery.toLowerCase());
-    }).toList();
+    final filteredChannels = filterChannels(channels, _searchQuery);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -79,6 +91,25 @@ class _ChannelDirectoryViewState extends ConsumerState<ChannelDirectoryView> {
         Expanded(
           child: channelState.isLoading
               ? const Center(child: CircularProgressIndicator())
+              : channelState.hasError && !channelState.hasValue
+              ? Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        "Couldn't load channels",
+                        style: textTheme.bodyMedium?.copyWith(
+                          color: colors.textSecondary,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextButton(
+                        onPressed: () => ref.invalidate(channelProvider),
+                        child: const Text('Retry'),
+                      ),
+                    ],
+                  ),
+                )
               : filteredChannels.isEmpty
               ? Center(
                   child: Text(
@@ -138,7 +169,7 @@ class _ChannelDirectoryViewState extends ConsumerState<ChannelDirectoryView> {
                             )
                           : null,
                       trailing: Text(
-                        '${channel.membersCount} members',
+                        channel.membersCount.countLabel('member'),
                         style: textTheme.bodySmall?.copyWith(
                           color: colors.textSecondary,
                         ),
@@ -146,7 +177,7 @@ class _ChannelDirectoryViewState extends ConsumerState<ChannelDirectoryView> {
                       onTap: () {
                         ref
                             .read(activeChatProvider.notifier)
-                            .selectChannel(channel.name);
+                            .selectChannel(channel.name, channelId: channel.id);
                       },
                     );
                   },

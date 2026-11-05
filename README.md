@@ -23,7 +23,7 @@ A lean Flutter app using Clean Architecture, Material 3, and Riverpod. The codeb
 │   ├── core/
 │   │   ├── core.dart
 │   │   ├── api_utils/        # ApiBaseService, failures, auth interceptor
-│   │   ├── config/           # AppConfig, env loader, flavor
+│   │   ├── config/           # AppConfig, env loader
 │   │   ├── locator/
 │   │   ├── navigator/        # GoRouter (e.g. login route)
 │   │   ├── secure_storage/
@@ -115,25 +115,23 @@ Env keys are read from **dotenv** after `loadAppEnv()` in `main.dart`. The repo 
 ```txt
 API_BASE_URL=https://api.staging.zedu.chat/api/v1/
 USE_MOCK_DATA=false
-APP_FLAVOR=development
 ```
 
-`USE_MOCK_DATA` accepts `true` / `false` (also `1` / `0`, `yes` / `no`). `APP_FLAVOR` accepts `development`, `staging`, or `production` (case-insensitive).
+`USE_MOCK_DATA` accepts `true` / `false` (also `1` / `0`, `yes` / `no`).
 
 ### Overrides for CI or release builds
 
 `--dart-define` overrides dotenv when you need non-file config:
 
 ```sh
-flutter run --dart-define=API_BASE_URL=https://api.example.com --dart-define=USE_MOCK_DATA=false --dart-define=APP_FLAVOR=production
+flutter run --dart-define=API_BASE_URL=https://api.example.com --dart-define=USE_MOCK_DATA=false
 ```
 
-Defaults when neither `.env` / `.env.example` nor defines set a value (see `AppConfig.fromEnvironment` and `AppFlavorConfig`):
+Defaults when neither `.env` / `.env.example` nor defines set a value (see `AppConfig.fromEnvironment`):
 
 ```txt
 API_BASE_URL=https://api.staging.zedu.chat/api/v1/
 USE_MOCK_DATA=false
-APP_FLAVOR=development
 ```
 
 ## Clone
@@ -168,16 +166,25 @@ flutter run
 
 ## Running on Windows(locally)
 
-Windows needs a few extra steps on a fresh clone to run locally, including a manual fix for the Agora plugin in your Pub cache. The full guide is in [`windows-setup-locally.md`](windows-setup-locally.md).
+On Windows, run the app with one command from the repository root, in PowerShell:
+
+```powershell
+.\run_windows.ps1
+```
+
+The script works on a fresh clone and on an existing setup. It checks the current state at every step and skips, repairs or redoes its work, including the Agora SDK fix in your Pub cache, so you do not need any manual steps first. The first run downloads the large Agora SDKs and takes a while. If PowerShell blocks scripts, run `powershell -ExecutionPolicy Bypass -File .\run_windows.ps1`. Use `.\run_windows.ps1 build` for a debug build and `.\run_windows.ps1 --release` for release. It needs Flutter, Visual Studio with Desktop development with C++, and Windows Developer Mode. The full guide, with a manual fallback, is in [`windows-setup-locally.md`](windows-setup-locally.md).
 
 Tested with Flutter 3.47.7 and Visual Studio 2026 Community (Desktop development with C++). Run every command in PowerShell, do not run Flutter as administrator, and never commit or share your `.env` file.
 
-The guide walks from a fresh clone to a running app and covers these build errors:
+The script handles these build errors, and the guide explains each one:
 
 - `Cannot extract through symlink` from the Agora plugin
 - `No file or variants found for asset: .env`
 - `error STL1011` in `audioplayers_windows`
 - `file cannot create directory: C:/Program Files/zedu` during install
+- `Cannot open include file: 'AgoraMediaBase.h'` when the clone path is too long
+- `Cannot open source file ... cpp_client_wrapper\core_implementations.cc` after a build from a long path
+- `Failed to install nuget package Microsoft.Windows.ImplementationLibrary` when `api.nuget.org` is unreachable
 
 
 ## Common commands

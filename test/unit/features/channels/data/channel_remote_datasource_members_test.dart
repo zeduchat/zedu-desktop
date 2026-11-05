@@ -25,6 +25,50 @@ void main() {
       datasource = ChannelRemoteDataSourceImpl(apiBaseService: mockApi);
     });
 
+    test(
+      'fetchChannelMembers maps people and skips those with no username',
+      () async {
+        when(
+          () => mockApi.get<Map<String, dynamic>>(
+            path: '/channels/c1/users',
+            queryParameters: {
+              'page': 1,
+              'limit': ChannelRemoteDataSourceImpl.memberPageSize,
+            },
+          ),
+        ).thenAnswer(
+          (_) async => ApiResponseModel<Map<String, dynamic>>(
+            data: {
+              'data': [
+                {
+                  'id': 'u1',
+                  'email': 'ada@zedu.chat',
+                  'restricted': false,
+                  'profile': {
+                    'username': 'ada',
+                    'avatar_url': 'https://cdn.zedu.chat/ada.png',
+                  },
+                },
+                {
+                  'id': 'u2',
+                  'email': 'blank@zedu.chat',
+                  'profile': {'username': ''},
+                },
+                {'id': 'u3', 'email': 'no-profile@zedu.chat'},
+              ],
+            },
+            statusCode: 200,
+          ),
+        );
+
+        final members = await datasource.fetchChannelMembers('c1');
+
+        expect(members.map((m) => m.username), ['ada']);
+        expect(members.single.userId, 'u1');
+        expect(members.single.avatarUrl, 'https://cdn.zedu.chat/ada.png');
+      },
+    );
+
     test('fetchOrganisationMemberIds reads every page of members', () async {
       const pageSize = ChannelRemoteDataSourceImpl.memberPageSize;
       final firstPage = List.generate(pageSize, (i) => 'u$i');

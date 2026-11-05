@@ -55,34 +55,44 @@ class OrganisationModel {
 
   factory OrganisationModel.fromJson(Map<String, dynamic> json) {
     return OrganisationModel(
-      id: json['id'] as String,
-      name: json['name'] as String,
-      description: json['description'] as String,
-      email: json['email'] as String,
-      type: json['type'] as String,
-      location: json['location'] as String,
-      country: json['country'] as String,
-      ownerId: json['owner_id'] as String,
-      logoUrl: json['logo_url'] as String,
+      id: json['id'] as String? ?? '',
+      name: json['name'] as String? ?? '',
+      description: json['description'] as String? ?? '',
+      email: json['email'] as String? ?? '',
+      type: json['type'] as String? ?? '',
+      location: json['location'] as String? ?? '',
+      country: json['country'] as String? ?? '',
+      ownerId: json['owner_id'] as String? ?? '',
+      logoUrl: json['logo_url'] as String? ?? '',
       creditBalance: (json['credit_balance'] as num?)?.toInt() ?? 0,
       channelsCount: (json['channels_count'] as num?)?.toInt() ?? 0,
       totalMessagesCount: (json['total_messages_count'] as num?)?.toInt() ?? 0,
-      orgRoles: json['org_roles'] as List<dynamic>,
-      pinned: json['pinned'] as bool,
+      orgRoles: json['org_roles'] as List<dynamic>? ?? const [],
+      pinned: json['pinned'] as bool? ?? false,
       users: json['Users'],
-      createdAt: DateTime.parse(json['created_at'] as String),
-      updatedAt: DateTime.parse(json['updated_at'] as String),
+      createdAt: json['created_at'] != null
+          ? (DateTime.tryParse(json['created_at'].toString()) ??
+                DateTime.fromMillisecondsSinceEpoch(0))
+          : DateTime.fromMillisecondsSinceEpoch(0),
+      updatedAt: json['updated_at'] != null
+          ? (DateTime.tryParse(json['updated_at'].toString()) ??
+                DateTime.fromMillisecondsSinceEpoch(0))
+          : DateTime.fromMillisecondsSinceEpoch(0),
       channels: json['channels'],
-      subscriptionPlanId: json['subscription_plan_id'] as String,
-      stripeCustomerId: json['stripe_customer_id'] as String,
-      orgPlanId: json['org_plan_id'] as String,
-      organisationPlan: OrganisationPlanModel.fromJson(
-        json['organisation_plan'] as Map<String, dynamic>,
-      ),
-      organisationSlug: json['organisation_slug'] as String,
-      userRole: UserRoleModel.fromJson(
-        json['user_role'] as Map<String, dynamic>,
-      ),
+      subscriptionPlanId: json['subscription_plan_id'] as String? ?? '',
+      stripeCustomerId: json['stripe_customer_id'] as String? ?? '',
+      orgPlanId: json['org_plan_id'] as String? ?? '',
+      organisationPlan: json['organisation_plan'] is Map<String, dynamic>
+          ? OrganisationPlanModel.fromJson(
+              json['organisation_plan'] as Map<String, dynamic>,
+            )
+          : OrganisationPlanModel.fromJson(const {
+              'plan_details': <String, dynamic>{},
+            }),
+      organisationSlug: json['organisation_slug'] as String? ?? '',
+      userRole: json['user_role'] is Map<String, dynamic>
+          ? UserRoleModel.fromJson(json['user_role'] as Map<String, dynamic>)
+          : const UserRoleModel(roleId: '', roleName: ''),
     );
   }
 }

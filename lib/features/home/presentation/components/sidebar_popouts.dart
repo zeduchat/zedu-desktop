@@ -309,7 +309,7 @@ class SidebarPopoutCard extends ConsumerWidget {
       height: _avatarSize,
       color: context.colors.primary,
       alignment: Alignment.center,
-      child: Text(data.$1[0].toUpperCase(), style: _w600(colors.onPrimary, 14)),
+      child: Text(avatarInitial(data.$1), style: _w600(colors.onPrimary, 14)),
     );
     return ListTile(
       contentPadding: EdgeInsets.zero,

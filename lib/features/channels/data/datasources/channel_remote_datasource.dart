@@ -17,11 +17,23 @@ abstract class ChannelRemoteDataSource {
     String? description,
   });
   Future<void> archiveChannel(String channelId, bool archived);
+  Future<void> leaveChannel(String channelId);
   Future<List<String>> fetchOrganisationMemberIds(String orgId);
   Future<List<String>> fetchChannelMemberIds(String channelId);
+  Future<List<DmParticipant>> fetchChannelMembers(String channelId);
   Future<void> addMembersToChannel({
     required String channelId,
     required List<String> userIds,
+  });
+
+  /// The latest messages of a channel, newest first.
+  Future<List<ChannelMessage>> fetchChannelMessages(String channelId);
+
+  /// Stars the channel for this user, or unstars it if it is already starred.
+  /// Returns whether it is starred now.
+  Future<bool> toggleStarChannel({
+    required String orgId,
+    required String channelId,
   });
 }
 
@@ -46,6 +58,22 @@ class ChannelRemoteDataSourceImpl implements ChannelRemoteDataSource {
     return data
         .map((e) => Channel.fromJson(e as Map<String, dynamic>))
         .toList();
+  }
+
+  @override
+  Future<bool> toggleStarChannel({
+    required String orgId,
+    required String channelId,
+  }) async {
+    final response = await apiBaseService.post<Map<String, dynamic>>(
+      path: '/organisations/$orgId/channels/$channelId/star',
+    );
+    final data = response.data['data'] as Map<String, dynamic>?;
+    final isStarred = data?['is_starred'] as bool?;
+    if (isStarred == null) {
+      throw Exception('No star state returned from toggle star');
+    }
+    return isStarred;
   }
 
   @override
@@ -99,6 +127,13 @@ class ChannelRemoteDataSourceImpl implements ChannelRemoteDataSource {
   }
 
   @override
+  Future<void> leaveChannel(String channelId) async {
+    await apiBaseService.post<Map<String, dynamic>>(
+      path: '/channels/$channelId/leave',
+    );
+  }
+
+  @override
   Future<List<String>> fetchOrganisationMemberIds(String orgId) {
     // People only: this endpoint leaves bots out unless include_bots=true.
     return _fetchAllMemberIds('/organisations/$orgId/users');
@@ -107,6 +142,24 @@ class ChannelRemoteDataSourceImpl implements ChannelRemoteDataSource {
   @override
   Future<List<String>> fetchChannelMemberIds(String channelId) {
     return _fetchAllMemberIds('/channels/$channelId/users');
+  }
+
+  @override
+  Future<List<DmParticipant>> fetchChannelMembers(String channelId) async {
+    final members = await _fetchAllMembers('/channels/$channelId/users');
+    return [
+      for (final member in members)
+        if ((member['id'] as String? ?? '').isNotEmpty &&
+            _memberField(member, 'username').isNotEmpty)
+          DmParticipant(
+            userId: member['id'] as String,
+            username: _memberField(member, 'username'),
+            email: member['email'] as String? ?? '',
+            avatarUrl: _memberField(member, 'avatar_url').isEmpty
+                ? null
+                : _memberField(member, 'avatar_url'),
+          ),
+    ];
   }
 
   @override
@@ -120,20 +173,49 @@ class ChannelRemoteDataSourceImpl implements ChannelRemoteDataSource {
     );
   }
 
+  @override
+  Future<List<ChannelMessage>> fetchChannelMessages(String channelId) async {
+    final response = await apiBaseService.get<Map<String, dynamic>>(
+      path: '/threads/channels/$channelId',
+      queryParameters: {'page': 1, 'limit': 50},
+    );
+    final data = response.data['data'];
+    if (data == null) return const [];
+    // A wrong shape throws, so the list shows its retry state.
+    return (data as List)
+        .cast<Map<String, dynamic>>()
+        .map(ChannelMessage.fromJson)
+        .toList();
+  }
+
+  // The channel users route nests username and avatar_url under profile.
+  String _memberField(Map<String, dynamic> member, String field) {
+    final profile = member['profile'];
+    final nested = profile is Map<String, dynamic> ? profile[field] : null;
+    if (nested is String && nested.isNotEmpty) return nested;
+    final topLevel = member[field];
+    return topLevel is String ? topLevel : '';
+  }
+
   Future<List<String>> _fetchAllMemberIds(String path) async {
-    final ids = <String>[];
+    final members = await _fetchAllMembers(path);
+    return [
+      for (final member in members)
+        if ((member['id'] as String? ?? '').isNotEmpty) member['id'] as String,
+    ];
+  }
+
+  Future<List<Map<String, dynamic>>> _fetchAllMembers(String path) async {
+    final members = <Map<String, dynamic>>[];
     for (var page = 1; page <= maxMemberPages; page++) {
       final response = await apiBaseService.get<Map<String, dynamic>>(
         path: path,
         queryParameters: {'page': page, 'limit': memberPageSize},
       );
       final data = response.data['data'] as List?;
-      if (data == null || data.isEmpty) return ids;
-      for (final item in data) {
-        final id = (item as Map<String, dynamic>)['id'] as String?;
-        if (id != null && id.isNotEmpty) ids.add(id);
-      }
-      if (data.length < memberPageSize) return ids;
+      if (data == null || data.isEmpty) return members;
+      members.addAll(data.cast<Map<String, dynamic>>());
+      if (data.length < memberPageSize) return members;
     }
     // Every page was full, so the list may go on. Fail rather than act on
     // part of it.

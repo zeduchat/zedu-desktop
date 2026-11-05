@@ -45,9 +45,7 @@ class _MessageBubbleState extends State<MessageBubble> {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    final initial = widget.author.isNotEmpty
-        ? widget.author.substring(0, 1).toUpperCase()
-        : '?';
+    final initial = avatarInitial(widget.author);
 
     return MouseRegion(
       onEnter: (_) => setState(() => _isHovering = true),
@@ -230,20 +228,7 @@ class _MessageBody extends StatelessWidget {
           children: [
             Icon(Icons.play_circle_fill, color: colors.primary, size: 28),
             const SizedBox(width: 8),
-            Container(
-              height: 20,
-              width: 100,
-              decoration: BoxDecoration(
-                image: DecorationImage(
-                  image: const AssetImage('assets/pngs/waveform_mock.png'),
-                  fit: BoxFit.cover,
-                  colorFilter: ColorFilter.mode(
-                    colors.primary,
-                    BlendMode.srcIn,
-                  ),
-                ),
-              ),
-            ),
+            _VoiceWaveform(color: colors.primary),
             const SizedBox(width: 8),
             Text(
               '0:05',
@@ -264,6 +249,9 @@ class _MessageBody extends StatelessWidget {
     Widget markdownWidget = cleanText.isNotEmpty
         ? MarkdownBody(
             data: cleanText,
+            onTapLink: (_, href, _) {
+              if (href != null) openMessageLink(href);
+            },
             styleSheet: MarkdownStyleSheet(
               p: TextStyle(fontSize: 14, color: colors.textPrimary),
               strong: TextStyle(
@@ -396,5 +384,57 @@ class _MessageBody extends StatelessWidget {
     }
 
     return markdownWidget;
+  }
+}
+
+/// The bars beside a voice note. Messages carry no waveform data, so it draws
+/// a fixed pattern in the theme colour. It used to load
+/// `assets/pngs/waveform_mock.png`, which was never added, so every voice note
+/// failed to render.
+class _VoiceWaveform extends StatelessWidget {
+  final Color color;
+
+  const _VoiceWaveform({required this.color});
+
+  static const _barHeights = <double>[
+    6,
+    12,
+    18,
+    10,
+    16,
+    8,
+    14,
+    20,
+    12,
+    6,
+    10,
+    16,
+    8,
+    14,
+    10,
+    6,
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      key: const ValueKey('voice-note-waveform'),
+      height: 20,
+      width: 100,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          for (final height in _barHeights)
+            Container(
+              width: 3,
+              height: height,
+              decoration: BoxDecoration(
+                color: color,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+        ],
+      ),
+    );
   }
 }

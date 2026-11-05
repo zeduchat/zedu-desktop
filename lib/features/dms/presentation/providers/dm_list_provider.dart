@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:zedu/core/core.dart';
 import 'package:zedu/features/features.dart';
 
@@ -44,13 +46,36 @@ class DmConversationActions {
 }
 
 class DmConversationActionsNotifier extends Notifier<DmConversationActions> {
+  /// Where this user's pins are remembered (null while signed out).
+  String? _pinnedKey;
+
   @override
-  DmConversationActions build() => const DmConversationActions();
+  DmConversationActions build() {
+    // Rebuilt for each signed-in user, so one account never sees another's pins.
+    final userId = dmPreferencesUserId(ref);
+    _pinnedKey = userId == null || userId.isEmpty
+        ? null
+        : DmPreferencesStore.pinnedKey(userId);
+    final key = _pinnedKey;
+    if (key != null) _restorePinned(key);
+    return const DmConversationActions();
+  }
+
+  Future<void> _restorePinned(String key) async {
+    final saved = await ref.read(dmPreferencesStoreProvider).read(key);
+    if (!ref.mounted || _pinnedKey != key || saved.isEmpty) return;
+    // Keep anything pinned while the saved list was loading.
+    state = state.copyWith(pinnedIds: {...saved, ...state.pinnedIds});
+  }
 
   void togglePinned(String channelId) {
     final ids = Set<String>.from(state.pinnedIds);
     ids.contains(channelId) ? ids.remove(channelId) : ids.add(channelId);
     state = state.copyWith(pinnedIds: ids);
+    final key = _pinnedKey;
+    if (key != null) {
+      unawaited(ref.read(dmPreferencesStoreProvider).write(key, ids));
+    }
   }
 
   /// Deletes the conversation on the server, then hides it from the list
@@ -84,11 +109,16 @@ class DmListNotifier extends AsyncNotifier<List<DmConversation>> {
   int _currentPage = 1;
   bool _hasMore = true;
 
+  /// Changes on every reload, so a page still in flight from before can be
+  /// dropped.
+  int _listVersion = 0;
+
   bool get hasMore => _hasMore;
 
   @override
   Future<List<DmConversation>> build() async {
     final orgId = ref.watch(currentOrgIdProvider);
+    _listVersion++;
     if (orgId.isEmpty) return const [];
 
     _currentPage = 1;
@@ -98,24 +128,11 @@ class DmListNotifier extends AsyncNotifier<List<DmConversation>> {
 
   Future<List<DmConversation>> _fetchPage(String orgId, int page) async {
     final repository = ref.read(dmRepositoryProvider);
+    final version = _listVersion;
     final results = await repository.getConversations(orgId: orgId, page: page);
-    if (results.length < DmRepository.pageSize) {
+    if (version == _listVersion && results.length < DmRepository.pageSize) {
       _hasMore = false;
     }
-
-    if (results.isEmpty && page == 1) {
-      return [
-        DmConversation(
-          channelId: 'mock-channel-id-123',
-          username: 'Test User',
-          participantId: 'mock-user-id',
-          previewMessage:
-              'This is a test conversation. Tap to test the composer.',
-          unreadCount: 0,
-        ),
-      ];
-    }
-
     return results;
   }
 
@@ -125,8 +142,13 @@ class DmListNotifier extends AsyncNotifier<List<DmConversation>> {
     if (orgId.isEmpty) return;
 
     final current = state.value ?? [];
-    _currentPage++;
-    final next = await _fetchPage(orgId, _currentPage);
+    final version = _listVersion;
+    // Only count the page once it has loaded, so a failed load is asked for
+    // again on the next scroll instead of being skipped.
+    final page = _currentPage + 1;
+    final next = await _fetchPage(orgId, page);
+    if (version != _listVersion) return;
+    _currentPage = page;
     state = AsyncValue.data([...current, ...next]);
   }
 
@@ -134,6 +156,7 @@ class DmListNotifier extends AsyncNotifier<List<DmConversation>> {
     final orgId = ref.read(currentOrgIdProvider);
     if (orgId.isEmpty) return;
 
+    _listVersion++;
     _currentPage = 1;
     _hasMore = true;
     state = const AsyncValue.loading();

@@ -25,9 +25,28 @@ class FakeMagicLinkNotifier extends MagicLinkNotifier {
   }
 }
 
-Widget buildMagicLinkRouterUnderTest({
-  FakeMagicLinkNotifier? magicLinkNotifier,
-}) {
+/// Keeps a send in flight until the test completes [completer], so the
+/// double-submit guard can be exercised.
+class _SlowMagicLinkNotifier extends MagicLinkNotifier {
+  _SlowMagicLinkNotifier(this.completer);
+
+  final Completer<bool> completer;
+  int sendCalls = 0;
+
+  @override
+  FutureOr<void> build() {}
+
+  @override
+  Future<bool> send(String email) async {
+    sendCalls++;
+    state = const AsyncLoading<void>();
+    final success = await completer.future;
+    state = const AsyncData<void>(null);
+    return success;
+  }
+}
+
+Widget buildMagicLinkRouterUnderTest({MagicLinkNotifier? magicLinkNotifier}) {
   final router = GoRouter(
     initialLocation: AppRouter.magicLinkRequest,
     routes: [
@@ -87,6 +106,89 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Email is required'), findsOneWidget);
+    });
+
+    testWidgets('pressing Enter in the email field submits the form', (
+      tester,
+    ) async {
+      await tester.binding.setSurfaceSize(const Size(1440, 1024));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      String? capturedEmail;
+      await tester.pumpWidget(
+        buildMagicLinkRouterUnderTest(
+          magicLinkNotifier: FakeMagicLinkNotifier(
+            sendResult: true,
+            onSend: (email) => capturedEmail = email,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.byType(TextFormField),
+        'anonymoususer@gmail.com',
+      );
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pumpAndSettle();
+
+      expect(capturedEmail, 'anonymoususer@gmail.com');
+      expect(find.text('Check your email'), findsOneWidget);
+    });
+
+    testWidgets('pressing Enter with an empty email shows the error', (
+      tester,
+    ) async {
+      await tester.binding.setSurfaceSize(const Size(1440, 1024));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      var sends = 0;
+      await tester.pumpWidget(
+        buildMagicLinkRouterUnderTest(
+          magicLinkNotifier: FakeMagicLinkNotifier(onSend: (_) => sends++),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byType(TextFormField));
+      await tester.pump();
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Email is required'), findsOneWidget);
+      expect(sends, 0);
+      expect(find.text('Check your email'), findsNothing);
+    });
+
+    testWidgets('pressing Enter while a send is in flight sends only once', (
+      tester,
+    ) async {
+      await tester.binding.setSurfaceSize(const Size(1440, 1024));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      final completer = Completer<bool>();
+      final notifier = _SlowMagicLinkNotifier(completer);
+      await tester.pumpWidget(
+        buildMagicLinkRouterUnderTest(magicLinkNotifier: notifier),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.byType(TextFormField),
+        'anonymoususer@gmail.com',
+      );
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pump();
+
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pump();
+
+      expect(notifier.sendCalls, 1);
+
+      completer.complete(true);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Check your email'), findsOneWidget);
     });
 
     testWidgets('successful send navigates to sent page with email', (

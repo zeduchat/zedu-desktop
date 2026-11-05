@@ -83,11 +83,27 @@ class ApiFailure implements Exception {
       if (data['message'] is String) return data['message'] as String;
       if (data['error'] is String) return data['error'] as String;
     }
-    if (data is String) {
-      return data;
+    if (data is String && _isShortPlainText(data)) {
+      return data.trim();
+    }
+    if (error.type == DioExceptionType.badResponse) {
+      // Not the API's error shape: an HTML page from a proxy, CDN or rate
+      // limiter, or Dio's own status-code text. Neither is for the user.
+      return error.response?.statusCode == 429
+          ? 'Too many requests. Please wait a moment and try again.'
+          : "The request couldn't be completed. Please try again.";
     }
     if (error.message case final message?) return message;
     return 'Request failed. Raw data: $data';
+  }
+
+  static bool _isShortPlainText(String body) {
+    final text = body.trim();
+    return text.isNotEmpty &&
+        text.length <= 200 &&
+        !text.contains('<') &&
+        !text.startsWith('{') &&
+        !text.startsWith('[');
   }
 
   static ApiFailureKind _kindFromDio(DioException error) {

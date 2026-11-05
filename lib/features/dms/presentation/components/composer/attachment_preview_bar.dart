@@ -17,16 +17,17 @@ class AttachmentPreviewBar extends StatelessWidget {
     return Container(
       height: 88,
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
-      child: ListView.separated(
+      child: ListView.builder(
         scrollDirection: Axis.horizontal,
         itemCount: files.length,
-        separatorBuilder: (context, index) => const SizedBox(width: 8),
         itemBuilder: (context, index) {
           final file = files[index];
+          // The inset keeps the remove button inside the Stack and the list:
+          // anything outside them is clipped and cannot be clicked.
           return Stack(
-            clipBehavior: Clip.none,
             children: [
               Container(
+                margin: const EdgeInsets.only(top: 8, right: 8),
                 width: 72,
                 height: 72,
                 decoration: BoxDecoration(
@@ -60,21 +61,34 @@ class AttachmentPreviewBar extends StatelessWidget {
                 ),
               ),
               Positioned(
-                top: -6,
-                right: -6,
-                child: GestureDetector(
-                  onTap: () => onRemove(index),
-                  child: Container(
-                    width: 18,
-                    height: 18,
-                    decoration: const BoxDecoration(
-                      color: Colors.red,
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.close,
-                      size: 11,
-                      color: Colors.white,
+                top: 0,
+                right: 0,
+                child: Tooltip(
+                  message: 'Remove attachment',
+                  child: MouseRegion(
+                    cursor: SystemMouseCursors.click,
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () => onRemove(index),
+                      child: SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: Center(
+                          child: Container(
+                            width: 18,
+                            height: 18,
+                            decoration: const BoxDecoration(
+                              color: Colors.red,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.close,
+                              size: 11,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
                     ),
                   ),
                 ),

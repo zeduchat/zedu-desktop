@@ -1,0 +1,14 @@
+export 'data/datasources/files_remote_datasource.dart';
+export 'data/repositories/files_repository_impl.dart';
+export 'domain/entities/file_folder.dart';
+export 'domain/entities/files_query.dart';
+export 'domain/entities/workspace_file.dart';
+export 'domain/repositories/files_repository.dart';
+export 'presentation/providers/files_notifier.dart';
+export 'presentation/providers/files_providers_di.dart';
+export 'presentation/providers/files_state.dart';
+export 'presentation/views/files_view.dart';
+export 'presentation/widgets/create_folder_dialog.dart';
+export 'presentation/widgets/files_sidebar.dart';
+export 'presentation/widgets/files_tables.dart';
+export 'presentation/widgets/files_toolbar.dart';

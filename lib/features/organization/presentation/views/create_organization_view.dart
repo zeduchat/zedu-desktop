@@ -16,23 +16,8 @@ class _CreateOrganizationViewState
   final _typeController = TextEditingController();
   String? _selectedCountry;
 
-  // Predefined list of countries
-  final List<String> _countries = [
-    'United States',
-    'United Kingdom',
-    'Canada',
-    'Australia',
-    'Nigeria',
-    'India',
-    'Germany',
-    'France',
-    'South Africa',
-    'Kenya',
-    'Brazil',
-    'Japan',
-    'Singapore',
-    'Other',
-  ];
+  // Complete list of countries from central registry
+  static const List<String> _countries = [...kCountries, 'Other'];
 
   @override
   void dispose() {
@@ -229,48 +214,54 @@ class _CreateOrganizationViewState
                     ),
                   ),
                   const SizedBox(height: 8),
-                  DropdownButtonFormField<String>(
+                  FormField<String>(
                     initialValue: _selectedCountry,
-                    items: _countries.map((country) {
-                      return DropdownMenuItem(
-                        value: country,
-                        child: Text(country),
-                      );
-                    }).toList(),
-                    onChanged: isLoading
-                        ? null
-                        : (val) {
-                            setState(() {
-                              _selectedCountry = val;
-                            });
-                          },
-                    decoration: InputDecoration(
-                      hintText: 'Select an option...',
-                      hintStyle: TextStyle(color: colors.textHint),
-                      filled: true,
-                      fillColor: Colors.white,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: BorderSide(color: colors.divider),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: BorderSide(color: colors.divider),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: BorderSide(color: colors.primary),
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 16,
-                      ),
-                    ),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
                         return 'Country is required';
                       }
                       return null;
+                    },
+                    builder: (field) {
+                      OutlineInputBorder border(Color color) =>
+                          OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: BorderSide(color: color),
+                          );
+
+                      return DropdownMenu<String>(
+                        expandedInsets: EdgeInsets
+                            .zero, // fill the same width as the other fields
+                        enabled: !isLoading,
+                        initialSelection: _selectedCountry,
+                        hintText: 'Select an option...',
+                        menuHeight: 240,
+                        requestFocusOnTap:
+                            false, // behave like a plain dropdown, no typing
+                        errorText: field.errorText,
+                        inputDecorationTheme: InputDecorationTheme(
+                          hintStyle: TextStyle(color: colors.textHint),
+                          filled: true,
+                          fillColor: Colors.white,
+                          border: border(colors.divider),
+                          enabledBorder: border(colors.divider),
+                          focusedBorder: border(colors.primary),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 16,
+                          ),
+                        ),
+                        dropdownMenuEntries: _countries
+                            .map(
+                              (c) =>
+                                  DropdownMenuEntry<String>(value: c, label: c),
+                            )
+                            .toList(),
+                        onSelected: (val) {
+                          setState(() => _selectedCountry = val);
+                          field.didChange(val);
+                        },
+                      );
                     },
                   ),
                   const SizedBox(height: 48),

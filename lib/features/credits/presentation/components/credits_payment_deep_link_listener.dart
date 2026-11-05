@@ -56,9 +56,9 @@ class _CreditsPaymentDeepLinkListenerState
     if (sessionId == null || sessionId == _lastProcessedSessionId) return;
     _lastProcessedSessionId = sessionId;
 
-    final user = ref.read(authNotifierProvider).user;
-    final orgId = user?.currentOrg;
-    if (orgId == null || orgId.isEmpty) return;
+    // The purchase was made for the workspace selected in the sidebar.
+    final orgId = ref.read(creditsOrgIdProvider);
+    if (orgId.isEmpty) return;
 
     AppLogger.i('Verifying credit payment session', tag: _tag);
     final verified = await ref
@@ -67,21 +67,33 @@ class _CreditsPaymentDeepLinkListenerState
 
     if (!mounted) return;
 
+    // Mounted from `App`'s builder, above the Navigator: see the note in
+    // AuthDeepLinkListener.
+    final navigator = AppRouter.navigatorKey.currentState;
+    if (navigator == null) return;
+
     if (verified) {
-      AppToastService.show(
-        context,
+      AppToastService.showAtRoot(
+        navigator,
         type: AppToastType.success,
         message: 'AI credits purchased successfully!',
       );
-      if (GoRouterState.of(context).uri.path != AppRouter.buyCredits) {
-        context.go(AppRouter.buyCredits);
+      if (GoRouter.of(
+            navigator.context,
+          ).routerDelegate.currentConfiguration.uri.path !=
+          AppRouter.buyCredits) {
+        navigator.context.go(AppRouter.buyCredits);
       }
       return;
     }
 
     final error = ref.read(creditsNotifierProvider).error;
     if (error != null) {
-      AppToastService.show(context, type: AppToastType.error, message: error);
+      AppToastService.showAtRoot(
+        navigator,
+        type: AppToastType.error,
+        message: error,
+      );
     }
   }
 

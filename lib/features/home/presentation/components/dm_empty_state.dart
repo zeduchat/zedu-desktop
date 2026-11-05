@@ -26,6 +26,7 @@ class DmEmptyState extends StatelessWidget {
                 ),
                 child: SvgPicture.asset(
                   'assets/svgs/dm_empty_chat.svg',
+                  excludeFromSemantics: true,
                   width: 60,
                   height: 56,
                 ),

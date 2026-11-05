@@ -110,7 +110,7 @@ class _ChangePasswordViewState extends ConsumerState<ChangePasswordView> {
               children: [
                 context.gapV(80),
                 Text(
-                  'Change Password',
+                  'Change password',
                   style: context.textTheme.headlineMedium?.copyWith(
                     fontWeight: FontWeight.w700,
                   ),
@@ -166,6 +166,7 @@ class _ChangePasswordViewState extends ConsumerState<ChangePasswordView> {
                         label: 'Confirm new password',
                         hint: 'Confirm new Password',
                         textInputAction: TextInputAction.done,
+                        onFieldSubmitted: (_) => _onChangePasswordPressed(),
                         validator: (value) {
                           if (value != _newPasswordController.text) {
                             return 'Passwords do not match';
@@ -175,7 +176,7 @@ class _ChangePasswordViewState extends ConsumerState<ChangePasswordView> {
                       ),
                       context.gapV(32),
                       AppButton(
-                        label: 'Change Password',
+                        label: 'Change password',
                         loading: authState.isLoading,
                         onPressed: _onChangePasswordPressed,
                       ),

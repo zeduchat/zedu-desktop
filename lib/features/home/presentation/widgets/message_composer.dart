@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:io' show Directory, File, Platform;
 import 'package:zedu/core/core.dart';
 import 'package:zedu/features/features.dart';
 
@@ -58,6 +60,89 @@ class _MessageComposerState extends ConsumerState<MessageComposer> {
         _controller.text = '[Voice Note Attached]';
       }
     });
+  }
+
+  Future<bool> handlePaste({DataReader? reader}) async {
+    final clipReader = reader ?? await SystemClipboard.instance?.read();
+    if (clipReader == null) return false;
+
+    SimpleFileFormat? matchedFormat;
+    String ext = 'png';
+
+    if (clipReader.canProvide(Formats.png)) {
+      matchedFormat = Formats.png;
+      ext = 'png';
+    } else if (clipReader.canProvide(Formats.jpeg)) {
+      matchedFormat = Formats.jpeg;
+      ext = 'jpg';
+    } else if (clipReader.canProvide(Formats.webp)) {
+      matchedFormat = Formats.webp;
+      ext = 'webp';
+    } else if (clipReader.canProvide(Formats.gif)) {
+      matchedFormat = Formats.gif;
+      ext = 'gif';
+    }
+
+    if (matchedFormat != null) {
+      final completer = Completer<bool>();
+      clipReader.getFile(
+        matchedFormat,
+        (file) async {
+          try {
+            final bytes = await file.readAll();
+            if (bytes.isNotEmpty) {
+              final fileName =
+                  'pasted_image_${DateTime.now().millisecondsSinceEpoch}.$ext';
+              try {
+                final tempPath =
+                    '${Directory.systemTemp.path}${Platform.pathSeparator}$fileName';
+                final tempFile = File(tempPath);
+                await tempFile.writeAsBytes(bytes);
+              } catch (_) {}
+              if (mounted) {
+                setState(() {
+                  _attachedFiles.add(fileName);
+                });
+              }
+            }
+            if (!completer.isCompleted) completer.complete(true);
+          } catch (_) {
+            if (!completer.isCompleted) completer.complete(false);
+          }
+        },
+        onError: (_) {
+          if (!completer.isCompleted) completer.complete(false);
+        },
+      );
+      return await completer.future;
+    }
+
+    if (clipReader.canProvide(Formats.fileUri)) {
+      clipReader.getValue(Formats.fileUri, (uri) async {
+        if (uri != null && uri.hasScheme && uri.scheme == 'file') {
+          final filePath = uri.toFilePath();
+          final fileExt = filePath.split('.').last.toLowerCase();
+          if (const [
+            'png',
+            'jpg',
+            'jpeg',
+            'webp',
+            'gif',
+            'bmp',
+          ].contains(fileExt)) {
+            final fileName = filePath.split(Platform.pathSeparator).last;
+            if (mounted) {
+              setState(() {
+                _attachedFiles.add(fileName);
+              });
+            }
+          }
+        }
+      });
+      return true;
+    }
+
+    return false;
   }
 
   void _handleSend() {
@@ -172,7 +257,10 @@ class _MessageComposerState extends ConsumerState<MessageComposer> {
               child: Column(
                 children: teamMembers.map((member) {
                   final name = member.name ?? member.email;
-                  final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
+                  final initial = avatarInitial(
+                    member.name,
+                    fallback: avatarInitial(member.email),
+                  );
                   return InkWell(
                     onTap: () => _insertMention(name),
                     child: Padding(
@@ -289,22 +377,47 @@ class _MessageComposerState extends ConsumerState<MessageComposer> {
                   tooltip: 'Attach file',
                 ),
                 Expanded(
-                  child: TextField(
-                    controller: _controller,
-                    focusNode: _focusNode,
-                    onChanged: _onTextChanged,
-                    minLines: 1,
-                    maxLines: 8,
-                    style: TextStyle(color: colors.textPrimary, fontSize: 15),
-                    decoration: InputDecoration(
-                      hintText: widget.activeChat.type == ActiveChatType.groupDm
-                          ? 'Message group...'
-                          : 'Message #${widget.activeChat.id ?? "general"}',
-                      hintStyle: TextStyle(color: colors.textHint),
-                      border: InputBorder.none,
-                      contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                  child: Focus(
+                    onKeyEvent: (node, event) {
+                      if (event is! KeyDownEvent) return KeyEventResult.ignored;
+                      final key = event.logicalKey;
+                      if (key == LogicalKeyboardKey.enter ||
+                          key == LogicalKeyboardKey.numpadEnter) {
+                        // Shift+Enter falls through so the default newline is inserted.
+                        if (HardwareKeyboard.instance.isShiftPressed) {
+                          return KeyEventResult.ignored;
+                        }
+                        _handleSend();
+                        return KeyEventResult.handled;
+                      }
+                      if (key == LogicalKeyboardKey.keyV &&
+                          (HardwareKeyboard.instance.isControlPressed ||
+                              HardwareKeyboard.instance.isMetaPressed)) {
+                        handlePaste();
+                        return KeyEventResult.ignored;
+                      }
+                      return KeyEventResult.ignored;
+                    },
+                    child: TextField(
+                      controller: _controller,
+                      focusNode: _focusNode,
+                      onChanged: _onTextChanged,
+                      minLines: 1,
+                      maxLines: 8,
+                      style: TextStyle(color: colors.textPrimary, fontSize: 15),
+                      decoration: InputDecoration(
+                        hintText:
+                            widget.activeChat.type == ActiveChatType.groupDm
+                            ? 'Message group...'
+                            : 'Message #${widget.activeChat.id ?? "general"}',
+                        hintStyle: TextStyle(color: colors.textHint),
+                        border: InputBorder.none,
+                        contentPadding: const EdgeInsets.symmetric(
+                          vertical: 12,
+                        ),
+                      ),
+                      onSubmitted: (_) => _handleSend(),
                     ),
-                    onSubmitted: (_) => _handleSend(),
                   ),
                 ),
                 if (_controller.text.isEmpty && !_isRecording)
@@ -325,6 +438,7 @@ class _MessageComposerState extends ConsumerState<MessageComposer> {
                         onPressed: _stopRecording,
                         icon: Icon(Icons.stop_circle, color: colors.error),
                         splashRadius: 20,
+                        tooltip: 'Stop recording',
                       ),
                     ],
                   )
@@ -333,6 +447,7 @@ class _MessageComposerState extends ConsumerState<MessageComposer> {
                     onPressed: _handleSend,
                     icon: Icon(Icons.send, color: colors.primary),
                     splashRadius: 20,
+                    tooltip: 'Send message',
                   ),
               ],
             ),

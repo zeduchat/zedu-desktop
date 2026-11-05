@@ -1,16 +1,41 @@
 import 'package:zedu/core/core.dart';
+import 'package:zedu/features/features.dart';
 
 /// Panel opened from the notifications bell in the sidebar rail.
 ///
-/// The desktop app has no notifications feed yet, so this shows an empty
-/// state. Real incoming-message notifications are still delivered by
+/// Lists the DMs that have unread messages and opens one when clicked. There
+/// is no mentions feed yet, so the empty state shows whenever no DM is
+/// unread. Real incoming-message notifications are still delivered by
 /// `NotificationService`.
-class NotificationsDialog extends StatelessWidget {
+class NotificationsDialog extends ConsumerWidget {
   const NotificationsDialog({super.key});
 
+  void _openConversation(
+    BuildContext context,
+    WidgetRef ref,
+    DmConversation conversation,
+  ) {
+    // Read before popping: the dialog's context is gone afterwards.
+    final router = GoRouter.maybeOf(context);
+    ref.read(homeSidebarProvider.notifier).setType(HomeSidebarType.dms);
+    ref.read(selectedDmProvider.notifier).select(conversation);
+    Navigator.of(context).pop();
+    if (router != null &&
+        router.routerDelegate.currentConfiguration.uri.path != AppRouter.home) {
+      router.go(AppRouter.home);
+    }
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final colors = context.colors;
+    final dmState = ref.watch(dmListProvider);
+    final deletedIds = ref.watch(
+      dmConversationActionsProvider.select((a) => a.deletedIds),
+    );
+    final unread = (dmState.value ?? const <DmConversation>[])
+        .where((c) => c.unreadCount > 0 && !deletedIds.contains(c.channelId))
+        .toList();
 
     return Dialog(
       insetPadding: const EdgeInsets.only(bottom: 80, left: 74),
@@ -54,42 +79,165 @@ class NotificationsDialog extends StatelessWidget {
               ),
             ),
             Divider(height: 1, color: colors.divider),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
+            if (unread.isEmpty && dmState.isLoading)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 40),
+                child: CircularProgressIndicator(),
+              )
+            else if (unread.isEmpty)
+              const _EmptyState()
+            else
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 360),
+                child: ListView(
+                  shrinkWrap: true,
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  children: [
+                    for (final conversation in unread)
+                      _UnreadDmRow(
+                        conversation: conversation,
+                        onTap: () =>
+                            _openConversation(context, ref, conversation),
+                      ),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _UnreadDmRow extends StatelessWidget {
+  const _UnreadDmRow({required this.conversation, required this.onTap});
+
+  final DmConversation conversation;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    final avatarUrl = conversation.effectiveAvatarUrl;
+    // Whole first character, so an empty name or an emoji can't break the row.
+    final trimmedName = conversation.displayName.trim();
+    final initial = trimmedName.isNotEmpty
+        ? trimmedName.characters.first.toUpperCase()
+        : '?';
+    final preview = conversation.previewMessage
+        .replaceAll(RegExp(r'<[^>]*>'), '')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+
+    return InkWell(
+      onTap: onTap,
+      mouseCursor: SystemMouseCursors.click,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: Row(
+          children: [
+            CircleAvatar(
+              radius: 16,
+              backgroundColor: colors.primaryBg,
+              backgroundImage: avatarUrl != null
+                  ? NetworkImage(avatarUrl)
+                  : null,
+              child: avatarUrl == null
+                  ? Text(
+                      initial,
+                      style: TextStyle(fontSize: 13, color: colors.primary),
+                    )
+                  : null,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: colors.primaryBg,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      Icons.notifications_none_outlined,
-                      color: colors.primary,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
                   Text(
-                    "You're all caught up",
+                    conversation.displayName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      fontSize: 15,
+                      fontSize: 14,
                       fontWeight: FontWeight.w600,
                       color: colors.textPrimary,
                     ),
                   ),
-                  const SizedBox(height: 6),
-                  Text(
-                    "There's nothing to show here yet.",
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 13, color: colors.textSecondary),
-                  ),
+                  if (preview.isNotEmpty)
+                    Text(
+                      preview,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: colors.textSecondary,
+                      ),
+                    ),
                 ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: colors.primary,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                '${conversation.unreadCount}',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: colors.onPrimary,
+                ),
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _EmptyState extends StatelessWidget {
+  const _EmptyState();
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
+      child: Column(
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: colors.primaryBg,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.notifications_none_outlined,
+              color: colors.primary,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            "You're all caught up",
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              color: colors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'You have no unread messages.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 13, color: colors.textSecondary),
+          ),
+        ],
       ),
     );
   }

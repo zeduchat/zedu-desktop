@@ -1,15 +1,34 @@
 import 'package:zedu/core/core.dart';
 import 'package:zedu/features/features.dart';
 
-class DmSidebarList extends ConsumerWidget {
+class DmSidebarList extends ConsumerStatefulWidget {
   const DmSidebarList({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<DmSidebarList> createState() => _DmSidebarListState();
+}
+
+class _DmSidebarListState extends ConsumerState<DmSidebarList> {
+  final _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _clearSearch() {
+    _searchController.clear();
+    setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final colors = context.colors;
+    final textColor = colors.onPrimary.withValues(alpha: 0.9);
+    final query = _searchController.text.trim().toLowerCase();
 
     return Container(
-      width: 320,
       color: colors.sidebar,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -32,19 +51,39 @@ class DmSidebarList extends ConsumerWidget {
                     child: Row(
                       children: [
                         const SizedBox(width: 8),
-                        Icon(
-                          Icons.search,
-                          color: colors.onPrimary.withValues(alpha: 0.9),
-                          size: 16,
-                        ),
+                        Icon(Icons.search, color: textColor, size: 16),
                         const SizedBox(width: 8),
-                        Text(
-                          'Find a Conversation',
-                          style: TextStyle(
-                            color: colors.onPrimary.withValues(alpha: 0.9),
-                            fontSize: 12,
+                        Expanded(
+                          child: TextField(
+                            controller: _searchController,
+                            onChanged: (_) => setState(() {}),
+                            cursorColor: textColor,
+                            style: TextStyle(color: textColor, fontSize: 12),
+                            decoration: InputDecoration(
+                              hintText: 'Find a Conversation',
+                              hintStyle: TextStyle(
+                                color: textColor,
+                                fontSize: 12,
+                              ),
+                              isDense: true,
+                              border: InputBorder.none,
+                              contentPadding: EdgeInsets.zero,
+                            ),
                           ),
                         ),
+                        if (_searchController.text.isNotEmpty)
+                          IconButton(
+                            tooltip: 'Clear search',
+                            onPressed: _clearSearch,
+                            icon: Icon(Icons.close, color: textColor, size: 14),
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints.tightFor(
+                              width: 28,
+                              height: 28,
+                            ),
+                          )
+                        else
+                          const SizedBox(width: 8),
                       ],
                     ),
                   ),
@@ -85,10 +124,19 @@ class DmSidebarList extends ConsumerWidget {
                             if (aPinned != bPinned) return aPinned ? -1 : 1;
                             return b.lastActivityAt.compareTo(a.lastActivityAt);
                           });
+                    if (query.isNotEmpty) {
+                      visibleConversations.retainWhere(
+                        (conversation) => conversation.displayName
+                            .toLowerCase()
+                            .contains(query),
+                      );
+                    }
                     if (visibleConversations.isEmpty) {
                       return Center(
                         child: Text(
-                          'No recent chats',
+                          query.isEmpty
+                              ? 'No recent chats'
+                              : 'No conversations match',
                           style: TextStyle(
                             color: colors.onPrimary.withValues(alpha: 0.5),
                           ),

@@ -42,7 +42,23 @@ class DmDraftStore extends ChangeNotifier {
   bool _disposed = false;
 
   DmDraftStore(this._storage, {required String userId, required String orgId})
-    : _keyPrefix = 'dm_draft_${userId}_${orgId}_';
+    : _keyPrefix = '${_userPrefix(userId)}${orgId}_';
+
+  static String _userPrefix(String userId) => 'dm_draft_${userId}_';
+
+  /// Deletes every draft [userId] saved on this computer, in every org and
+  /// conversation, so private unsent text doesn't outlive signing out.
+  static Future<void> deleteAllForUser(
+    SecureStorageService storage,
+    String userId,
+  ) async {
+    if (userId.isEmpty) return;
+    final prefix = _userPrefix(userId);
+    final stored = await storage.readAll();
+    for (final key in stored.keys.where((k) => k.startsWith(prefix))) {
+      await storage.deleteValue(key);
+    }
+  }
 
   @override
   void dispose() {

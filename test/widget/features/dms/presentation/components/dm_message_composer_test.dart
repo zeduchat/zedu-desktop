@@ -325,4 +325,51 @@ void main() {
       expect(controller.selection, const TextSelection.collapsed(offset: 5));
     });
   });
+
+  group('DmMessageComposer drafts with no channel yet', () {
+    testWidgets('each person keeps their own draft', (tester) async {
+      final draftKey = ValueNotifier('new-dm:ada');
+      addTearDown(draftKey.dispose);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            dmDraftStoreProvider.overrideWith(
+              (ref) => DmDraftStore(
+                FakeSecureStorageService(),
+                userId: 'user-1',
+                orgId: 'org-1',
+              ),
+            ),
+          ],
+          child: buildTestMaterialApp(
+            Scaffold(
+              body: ValueListenableBuilder<String>(
+                valueListenable: draftKey,
+                builder: (context, key, _) => DmMessageComposer(
+                  recipientName: 'Ada',
+                  channelId: '',
+                  draftKey: key,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.enterText(find.byType(TextField), 'for ada only');
+      await tester.pump(const Duration(milliseconds: 300));
+
+      draftKey.value = 'new-dm:grace';
+      await tester.pumpAndSettle(const Duration(milliseconds: 300));
+      expect(composerController(tester).text, isEmpty);
+
+      draftKey.value = 'new-dm:ada';
+      await tester.pumpAndSettle(const Duration(milliseconds: 300));
+      expect(composerController(tester).text, 'for ada only');
+
+      composerController(tester).clear();
+      await tester.pump(const Duration(milliseconds: 300));
+    });
+  });
 }

@@ -235,4 +235,111 @@ void main() {
       expect(find.text('2/4/2026'), findsOneWidget);
     });
   });
+
+  group('avatar initial', () {
+    testWidgets('skips leading whitespace in the name', (tester) async {
+      await tester.pumpWidget(
+        buildTileUnderTest(buildConversation(username: ' ada')),
+      );
+
+      expect(tester.takeException(), isNull);
+      expect(find.text('A'), findsOneWidget);
+    });
+
+    testWidgets('shows ? for a whitespace-only name', (tester) async {
+      await tester.pumpWidget(
+        buildTileUnderTest(buildConversation(username: '   ')),
+      );
+
+      expect(tester.takeException(), isNull);
+      expect(find.text('?'), findsOneWidget);
+    });
+  });
+
+  group('rows for people with no conversation yet', () {
+    DmConversation newDm(String participantId) => DmConversation(
+      channelId: '',
+      username: participantId,
+      participantId: participantId,
+      previewMessage: 'Chat with this user',
+      unreadCount: 0,
+    );
+
+    Future<DmDraftStore> pumpRows(
+      WidgetTester tester, {
+      DmConversation? selected,
+    }) async {
+      final store = DmDraftStore(
+        FakeSecureStorageService(),
+        userId: 'user-1',
+        orgId: 'org-1',
+      );
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            selectedDmProvider.overrideWith(
+              () => FakeSelectedDmNotifier(selected),
+            ),
+            dmDraftStoreProvider.overrideWith((ref) => store),
+          ],
+          child: buildTestMaterialApp(
+            Scaffold(
+              backgroundColor: _palette.sidebar,
+              body: Column(
+                children: [
+                  DmListTile(conversation: newDm('ada')),
+                  DmListTile(conversation: newDm('grace')),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      return store;
+    }
+
+    Color? fillOf(WidgetTester tester, String name) {
+      final ink = tester.widget<Ink>(
+        find.descendant(
+          of: find.widgetWithText(DmListTile, name),
+          matching: find.byType(Ink),
+        ),
+      );
+      return (ink.decoration! as BoxDecoration).color;
+    }
+
+    testWidgets('only the open row is highlighted', (tester) async {
+      await pumpRows(tester, selected: newDm('ada'));
+
+      expect(fillOf(tester, 'ada'), selectedFill);
+      expect(fillOf(tester, 'grace'), Colors.transparent);
+    });
+
+    testWidgets('a draft shows only on its own row', (tester) async {
+      final store = await pumpRows(tester);
+
+      await store.save(newDm('ada').conversationKey, 'hello ada');
+      await tester.pumpAndSettle();
+
+      expect(
+        find.descendant(
+          of: find.widgetWithText(DmListTile, 'ada'),
+          matching: find.textContaining('hello ada', findRichText: true),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.widgetWithText(DmListTile, 'grace'),
+          matching: find.textContaining('hello ada', findRichText: true),
+        ),
+        findsNothing,
+      );
+    });
+
+    test('rows with a channel keep the channel as their key', () {
+      expect(buildConversation().conversationKey, 'channel-1');
+    });
+  });
 }

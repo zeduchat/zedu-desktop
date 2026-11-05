@@ -131,6 +131,39 @@ void main() {
       });
     });
 
+    group('highlights the open channel', () {
+      bool isHighlighted(WidgetTester tester, String name) {
+        final ink = tester.widget<Ink>(
+          find.ancestor(of: find.text(name), matching: find.byType(Ink)),
+        );
+        return (ink.decoration! as BoxDecoration).color != Colors.transparent;
+      }
+
+      testWidgets('and moves it when another channel opens', (tester) async {
+        await pumpList(tester, channels: FakeChannelNotifier.new);
+        expect(isHighlighted(tester, 'general'), isTrue);
+        expect(isHighlighted(tester, 'random'), isFalse);
+
+        await tester.tap(find.text('random'));
+        await tester.pump();
+
+        expect(isHighlighted(tester, 'general'), isFalse);
+        expect(isHighlighted(tester, 'random'), isTrue);
+      });
+
+      testWidgets('but not a channel named like the open group DM', (
+        tester,
+      ) async {
+        await pumpList(tester, channels: FakeChannelNotifier.new);
+
+        container.read(activeChatProvider.notifier).selectGroupDm('random');
+        await tester.pump();
+
+        expect(isHighlighted(tester, 'general'), isFalse);
+        expect(isHighlighted(tester, 'random'), isFalse);
+      });
+    });
+
     testWidgets('tapping a channel opens it', (tester) async {
       await pumpList(tester, channels: FakeChannelNotifier.new);
       expect(container.read(activeChatProvider).id, 'general');
@@ -140,7 +173,11 @@ void main() {
 
       expect(
         container.read(activeChatProvider),
-        const ActiveChatState(type: ActiveChatType.channel, id: 'random'),
+        const ActiveChatState(
+          type: ActiveChatType.channel,
+          id: 'random',
+          channelId: 'channel-random',
+        ),
       );
     });
   });

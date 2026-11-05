@@ -7,6 +7,7 @@ class _FakeChannelNotifier extends ChannelNotifier {
   Result<Channel> result = const Failure<Channel>(
     ApiFailure(message: 'Channel name already exists'),
   );
+  int createCalls = 0;
 
   @override
   Future<List<Channel>> build() async => const [];
@@ -17,7 +18,10 @@ class _FakeChannelNotifier extends ChannelNotifier {
     required String description,
     required bool isPrivate,
     String? topic,
-  }) async => result;
+  }) async {
+    createCalls++;
+    return result;
+  }
 }
 
 void main() {
@@ -56,6 +60,13 @@ void main() {
     Future<void> submit(WidgetTester tester) async {
       await tester.enterText(find.byType(TextField).first, 'general');
       await tester.tap(find.text('Create'));
+      await tester.pumpAndSettle();
+    }
+
+    // AppToastService auto-dismisses on a 4s timer; let it fire before the
+    // test ends so no timer is left pending.
+    Future<void> drainToastTimer(WidgetTester tester) async {
+      await tester.pump(const Duration(seconds: 4));
       await tester.pumpAndSettle();
     }
 
@@ -117,6 +128,59 @@ void main() {
       await submit(tester);
 
       expect(find.text('Create a channel'), findsNothing);
+      await drainToastTimer(tester);
+    });
+
+    testWidgets('confirms the creation with a success toast', (tester) async {
+      await openModal(tester);
+      notifier.result = Success<Channel>(
+        Channel(
+          id: 'c1',
+          name: 'general',
+          description: '',
+          organisationId: 'org-1',
+          ownerId: 'user-1',
+        ),
+      );
+
+      await submit(tester);
+
+      expect(find.text('Channel created'), findsOneWidget);
+      await drainToastTimer(tester);
+    });
+
+    testWidgets('asks for a name when Create is tapped with none', (
+      tester,
+    ) async {
+      await openModal(tester);
+
+      await tester.tap(find.text('Create'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Channel name is required'), findsOneWidget);
+      expect(notifier.createCalls, 0);
+    });
+
+    testWidgets('treats a name of only spaces as empty', (tester) async {
+      await openModal(tester);
+
+      await tester.enterText(find.byType(TextField).first, '   ');
+      await tester.tap(find.text('Create'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Channel name is required'), findsOneWidget);
+      expect(notifier.createCalls, 0);
+    });
+
+    testWidgets('clears the name error once a name is typed', (tester) async {
+      await openModal(tester);
+      await tester.tap(find.text('Create'));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byType(TextField).first, 'general');
+      await tester.pump();
+
+      expect(find.text('Channel name is required'), findsNothing);
     });
   });
 }

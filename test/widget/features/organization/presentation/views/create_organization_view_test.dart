@@ -29,5 +29,35 @@ void main() {
       expect(find.text('Enter your organization Name'), findsNothing);
       expect(find.text('What does your organization do'), findsNothing);
     });
+
+    testWidgets('country dropdown includes kCountries and Other option', (
+      tester,
+    ) async {
+      await tester.pumpWidget(buildCreateOrganizationViewUnderTest());
+
+      final dropdownFinder = find.byType(DropdownMenu<String>);
+      expect(dropdownFinder, findsOneWidget);
+
+      final dropdown = tester.widget<DropdownMenu<String>>(dropdownFinder);
+      final entryValues = dropdown.dropdownMenuEntries
+          .map((e) => e.value)
+          .toList();
+
+      for (final country in kCountries) {
+        expect(
+          entryValues.contains(country),
+          isTrue,
+          reason: '$country should be in dropdown entries',
+        );
+      }
+      expect(entryValues.contains('Other'), isTrue);
+      expect(entryValues.last, equals('Other'));
+      expect(entryValues.length, equals(kCountries.length + 1));
+
+      // Specifically verify countries that were previously omitted
+      expect(entryValues.contains('Spain'), isTrue);
+      expect(entryValues.contains('Ireland'), isTrue);
+      expect(entryValues.contains('Afghanistan'), isTrue);
+    });
   });
 }

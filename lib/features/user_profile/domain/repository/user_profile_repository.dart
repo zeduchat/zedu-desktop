@@ -6,10 +6,13 @@ abstract interface class UserProfileRepository {
   Future<Result<ProfileAccount>> updateAccount(ProfileAccount account);
   Future<Result<void>> deleteAccount();
 
-  Future<Result<NotificationPreferences>> getNotificationPreferences();
-  Future<Result<NotificationPreferences>> updateNotificationPreferences(
-    NotificationPreferences preferences,
-  );
+  Future<Result<NotificationPreferences>> getNotificationPreferences({
+    required String? orgId,
+  });
+  Future<Result<NotificationPreferences>> updateNotificationPreferences({
+    required String? orgId,
+    required NotificationPreferences preferences,
+  });
 
   Future<Result<List<SecuritySession>>> getSecuritySessions();
   Future<Result<void>> changePassword({
@@ -17,16 +20,17 @@ abstract interface class UserProfileRepository {
     required String newPassword,
   });
 
-  Future<Result<OrganizationProfile>> getOrganization();
+  Future<Result<OrganizationProfile>> getOrganization({String? orgId});
   Future<Result<OrganizationProfile>> createOrganization({
     required String name,
     required String type,
     required String country,
   });
   Future<Result<OrganizationProfile>> updateOrganization(
-    OrganizationProfile organization,
-  );
-  Future<Result<void>> deleteOrganization();
+    OrganizationProfile organization, {
+    String? orgId,
+  });
+  Future<Result<void>> deleteOrganization({required String orgId});
 
   Future<Result<List<TeamMember>>> getTeamMembers({String? orgId});
   Future<Result<TeamMember>> inviteMember({

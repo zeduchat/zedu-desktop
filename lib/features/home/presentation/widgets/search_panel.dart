@@ -10,6 +10,50 @@ class SearchPanel extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+  State<SearchPanel> createState() => _SearchPanelState();
+}
+
+class _SearchPanelState extends State<SearchPanel> {
+  final TextEditingController _searchController = TextEditingController();
+  List<String> _results = [];
+  bool _isSearching = false;
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _performSearch(String query) {
+    if (query.isEmpty) {
+      setState(() {
+        _results = [];
+        _isSearching = false;
+      });
+      return;
+    }
+
+    setState(() {
+      _isSearching = true;
+      // Mock search delay
+    });
+
+    Future.delayed(const Duration(milliseconds: 500), () {
+      if (mounted) {
+        setState(() {
+          _isSearching = false;
+          _results = [
+            'Found message matching "$query"',
+            'Another result for "$query"',
+            'Older message discussing "$query"',
+          ];
+        });
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final colors = context.colors;
     final query = ref.watch(_searchQueryProvider);
     final results = ref.watch(_searchResultsProvider(channelId));
@@ -45,6 +89,7 @@ class SearchPanel extends ConsumerWidget {
                   onPressed: onClose,
                   icon: Icon(Icons.close, color: colors.textHint),
                   splashRadius: 20,
+                  tooltip: 'Close search',
                 ),
               ],
             ),

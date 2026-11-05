@@ -25,6 +25,7 @@ class SidebarChannelList extends ConsumerWidget {
                   (c.organisationId.isEmpty || c.organisationId == orgId),
             )
             .toList();
+    final activeChat = ref.watch(activeChatProvider);
 
     return ConstrainedBox(
       constraints: const BoxConstraints(maxHeight: 240),
@@ -35,9 +36,12 @@ class SidebarChannelList extends ConsumerWidget {
           for (final channel in channels)
             _SidebarChannelItem(
               label: channel.name,
+              selected:
+                  activeChat.type == ActiveChatType.channel &&
+                  activeChat.id == channel.name,
               onTap: () => ref
                   .read(activeChatProvider.notifier)
-                  .selectChannel(channel.name),
+                  .selectChannel(channel.name, channelId: channel.id),
             ),
         ],
       ),
@@ -47,37 +51,59 @@ class SidebarChannelList extends ConsumerWidget {
 
 class _SidebarChannelItem extends StatelessWidget {
   final String label;
+  final bool selected;
   final VoidCallback onTap;
 
-  const _SidebarChannelItem({required this.label, required this.onTap});
+  const _SidebarChannelItem({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
+    final borderRadius = BorderRadius.circular(6);
 
-    return InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-        child: Row(
-          children: [
-            Text(
-              '#',
-              style: TextStyle(
-                color: colors.onPrimary.withValues(alpha: 0.54),
-                fontSize: 18,
-              ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      child: Ink(
+        decoration: BoxDecoration(
+          color: selected
+              ? colors.onPrimary.withValues(alpha: 0.16)
+              : Colors.transparent,
+          borderRadius: borderRadius,
+        ),
+        child: InkWell(
+          borderRadius: borderRadius,
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            child: Row(
+              children: [
+                Text(
+                  '#',
+                  style: TextStyle(
+                    color: colors.onPrimary.withValues(alpha: 0.54),
+                    fontSize: 18,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Flexible(
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: colors.onPrimary,
+                      fontSize: 15,
+                      fontWeight: selected ? FontWeight.w600 : null,
+                    ),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(width: 12),
-            Flexible(
-              child: Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(color: colors.onPrimary, fontSize: 15),
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );

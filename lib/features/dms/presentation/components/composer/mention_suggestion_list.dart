@@ -59,6 +59,7 @@ class MentionSuggestionList extends StatelessWidget {
                 final initial = trimmed.isNotEmpty
                     ? trimmed.characters.first.toUpperCase()
                     : '?';
+                final initial = avatarInitial(p.username);
                 return InkWell(
                   onTap: () => onSelect(p),
                   hoverColor: colors.primary.withValues(alpha: 0.07),

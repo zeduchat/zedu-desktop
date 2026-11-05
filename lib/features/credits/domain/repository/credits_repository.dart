@@ -7,7 +7,8 @@ abstract interface class CreditsRepository {
   Future<Result<CreditUsageReport>> getUsageReport(String orgId);
   Future<Result<List<CreditTransaction>>> getTransactions(String orgId);
   Future<Result<CreditCheckoutSession>> purchaseCredits({
-    required String planId,
+    String? packageId,
+    String? planId,
     required String email,
   });
   Future<Result<void>> verifyPayment({required String sessionId});

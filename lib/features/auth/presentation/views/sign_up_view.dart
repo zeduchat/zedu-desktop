@@ -9,16 +9,29 @@ class SignUpView extends ConsumerStatefulWidget {
 }
 
 class _SignUpViewState extends ConsumerState<SignUpView> {
-  static final _termsUrl = Uri.parse('https://zedu.chat/terms-of-service');
-  static final _privacyUrl = Uri.parse('https://zedu.chat/policy');
+  static final _termsUrl = Uri.parse(kTermsUrl);
+  static final _privacyUrl = Uri.parse(kPrivacyUrl);
 
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
 
+  // Google may sign in an account that already exists, so the success toast
+  // must not claim a new account was created.
+  bool _signingUpWithGoogle = false;
+  late final _loginLink = TapGestureRecognizer()
+    ..onTap = () => context.go(AppRouter.login);
+  late final _termsLink = TapGestureRecognizer()
+    ..onTap = () => launchUrl(_termsUrl);
+  late final _privacyLink = TapGestureRecognizer()
+    ..onTap = () => launchUrl(_privacyUrl);
+
   @override
   void dispose() {
+    _loginLink.dispose();
+    _termsLink.dispose();
+    _privacyLink.dispose();
     _emailController.dispose();
     _usernameController.dispose();
     _passwordController.dispose();
@@ -27,14 +40,21 @@ class _SignUpViewState extends ConsumerState<SignUpView> {
 
   Future<void> _onCreateAccountPressed() async {
     if (!_formKey.currentState!.validate()) return;
+    _signingUpWithGoogle = false;
 
     ref
         .read(authNotifierProvider.notifier)
         .signUp(
           username: _usernameController.text.trim(),
           email: _emailController.text.trim(),
-          password: _passwordController.text.trim(),
+          password: _passwordController.text,
         );
+  }
+
+  void _onGooglePressed() {
+    if (ref.read(authNotifierProvider).isLoading) return;
+    _signingUpWithGoogle = true;
+    ref.read(authNotifierProvider.notifier).loginWithGoogle();
   }
 
   @override
@@ -45,7 +65,9 @@ class _SignUpViewState extends ConsumerState<SignUpView> {
         AppToastService.show(
           context,
           type: AppToastType.success,
-          message: 'Account created successfully!',
+          message: _signingUpWithGoogle
+              ? 'Signed in with Google!'
+              : 'Account created successfully!',
         );
         context.go(AppRouter.home);
       }
@@ -98,8 +120,7 @@ class _SignUpViewState extends ConsumerState<SignUpView> {
                         color: context.colors.primary,
                         fontFamily: FontFamily.roboto,
                       ),
-                      recognizer: TapGestureRecognizer()
-                        ..onTap = () => context.go(AppRouter.login),
+                      recognizer: _loginLink,
                     ),
                   ],
                 ),
@@ -172,6 +193,10 @@ class _SignUpViewState extends ConsumerState<SignUpView> {
                         hint: 'Password',
                         textInputAction: TextInputAction.done,
                         validator: (value) {
+                          if (value != null &&
+                              Validators.hasPasswordEdgeSpace(value)) {
+                            return Validators.passwordEdgeSpaceMessage;
+                          }
                           if (value == null || value.length < 8) {
                             return 'Password must be at least 8 characters long';
                           }
@@ -187,57 +212,46 @@ class _SignUpViewState extends ConsumerState<SignUpView> {
                   loading: authState.isLoading,
                   onPressed: _onCreateAccountPressed,
                 ),
-                context.gapV(32),
-                Padding(
-                  padding: context.symmetric(horizontal: 100, vertical: 0),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Divider(
-                          color: context.colors.divider,
-                          height: 0.67,
+                if (kSocialSignInEnabled) ...[
+                  context.gapV(32),
+                  Padding(
+                    padding: context.symmetric(horizontal: 100, vertical: 0),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Divider(
+                            color: context.colors.divider,
+                            height: 0.67,
+                          ),
                         ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        child: Text(
-                          'OR',
-                          style: textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurface.withValues(
-                              alpha: 0.72,
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          child: Text(
+                            'OR',
+                            style: textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurface.withValues(
+                                alpha: 0.72,
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                      Expanded(
-                        child: Divider(
-                          color: context.colors.divider,
-                          height: 0.67,
+                        Expanded(
+                          child: Divider(
+                            color: context.colors.divider,
+                            height: 0.67,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-                context.gapV(32),
-                SocialAuthButton(
-                  icon: 'assets/svgs/google_logo.svg',
-                  label: 'Sign up with Google',
-                  onPressed: () => AppToastService.show(
-                    context,
-                    type: AppToastType.info,
-                    message: 'Google sign up is not available yet.',
+                  context.gapV(32),
+                  SocialAuthButton(
+                    icon: 'assets/svgs/google_logo.svg',
+                    label: 'Sign up with Google',
+                    loading: authState.isLoading,
+                    onPressed: _onGooglePressed,
                   ),
-                ),
-                context.gapV(12),
-                SocialAuthButton(
-                  icon: 'assets/svgs/apple_logo.svg',
-                  label: 'Sign up with Apple',
-                  onPressed: () => AppToastService.show(
-                    context,
-                    type: AppToastType.info,
-                    message: 'Apple sign up is not available yet.',
-                  ),
-                ),
+                ],
                 context.gapV(32),
                 Text.rich(
                   TextSpan(
@@ -247,21 +261,19 @@ class _SignUpViewState extends ConsumerState<SignUpView> {
                     ),
                     children: [
                       TextSpan(
-                        text: 'terms of service',
+                        text: 'Terms of Service',
                         style: context.textTheme.bodySmall?.copyWith(
                           color: context.colors.primary,
                         ),
-                        recognizer: TapGestureRecognizer()
-                          ..onTap = () => launchUrl(_termsUrl),
+                        recognizer: _termsLink,
                       ),
                       const TextSpan(text: ' and '),
                       TextSpan(
-                        text: 'privacy policy',
+                        text: 'Privacy Policy',
                         style: context.textTheme.bodySmall?.copyWith(
                           color: context.colors.primary,
                         ),
-                        recognizer: TapGestureRecognizer()
-                          ..onTap = () => launchUrl(_privacyUrl),
+                        recognizer: _privacyLink,
                       ),
                     ],
                   ),

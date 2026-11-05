@@ -294,6 +294,10 @@ If you expose a secret, deleting it in the next commit is not enough. Tell a rev
   - what you already tried;
   - what help you need.
 
+### Working Notes & Handoffs
+
+Per-ticket hand-offs, scratch status notes, decisions, and runbooks belong on the ticket and the pull request discussion, not committed into the product repository. Do not commit temporary directories or scratch notes (e.g. `handoff/`) into the codebase.
+
 ---
 
 ## Quick reference

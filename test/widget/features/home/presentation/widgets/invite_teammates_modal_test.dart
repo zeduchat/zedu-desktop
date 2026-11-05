@@ -4,13 +4,46 @@ import 'package:zedu/core/core.dart';
 import 'package:zedu/features/features.dart';
 import '../../../../../helpers/helpers.dart';
 
-// Avoids the locator: the modal only asks this notifier for search results.
-class FakeUserProfileNotifier extends UserProfileNotifier {
+Future<void> drainToastTimer(WidgetTester tester) async {
+  await tester.pump(const Duration(seconds: 4));
+  await tester.pumpAndSettle();
+}
+
+class ErrorUserProfileNotifier extends UserProfileNotifier {
   @override
   UserProfileState build() => const UserProfileState();
 
   @override
   Future<List<Map<String, dynamic>>> fetchRegisteredUsers() async => [];
+
+  @override
+  Future<void> inviteMember({
+    required String email,
+    required String role,
+    String? userId,
+  }) async {
+    state = const UserProfileState(error: 'Failed to invite member');
+  }
+}
+
+// Avoids the locator and API: no users to suggest, invites are recorded.
+class FakeUserProfileNotifier extends UserProfileNotifier {
+  final List<String> invited = [];
+
+  @override
+  UserProfileState build() => const UserProfileState();
+
+  @override
+  Future<List<Map<String, dynamic>>> fetchRegisteredUsers() async => [];
+
+  @override
+  Future<void> inviteMember({
+    required String email,
+    required String role,
+    String? userId,
+  }) async {
+    invited.add(email);
+  }
 }
 
 class FakeAddEveryoneToChannel extends AddEveryoneToChannel {
@@ -82,6 +115,43 @@ Future<void> openModal(WidgetTester tester) async {
 }
 
 void main() {
+  for (final entry in {
+    1: 'Successfully invited 1 teammate.',
+    2: 'Successfully invited 2 teammates.',
+  }.entries) {
+    testWidgets('invitation success copy for ${entry.key} recipients', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        buildModalUnderTest(
+          () async => const AddEveryoneNobodyToAdd('general'),
+        ),
+      );
+      await openModal(tester);
+
+      for (var i = 0; i < entry.key; i++) {
+        await tester.enterText(find.byType(TextField), 'person$i@example.com');
+        await tester.testTextInput.receiveAction(TextInputAction.done);
+        await tester.pump();
+      }
+      await tester.tap(find.widgetWithText(ElevatedButton, 'Add'));
+      await tester.pumpAndSettle();
+
+      expect(find.text(entry.value), findsOneWidget);
+      expect(find.byType(InviteTeammatesModal), findsNothing);
+    });
+  }
+
+  testWidgets('shows the invite hint without a leading pipe', (tester) async {
+    await tester.pumpWidget(
+      buildModalUnderTest(() async => const AddEveryoneNobodyToAdd('general')),
+    );
+    await openModal(tester);
+
+    final field = tester.widget<TextField>(find.byType(TextField));
+    expect(field.decoration?.hintText, 'Enter name or email');
+  });
+
   group('InviteTeammatesModal "Add everyone"', () {
     testWidgets('adds everyone, shows how many and closes the window', (
       tester,
@@ -97,6 +167,7 @@ void main() {
       expect(fakeAddEveryone.calls, 1);
       expect(find.text('Added 3 people to #general.'), findsOneWidget);
       expect(find.byType(InviteTeammatesModal), findsNothing);
+      await drainToastTimer(tester);
     });
 
     testWidgets('says "person" when one person is added', (tester) async {
@@ -109,6 +180,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Added 1 person to #general.'), findsOneWidget);
+      await drainToastTimer(tester);
     });
 
     testWidgets('keeps the window open when everyone is already in', (
@@ -129,6 +201,7 @@ void main() {
         findsOneWidget,
       );
       expect(find.byType(InviteTeammatesModal), findsOneWidget);
+      await drainToastTimer(tester);
     });
 
     testWidgets('shows the error and keeps the window open on failure', (
@@ -147,6 +220,7 @@ void main() {
       expect(find.text('failed to add users to channel'), findsOneWidget);
       expect(find.byType(InviteTeammatesModal), findsOneWidget);
       expect(find.text('Add everyone'), findsOneWidget);
+      await drainToastTimer(tester);
     });
 
     testWidgets('is disabled while adding, so a second click does nothing', (
@@ -172,6 +246,7 @@ void main() {
       pending.complete(const AddEveryoneNobodyToAdd('general'));
       await tester.pumpAndSettle();
       expect(find.text('Add everyone'), findsOneWidget);
+      await drainToastTimer(tester);
     });
 
     testWidgets('names the channel that is open, in the title and messages', (
@@ -195,6 +270,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Added 2 people to #design.'), findsOneWidget);
+      await drainToastTimer(tester);
     });
 
     testWidgets('keeps a very long channel name inside the title', (
@@ -224,6 +300,133 @@ void main() {
 
       expect(find.byTooltip('Copy Invite Link'), findsOneWidget);
       expect(find.widgetWithText(ElevatedButton, 'Add'), findsOneWidget);
+    });
+  });
+
+  group('InviteTeammatesModal email validation', () {
+    const errorText = 'Please enter a valid email address.';
+
+    Future<FakeUserProfileNotifier> pumpModal(WidgetTester tester) async {
+      await tester.binding.setSurfaceSize(const Size(1280, 900));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      // The fixed 480px dialog's button row only overflows with the wide
+      // Ahem test font; ignore that layout warning, keep every other error.
+      final onError = FlutterError.onError;
+      FlutterError.onError = (details) {
+        if (details.exceptionAsString().contains('overflowed')) return;
+        onError?.call(details);
+      };
+      addTearDown(() => FlutterError.onError = onError);
+      final notifier = FakeUserProfileNotifier();
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            userProfileNotifierProvider.overrideWith(() => notifier),
+            activeChatProvider.overrideWith(
+              () => FakeActiveChatNotifier(ActiveChatState.generalChannel),
+            ),
+          ],
+          child: buildTestMaterialApp(
+            const Scaffold(body: InviteTeammatesModal()),
+          ),
+        ),
+      );
+      await tester.pump();
+      return notifier;
+    }
+
+    Future<void> submitText(WidgetTester tester, String text) async {
+      await tester.enterText(find.byType(TextField), text);
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pump();
+    }
+
+    for (final invalid in ['@@@', 'abc@', 'name@domain']) {
+      testWidgets('rejects "$invalid" with an error', (tester) async {
+        await pumpModal(tester);
+
+        await submitText(tester, invalid);
+
+        expect(find.byType(Chip), findsNothing);
+        expect(find.text(errorText), findsOneWidget);
+      });
+    }
+
+    testWidgets('clears the error when the user types again', (tester) async {
+      await pumpModal(tester);
+      await submitText(tester, 'abc@');
+      expect(find.text(errorText), findsOneWidget);
+
+      await tester.enterText(find.byType(TextField), 'abc@zedu.chat');
+      await tester.pump();
+
+      expect(find.text(errorText), findsNothing);
+    });
+
+    testWidgets('adds a valid email as an invite', (tester) async {
+      await pumpModal(tester);
+
+      await submitText(tester, ' ada@example.com ');
+
+      expect(find.widgetWithText(Chip, 'ada@example.com'), findsOneWidget);
+      expect(find.text(errorText), findsNothing);
+    });
+
+    testWidgets('adds the same email in different case only once', (
+      tester,
+    ) async {
+      await pumpModal(tester);
+
+      await submitText(tester, 'Ada@example.com');
+      await submitText(tester, 'ada@example.com');
+
+      expect(find.byType(Chip), findsOneWidget);
+    });
+
+    testWidgets('Add with invalid text left in the box sends nothing', (
+      tester,
+    ) async {
+      final notifier = await pumpModal(tester);
+      await submitText(tester, 'ada@example.com');
+      await tester.enterText(find.byType(TextField), 'abc@');
+
+      await tester.tap(find.widgetWithText(ElevatedButton, 'Add'));
+      await tester.pump();
+
+      expect(notifier.invited, isEmpty);
+      expect(find.text(errorText), findsOneWidget);
+    });
+  });
+
+  group('InviteTeammatesModal error toasts', () {
+    testWidgets('shows error toast when submit fails', (tester) async {
+      await tester.binding.setSurfaceSize(const Size(1280, 900));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final notifier = ErrorUserProfileNotifier();
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            userProfileNotifierProvider.overrideWith(() => notifier),
+            activeChatProvider.overrideWith(
+              () => FakeActiveChatNotifier(ActiveChatState.generalChannel),
+            ),
+          ],
+          child: buildTestMaterialApp(
+            const Scaffold(body: InviteTeammatesModal()),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.enterText(find.byType(TextField), 'team@example.com');
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pump();
+
+      await tester.tap(find.widgetWithText(ElevatedButton, 'Add'));
+      await tester.pump();
+      await tester.pump();
+
+      expect(find.text('Failed to invite member'), findsOneWidget);
+      await drainToastTimer(tester);
     });
   });
 }

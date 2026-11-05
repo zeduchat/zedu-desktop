@@ -13,15 +13,22 @@ class _HomeViewState extends ConsumerState<HomeView> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final orgId = ref.read(authNotifierProvider).user?.currentOrg;
-      if (orgId != null && orgId.isNotEmpty) {
-        ref.read(creditsNotifierProvider.notifier).load(orgId: orgId);
-      }
+      _loadCredits(ref.read(creditsOrgIdProvider));
     });
+  }
+
+  void _loadCredits(String orgId) {
+    if (orgId.isEmpty) return;
+    ref.read(creditsNotifierProvider.notifier).load(orgId: orgId);
   }
 
   @override
   Widget build(BuildContext context) {
+    // Switching workspace reloads its credits, so the balance in the user
+    // menu belongs to the workspace on screen.
+    ref.listen<String>(creditsOrgIdProvider, (previous, next) {
+      if (previous != next) _loadCredits(next);
+    });
     final colors = context.colors;
     final showProfile = ref.watch(personalProfilePanelProvider);
 
@@ -34,7 +41,7 @@ class _HomeViewState extends ConsumerState<HomeView> {
             child: Row(
               children: [
                 AppSidebarRail(activeType: ref.watch(homeSidebarProvider)),
-                const _MainSidebarSwitcher(),
+                ResizableSidebar(child: const _MainSidebarSwitcher()),
                 Expanded(
                   child: Stack(
                     children: [
@@ -129,6 +136,12 @@ class _MainSidebarSwitcher extends ConsumerWidget {
     if (state == HomeSidebarType.dms) {
       return const DmSidebarList();
     }
+    if (state == HomeSidebarType.people) {
+      return const PeopleSidebar();
+    }
+    if (state == HomeSidebarType.files) {
+      return const FilesSidebar();
+    }
     return const _MainSidebar();
   }
 }
@@ -140,6 +153,31 @@ class _ChatAreaSwitcher extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(homeSidebarProvider);
     final selectedDm = ref.watch(selectedDmProvider);
+    final activeChat = ref.watch(activeChatProvider);
+
+    void leaveFullPage() {
+      final type = ref.read(activeChatProvider).type;
+      if (type == ActiveChatType.newGroupChat ||
+          type == ActiveChatType.channelDirectory) {
+        ref.read(activeChatProvider.notifier).selectChannel('general');
+      }
+    }
+
+    // Close the New Group Chat and Channel Directory pages when the user
+    // switches sidebar tab or opens a conversation.
+    ref.listen(homeSidebarProvider, (previous, next) {
+      if (previous != next) leaveFullPage();
+    });
+    ref.listen(selectedDmProvider, (previous, next) {
+      if (next != null) leaveFullPage();
+    });
+
+    if (activeChat.type == ActiveChatType.newGroupChat) {
+      return const NewGroupChatView();
+    }
+    if (activeChat.type == ActiveChatType.channelDirectory) {
+      return const ChannelDirectoryView();
+    }
 
     if (state == HomeSidebarType.dms) {
       if (selectedDm != null) {
@@ -147,6 +185,12 @@ class _ChatAreaSwitcher extends ConsumerWidget {
       } else {
         return const DmEmptyState();
       }
+    }
+    if (state == HomeSidebarType.people) {
+      return const PeopleView();
+    }
+    if (state == HomeSidebarType.files) {
+      return const FilesView();
     }
     return const HomeChatArea();
   }
@@ -160,61 +204,32 @@ class _MainSidebar extends ConsumerWidget {
     final colors = context.colors;
 
     return Container(
-      width: 320,
       color: colors.sidebar,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const WorkspaceSwitcherHeader(),
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
+            padding: const EdgeInsets.fromLTRB(16, 20, 8, 8),
             child: Row(
               children: [
                 Icon(Icons.arrow_drop_down, color: colors.onPrimary, size: 20),
                 const SizedBox(width: 8),
-                Text(
-                  'Channels',
-                  style: TextStyle(
-                    color: colors.onPrimary,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 15,
+                Expanded(
+                  child: Text(
+                    'Channels',
+                    style: TextStyle(
+                      color: colors.onPrimary,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
+                    ),
                   ),
                 ),
+                const _ChannelsMenu(),
               ],
             ),
           ),
           const SidebarChannelList(),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                border: Border.all(
-                  color: colors.onPrimary.withValues(alpha: 0.24),
-                ),
-                borderRadius: BorderRadius.circular(6),
-                color: colors.onPrimary.withValues(alpha: 0.05),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      'View all channels',
-                      style: TextStyle(
-                        color: colors.onPrimary.withValues(alpha: 0.7),
-                        fontSize: 13,
-                      ),
-                    ),
-                  ),
-                  Icon(
-                    Icons.chevron_right,
-                    color: colors.onPrimary.withValues(alpha: 0.7),
-                    size: 16,
-                  ),
-                ],
-              ),
-            ),
-          ),
           const _AddChannelButton(),
           const SizedBox(height: 20),
           Padding(
@@ -236,6 +251,49 @@ class _MainSidebar extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+enum _ChannelsMenuAction { create, browse }
+
+class _ChannelsMenu extends ConsumerWidget {
+  const _ChannelsMenu();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final colors = context.colors;
+
+    return PopupMenuButton<_ChannelsMenuAction>(
+      tooltip: 'Channel actions',
+      iconSize: 18,
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints(minWidth: 180),
+      icon: Icon(
+        Icons.more_horiz,
+        color: colors.onPrimary.withValues(alpha: 0.7),
+      ),
+      onSelected: (action) {
+        switch (action) {
+          case _ChannelsMenuAction.create:
+            showDialog<void>(
+              context: context,
+              builder: (_) => const CreateChannelModal(),
+            );
+          case _ChannelsMenuAction.browse:
+            ref.read(activeChatProvider.notifier).selectChannelDirectory();
+        }
+      },
+      itemBuilder: (_) => const [
+        PopupMenuItem(
+          value: _ChannelsMenuAction.create,
+          child: Text('Create a channel'),
+        ),
+        PopupMenuItem(
+          value: _ChannelsMenuAction.browse,
+          child: Text('Browse channels'),
+        ),
+      ],
     );
   }
 }
@@ -284,36 +342,89 @@ class HomeChatArea extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Shows the channel picked in the sidebar. Its messages are not listed
-    // yet, so the header and welcome text carry the name.
+    // Shows the channel picked in the sidebar: its messages, or the welcome
+    // text while it has none.
     final chat = ref.watch(activeChatProvider);
     final channels = ref.watch(channelProvider).value ?? const <Channel>[];
     final channelName = chat.type == ActiveChatType.channel
         ? (chat.id ?? 'general')
         : 'general';
     Channel? selected;
-    for (final item in channels) {
-      if (item.name.toLowerCase() == channelName.toLowerCase()) {
-        selected = item;
-        break;
+    // Two channels can differ only in letter case, so the picked id wins over
+    // the name. The name still finds #general at the start, before any pick.
+    final pickedId = chat.type == ActiveChatType.channel
+        ? chat.channelId
+        : null;
+    if (pickedId != null) {
+      for (final item in channels) {
+        if (item.id == pickedId) {
+          selected = item;
+          break;
+        }
       }
+    }
+    if (selected == null) {
+      for (final item in channels) {
+        if (item.name.toLowerCase() == channelName.toLowerCase()) {
+          selected = item;
+          break;
+        }
+      }
+    }
+
+    final channelId = selected?.id ?? '';
+    final welcome = _buildWelcomeScreen(context, channelName);
+    // Until these load, or if loading fails, the composer simply suggests nobody.
+    final members = channelId.isEmpty
+        ? const <DmParticipant>[]
+        : ref.watch(channelMembersProvider(channelId)).value ??
+              const <DmParticipant>[];
+
+    if (channelId.isNotEmpty) {
+      // The composer sends through the chat history; reload the list once a
+      // send has gone through, so the new message shows.
+      ref.listen<int>(
+        chatHistoryProvider(channelId).select(
+          (history) =>
+              history.messages.where((m) => m['status'] == null).length,
+        ),
+        (previous, next) {
+          if (next > (previous ?? 0)) {
+            ref.invalidate(channelHistoryProvider(channelId));
+          }
+        },
+      );
     }
 
     return Column(
       children: [
-        _buildChatHeader(context, channelName),
-        Expanded(child: _buildWelcomeScreen(context, channelName)),
+        _buildChatHeader(context, channelName, selected),
+        Expanded(
+          child: channelId.isEmpty
+              ? welcome
+              : ChannelMessageList(
+                  key: ValueKey(channelId),
+                  channelId: channelId,
+                  empty: welcome,
+                  unreadCount: selected?.unreadCount ?? 0,
+                ),
+        ),
         DmMessageComposer(
           key: ValueKey(selected?.id ?? channelName),
           recipientName: '#$channelName',
           channelId: selected?.id ?? '',
+          participants: members,
           isChannel: true,
         ),
       ],
     );
   }
 
-  Widget _buildChatHeader(BuildContext context, String channelName) {
+  Widget _buildChatHeader(
+    BuildContext context,
+    String channelName,
+    Channel? channel,
+  ) {
     final colors = context.colors;
 
     return Container(
@@ -344,7 +455,10 @@ class HomeChatArea extends ConsumerWidget {
             child: Icon(Icons.person, size: 18, color: colors.onPrimary),
           ),
           const SizedBox(width: 8),
-          Icon(Icons.more_vert, color: colors.textHint),
+          if (channel == null)
+            Icon(Icons.more_vert, color: colors.textHint)
+          else
+            _ChannelHeaderMenu(channel: channel),
         ],
       ),
     );
@@ -378,6 +492,120 @@ class HomeChatArea extends ConsumerWidget {
         ],
       ),
     );
+  }
+}
+
+/// The channel header's "more" menu.
+class _ChannelHeaderMenu extends ConsumerWidget {
+  final Channel channel;
+
+  const _ChannelHeaderMenu({required this.channel});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final colors = context.colors;
+
+    return PopupMenuButton<String>(
+      key: const ValueKey('channel-header-menu'),
+      tooltip: 'Channel options',
+      position: PopupMenuPosition.under,
+      icon: Icon(Icons.more_vert, color: colors.textHint),
+      onSelected: (value) {
+        if (value == 'notifications') {
+          ChannelNotificationDialog.show(context, channel);
+        }
+        if (value == 'leave') _confirmLeave(context, ref);
+      },
+      itemBuilder: (_) => [
+        PopupMenuItem(
+          value: 'notifications',
+          child: Row(
+            children: [
+              Icon(
+                Icons.notifications_outlined,
+                size: 18,
+                color: colors.textPrimary,
+              ),
+              const SizedBox(width: 12),
+              Flexible(
+                child: Text(
+                  'Notification settings',
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: colors.textPrimary),
+                ),
+              ),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: 'leave',
+          child: Row(
+            children: [
+              Icon(Icons.logout, size: 18, color: colors.error),
+              const SizedBox(width: 12),
+              Text('Leave channel', style: TextStyle(color: colors.error)),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _confirmLeave(BuildContext context, WidgetRef ref) async {
+    final colors = context.colors;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('Leave #${channel.name}?'),
+        content: Text(
+          channel.isPrivate
+              ? 'You will stop getting its messages, and someone will need to '
+                    'add you again to rejoin.'
+              : 'You will stop getting its messages. You can join it again '
+                    'from the channel directory.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: Text('Leave', style: TextStyle(color: colors.error)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+
+    final overlay = Overlay.of(context, rootOverlay: true);
+    final result = await ref
+        .read(channelProvider.notifier)
+        .leaveChannel(channel.id);
+
+    switch (result) {
+      case Success<void>():
+        // Open another channel so the header never shows one we left.
+        final remaining = ref.read(channelProvider).value ?? const <Channel>[];
+        ref
+            .read(activeChatProvider.notifier)
+            .selectChannel(
+              remaining.isEmpty ? 'general' : remaining.first.name,
+            );
+        AppToastService.showWith(
+          overlay,
+          type: AppToastType.success,
+          message: 'You left #${channel.name}',
+        );
+      case Failure<void>(:final error):
+        AppToastService.showWith(
+          overlay,
+          type: AppToastType.error,
+          message: error.message.isEmpty
+              ? 'Could not leave #${channel.name}'
+              : error.message,
+        );
+    }
   }
 }
 
@@ -418,47 +646,97 @@ class _InviteCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.colors;
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        border: Border.all(color: colors.divider),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: colors.primaryBg,
-              borderRadius: BorderRadius.circular(8),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final inviteButton = AppButton(
+          label: 'Invite teammates',
+          trailing: const Icon(Icons.arrow_forward, size: 16),
+          expand: constraints.maxWidth < 640,
+          height: 48,
+          style: ButtonStyle(
+            padding: const WidgetStatePropertyAll(
+              EdgeInsets.symmetric(horizontal: 16),
             ),
-            child: Icon(Icons.person_add_outlined, color: colors.primary),
+            minimumSize: const WidgetStatePropertyAll(Size(0, 48)),
+            side: WidgetStateProperty.resolveWith((states) {
+              if (states.contains(WidgetState.focused)) {
+                return BorderSide(color: colors.borderOutline, width: 2);
+              }
+              return null;
+            }),
           ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Invite teammates',
-                  style: TextStyle(
-                    color: colors.textPrimary,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
+          onPressed: () {
+            showDialog<void>(
+              context: context,
+              builder: (context) => const InviteTeammatesModal(),
+            );
+          },
+        );
+
+        final invitationDetails = Row(
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: colors.primaryBg,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(Icons.person_add_outlined, color: colors.primary),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Bring your team into Zedu',
+                    style: context.textTheme.titleSmall?.copyWith(
+                      color: colors.textPrimary,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Add more team members to collaborate',
-                  style: TextStyle(color: colors.textHint, fontSize: 12),
-                ),
-              ],
+                  const SizedBox(height: 4),
+                  Text(
+                    'Invite teammates to join #general and start collaborating.',
+                    style: context.textTheme.bodySmall?.copyWith(
+                      color: colors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
             ),
+          ],
+        );
+
+        return Card(
+          color: colors.onPrimary,
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            side: BorderSide(color: colors.divider),
+            borderRadius: BorderRadius.circular(12),
           ),
-          Icon(Icons.chevron_right, color: colors.textHint),
-        ],
-      ),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: constraints.maxWidth < 640
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      invitationDetails,
+                      const SizedBox(height: 16),
+                      inviteButton,
+                    ],
+                  )
+                : Row(
+                    children: [
+                      Expanded(child: invitationDetails),
+                      const SizedBox(width: 16),
+                      inviteButton,
+                    ],
+                  ),
+          ),
+        );
+      },
     );
   }
 }

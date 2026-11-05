@@ -50,35 +50,46 @@ class UserModel {
   factory UserModel.fromJson(Map<String, dynamic> json) {
     return UserModel(
       id: json['id'] as String,
-      firstName: json['first_name'] as String,
-      lastName: json['last_name'] as String,
-      fullname: json['fullname'] as String,
+      firstName: json['first_name'] as String? ?? '',
+      lastName: json['last_name'] as String? ?? '',
+      fullname: json['fullname'] as String? ?? '',
       email: json['email'] as String,
-      phone: json['phone'] as String,
-      username: json['username'] as String,
+      phone: json['phone'] as String? ?? '',
+      username: json['username'] as String? ?? '',
       isVerified: json['is_verified'] as bool,
       isOnboarded: json['is_onboarded'] as bool,
-      createdAt: DateTime.fromMillisecondsSinceEpoch(
-        int.parse(json['created_at'] as String) * 1000,
-      ),
-      updatedAt: DateTime.fromMillisecondsSinceEpoch(
-        int.parse(json['updated_at'] as String) * 1000,
-      ),
-      avatarUrl: json['avatar_url'] as String,
-      currentOrg: json['current_org'] as String,
-      currentOrganisationSlug: json['current_organisation_slug'] as String,
-      defaultAvatarUrl: json['default_avatar_url'] as String,
-      expiresIn: DateTime.fromMillisecondsSinceEpoch(
-        int.parse(json['expires_in'] as String) * 1000,
-      ),
+      createdAt: _parseDate(json['created_at']),
+      updatedAt: _parseDate(json['updated_at']),
+      avatarUrl: json['avatar_url'] as String? ?? '',
+      currentOrg: json['current_org'] as String? ?? '',
+      currentOrganisationSlug:
+          json['current_organisation_slug'] as String? ?? '',
+      defaultAvatarUrl: json['default_avatar_url'] as String? ?? '',
+      expiresIn: _parseDate(json['expires_in']),
       isActive: json['is_active'] as bool,
       online: json['online'] as bool,
       organisation: OrganisationModel.fromJson(
         json['organisation'] as Map<String, dynamic>,
       ),
       profileUpdated: json['profile_updated'] as bool,
-      userId: json['user_id'] as String,
+      userId: json['user_id'] as String? ?? json['id'] as String,
     );
+  }
+
+  /// Accepts epoch seconds (as a number or a string) and ISO-8601 strings.
+  static DateTime _parseDate(Object? raw) {
+    if (raw is num) {
+      return DateTime.fromMillisecondsSinceEpoch(raw.toInt() * 1000);
+    }
+    if (raw is String) {
+      final seconds = int.tryParse(raw);
+      if (seconds != null) {
+        return DateTime.fromMillisecondsSinceEpoch(seconds * 1000);
+      }
+      final iso = DateTime.tryParse(raw);
+      if (iso != null) return iso;
+    }
+    return DateTime.fromMillisecondsSinceEpoch(0);
   }
 
   Map<String, dynamic> toJson() => {
@@ -123,5 +134,6 @@ class UserModel {
     subscriptionPlanId: organisation.subscriptionPlanId,
     aiCreditsPurchasable:
         organisation.organisationPlan.planDetails.aiCreditsPurchasable,
+    status: UserStatus(online: online),
   );
 }

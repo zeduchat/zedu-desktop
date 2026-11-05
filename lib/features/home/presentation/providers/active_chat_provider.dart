@@ -13,7 +13,11 @@ class ActiveChatState {
   final ActiveChatType type;
   final String? id;
 
-  const ActiveChatState({required this.type, this.id});
+  /// The id of the picked channel. Two channels can differ only in letter
+  /// case, so the name in [id] alone cannot tell them apart.
+  final String? channelId;
+
+  const ActiveChatState({required this.type, this.id, this.channelId});
 
   static const generalChannel = ActiveChatState(
     type: ActiveChatType.channel,
@@ -32,10 +36,11 @@ class ActiveChatState {
       other is ActiveChatState &&
           runtimeType == other.runtimeType &&
           type == other.type &&
-          id == other.id;
+          id == other.id &&
+          channelId == other.channelId;
 
   @override
-  int get hashCode => type.hashCode ^ id.hashCode;
+  int get hashCode => Object.hash(type, id, channelId);
 }
 
 class ActiveChatNotifier extends Notifier<ActiveChatState> {
@@ -47,8 +52,12 @@ class ActiveChatNotifier extends Notifier<ActiveChatState> {
     return ActiveChatState.generalChannel;
   }
 
-  void selectChannel(String channelId) {
-    state = ActiveChatState(type: ActiveChatType.channel, id: channelId);
+  void selectChannel(String channelName, {String? channelId}) {
+    state = ActiveChatState(
+      type: ActiveChatType.channel,
+      id: channelName,
+      channelId: channelId,
+    );
   }
 
   void selectGroupDm(String groupDmId) {

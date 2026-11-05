@@ -13,6 +13,16 @@ class ApiBaseService {
     receiveTimeout: const Duration(seconds: 30),
   );
 
+  /// Trims leading slashes from [path] so that Dio's URI resolution does not
+  /// treat the path as root-relative and strip the path prefix of [baseUrl].
+  /// Absolute URLs (with scheme) and empty paths are preserved unchanged.
+  static String normalizePath(String path) {
+    if (path.isEmpty || Uri.tryParse(path)?.hasScheme == true) {
+      return path;
+    }
+    return path.replaceFirst(RegExp(r'^/+'), '');
+  }
+
   final Dio _dio;
 
   Future<ApiResponseModel<T>> get<T>({
@@ -106,15 +116,17 @@ class ApiBaseService {
     Map<String, dynamic>? queryParameters,
     Map<String, String>? headers,
   }) async {
+    final normalizedPath = normalizePath(path);
+    final requestHeaders = headersForPath(normalizedPath, headers: headers);
+    if (data is FormData) {
+      requestHeaders.remove('Content-Type');
+    }
     try {
       final response = await _dio.request<T>(
-        path,
+        normalizedPath,
         data: data,
         queryParameters: queryParameters,
-        options: Options(
-          method: method,
-          headers: headersForPath(path, headers: headers),
-        ),
+        options: Options(method: method, headers: requestHeaders),
       );
 
       final responseData = response.data;
@@ -128,8 +140,15 @@ class ApiBaseService {
         );
       }
 
+      if (responseData is! T) {
+        throw ApiFailure.fromParsingError(
+          'expected $T, got ${responseData.runtimeType}',
+          path: path,
+        );
+      }
+
       return ApiResponseModel<T>(
-        data: responseData as T,
+        data: responseData,
         statusCode: response.statusCode ?? 0,
         message: response.statusMessage,
       );

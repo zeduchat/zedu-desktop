@@ -1,0 +1,10 @@
+export 'data/datasources/people_remote_datasource.dart';
+export 'data/repositories/people_repository_impl.dart';
+export 'domain/entities/org_member.dart';
+export 'domain/repositories/people_repository.dart';
+export 'presentation/providers/people_notifier.dart';
+export 'presentation/providers/people_providers_di.dart';
+export 'presentation/views/people_view.dart';
+export 'presentation/widgets/member_avatar.dart';
+export 'presentation/widgets/people_search_field.dart';
+export 'presentation/widgets/people_sidebar.dart';

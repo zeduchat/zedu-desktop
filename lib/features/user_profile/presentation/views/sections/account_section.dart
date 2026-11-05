@@ -15,6 +15,12 @@ class AccountSection extends StatelessWidget {
   final ValueChanged<ProfileAccount> onSave;
   final Future<void> Function() onDelete;
 
+  String get _handle {
+    final username = account.username.trim();
+    if (username.isNotEmpty) return '@$username';
+    return '@${account.name.replaceAll(' ', '').toLowerCase()}';
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -33,12 +39,16 @@ class AccountSection extends StatelessWidget {
               children: [
                 Stack(
                   children: [
-                    _AvatarBlock(initials: account.initials),
+                    _AvatarBlock(
+                      initials: account.initials,
+                      avatarUrl: account.avatarUrl,
+                    ),
                     Positioned(
                       top: 8,
                       right: 8,
                       child: SquareIconButton(
                         icon: Icons.edit_outlined,
+                        tooltip: 'Edit account',
                         onTap: () =>
                             _showAccountDialog(context, account, onSave),
                       ),
@@ -55,7 +65,7 @@ class AccountSection extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  '@${account.name.replaceAll(' ', '').toLowerCase()}',
+                  _handle,
                   style: context.textTheme.bodySmall?.copyWith(
                     color: const Color(0xFF6B7280),
                   ),
@@ -116,22 +126,40 @@ class AccountSection extends StatelessWidget {
 }
 
 class _AvatarBlock extends StatelessWidget {
-  const _AvatarBlock({required this.initials});
+  const _AvatarBlock({required this.initials, required this.avatarUrl});
 
   final String initials;
+  final String? avatarUrl;
 
   @override
   Widget build(BuildContext context) {
+    final url = avatarUrl?.trim() ?? '';
+    final fallback = Center(
+      child: Text(
+        initials,
+        style: const TextStyle(
+          fontSize: 56,
+          fontWeight: FontWeight.w600,
+          color: Color(0xFF0B7A73),
+        ),
+      ),
+    );
     return Container(
       width: 160,
       height: 144,
+      clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         color: const Color(0xFFE9FBFA),
         borderRadius: BorderRadius.circular(8),
       ),
-      child: const Center(
-        child: Icon(Icons.person, size: 96, color: Color(0xFF17C9BD)),
-      ),
+      child: url.isEmpty
+          ? fallback
+          : Image.network(
+              url,
+              fit: BoxFit.cover,
+              // A broken link still shows who this account is.
+              errorBuilder: (_, _, _) => fallback,
+            ),
     );
   }
 }

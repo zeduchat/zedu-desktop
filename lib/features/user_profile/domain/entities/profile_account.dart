@@ -1,3 +1,5 @@
+import 'package:zedu/core/core.dart';
+
 class ProfileAccount {
   const ProfileAccount({
     required this.name,
@@ -32,8 +34,11 @@ class ProfileAccount {
   String get initials {
     final parts = name.trim().split(RegExp(r'\s+'));
     if (parts.isEmpty || parts.first.isEmpty) return 'ZU';
-    if (parts.length == 1) return parts.first.substring(0, 1).toUpperCase();
-    return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
+    // Whole characters (characters.first), so names that start with an emoji
+    // or another non-BMP character aren't cut in half.
+    if (parts.length == 1) return parts.first.characters.first.toUpperCase();
+    return '${parts.first.characters.first}${parts.last.characters.first}'
+        .toUpperCase();
   }
 
   ProfileAccount copyWith({

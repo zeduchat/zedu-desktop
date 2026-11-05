@@ -140,5 +140,69 @@ void main() {
         expect(menuRect.bottom, lessThanOrEqualTo(260));
       },
     );
+
+    testWidgets(
+      'enforces minimum clamped maxHeight of 120 on extremely low vertical resolutions without crashing',
+      (tester) async {
+        await useTestWindow(tester);
+        await tester.binding.setSurfaceSize(const Size(1440, 130));
+        tester.view.physicalSize = const Size(1440, 130);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+
+        await tester.pumpWidget(buildHeaderUnderTest());
+        await tester.pump();
+
+        await tester.tap(find.text('commabuster'));
+        await tester.pumpAndSettle();
+
+        expect(tester.takeException(), isNull);
+        expect(find.byType(WorkspaceSwitcherList), findsOneWidget);
+
+        final constrainedBoxes = tester.widgetList<ConstrainedBox>(
+          find.descendant(
+            of: find.byType(Stack),
+            matching: find.byType(ConstrainedBox),
+          ),
+        );
+        final menuBox = constrainedBoxes.firstWhere(
+          (box) => box.constraints.maxHeight == 120.0,
+        );
+        expect(menuBox.constraints.maxHeight, 120.0);
+      },
+    );
+
+    testWidgets('plus button opens the New Group Chat page', (tester) async {
+      await useTestWindow(tester);
+      await tester.pumpWidget(buildHeaderUnderTest());
+      await tester.pump();
+
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(WorkspaceSwitcherHeader)),
+      );
+      expect(
+        container.read(activeChatProvider).type,
+        isNot(ActiveChatType.newGroupChat),
+      );
+
+      await tester.tap(find.byIcon(Icons.add));
+      await tester.pump();
+
+      expect(
+        container.read(activeChatProvider).type,
+        ActiveChatType.newGroupChat,
+      );
+    });
+
+    testWidgets('plus button has a tooltip for accessibility', (tester) async {
+      await useTestWindow(tester);
+      await tester.pumpWidget(buildHeaderUnderTest());
+      await tester.pump();
+
+      final iconButton = tester.widget<IconButton>(
+        find.widgetWithIcon(IconButton, Icons.add),
+      );
+      expect(iconButton.tooltip, 'New conversation');
+    });
   });
 }

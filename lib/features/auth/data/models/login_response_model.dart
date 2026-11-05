@@ -14,13 +14,21 @@ class LoginResponseModel {
   final String notificationToken;
 
   factory LoginResponseModel.fromJson(Map<String, dynamic> json) {
+    final rawExpiry = json['access_token_expires_in'];
+    final int expirySeconds;
+    if (rawExpiry is num) {
+      expirySeconds = rawExpiry.toInt();
+    } else {
+      expirySeconds = int.tryParse(rawExpiry?.toString() ?? '') ?? 0;
+    }
+
     return LoginResponseModel(
       user: UserModel.fromJson(json['user'] as Map<String, dynamic>),
-      accessToken: json['access_token'] as String,
+      accessToken: json['access_token'] as String? ?? '',
       accessTokenExpiresIn: DateTime.fromMillisecondsSinceEpoch(
-        int.parse(json['access_token_expires_in'] as String) * 1000,
+        expirySeconds * 1000,
       ),
-      notificationToken: json['notification_token'] as String,
+      notificationToken: json['notification_token'] as String? ?? '',
     );
   }
 

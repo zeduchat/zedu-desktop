@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:zedu/core/core.dart';
 import 'package:zedu/features/features.dart';
@@ -7,20 +8,248 @@ class AuthNotifier extends Notifier<AuthState> {
   late SecureStorageService _storage;
   late AuthInterceptor _interceptor;
 
+  /// Guards against overlapping presence-toggle requests (rapid clicks,
+  /// reopening the menu while a request is pending).
+  bool _presenceToggleInFlight = false;
+
+  /// Bumped on every session boundary (login, logout, unauthorized) so
+  /// responses arriving after the boundary are discarded instead of leaking
+  /// into the new session.
+  int _sessionGeneration = 0;
+
+  /// Monotonic sequence for custom-status mutations; a completed mutation
+  /// only applies locally while no newer mutation has started.
+  int _statusMutationSeq = 0;
+
+  /// Serializes every repository call that carries an `online` flag. The
+  /// backend's change-status endpoint writes the online flag unconditionally,
+  /// so overlapping writes could reach it out of order and a stale one would
+  /// silently undo a newer confirmed presence change. Chaining the requests
+  /// (each send waits for the previous response) gives the backend one
+  /// deterministic order: the last write it receives is always the client's
+  /// latest intent.
+  Future<void> _onlineWriteTail = Future<void>.value();
+
+  /// The presence value the backend last confirmed for this session and identity context.
+  /// Queued writes capture their `online` payload from this at send time, so an
+  /// operation that waited in the queue carries the presence that is current
+  /// when it reaches the server, not the one from when it was requested.
+  bool? _confirmedOnline;
+  int? _confirmedOnlineSessionGeneration;
+  String? _confirmedOnlineUserId;
+  String? _confirmedOnlineOrgId;
+
+  _ConfirmedCustomStatus? _confirmedCustomStatus;
+
+  /// Counts user-state mutations (presence and status writes) scoped to each
+  /// session/identity context. A profile refresh that overlaps one — a mutation
+  /// was in flight when the refresh started, or one started while the refresh was
+  /// in flight in the same context — merges fresh profile fields with the locally
+  /// newer status instead of replacing it with the older snapshot.
+  final Map<_MutationContext, int> _mutationsStarted = {};
+  final Map<_MutationContext, int> _mutationsCompleted = {};
+
+  int _getMutationsStarted(_MutationContext ctx) => _mutationsStarted[ctx] ?? 0;
+  int _getMutationsCompleted(_MutationContext ctx) =>
+      _mutationsCompleted[ctx] ?? 0;
+
+  void _recordMutationStarted(_MutationContext ctx) {
+    _mutationsStarted[ctx] = _getMutationsStarted(ctx) + 1;
+  }
+
+  void _recordMutationCompleted(_MutationContext ctx) {
+    _mutationsCompleted[ctx] = _getMutationsCompleted(ctx) + 1;
+  }
+
+  /// Clear a discarded custom-status mutation's loading flag only if it still
+  /// belongs to the current authenticated user and is the latest status write.
+  /// Never alter state belonging to a newer mutation or session.
+  void _resetDiscardedStatusLoading({
+    required int sessionGeneration,
+    required int mutationSeq,
+    required String userId,
+  }) {
+    if (!_disposed &&
+        _sessionGeneration == sessionGeneration &&
+        _statusMutationSeq == mutationSeq &&
+        state.status == AuthStatus.authenticated &&
+        state.user?.id == userId) {
+      state = state.copyWith(isLoading: false);
+    }
+  }
+
+  void _setConfirmedOnline({
+    required bool online,
+    required int sessionGeneration,
+    required String? userId,
+    required String? orgId,
+  }) {
+    _confirmedOnline = online;
+    _confirmedOnlineSessionGeneration = sessionGeneration;
+    _confirmedOnlineUserId = userId;
+    _confirmedOnlineOrgId = orgId;
+  }
+
+  void _clearConfirmedOnline() {
+    _confirmedOnline = null;
+    _confirmedOnlineSessionGeneration = null;
+    _confirmedOnlineUserId = null;
+    _confirmedOnlineOrgId = null;
+  }
+
+  bool _disposed = false;
+
   static const _tag = 'AuthNotifier';
+
+  /// Shown once when a 401 ends a signed-in session.
+  static const sessionExpiredMessage =
+      'Your session has expired. Please sign in again.';
 
   @override
   AuthState build() {
     _repository = ref.read(authRepositoryProvider);
     _storage = locator<SecureStorageService>();
     _interceptor = locator<AuthInterceptor>();
+    ref.onDispose(() {
+      _disposed = true;
+      _statusExpiryTimer?.cancel();
+    });
+    // Whenever the user (or their status) changes, re-arm the "Clear after" timer.
+    listenSelf((_, next) => _scheduleStatusExpiry(next));
+
+    // Signing out or in must never show the other session's data, however
+    // the session changed (logout, expired token, login, magic link, Google).
+    listenSelf((previous, next) {
+      final changedSession =
+          (previous?.status == AuthStatus.authenticated &&
+              next.status == AuthStatus.unauthenticated) ||
+          (previous?.status == AuthStatus.unauthenticated &&
+              next.status == AuthStatus.authenticated);
+      if (changedSession) _resetSessionData();
+    });
 
     _interceptor.onUnauthorized = () {
       AppLogger.w('Unauthorized — clearing session', tag: _tag);
-      state = const AuthState(status: AuthStatus.unauthenticated);
+      // Only a session that was signed in expired: a 401 from a login attempt
+      // or a session restore is not one, and further 401s from requests that
+      // were already in flight must not repeat the message.
+      final wasSignedIn = state.status == AuthStatus.authenticated;
+      _bumpSession();
+      ref.read(userMenuStateProvider.notifier).reset();
+      state = AuthState(
+        status: AuthStatus.unauthenticated,
+        sessionExpired: wasSignedIn,
+      );
     };
     _restoreSession();
     return const AuthState(status: AuthStatus.unknown);
+  }
+
+  /// Rebuilds everything that belongs to one signed-in session. These providers
+  /// live in the root scope, so they otherwise outlast sign-out.
+  void _resetSessionData() {
+    ref
+      ..invalidate(workspaceProvider)
+      ..invalidate(userProfileNotifierProvider)
+      ..invalidate(creditsNotifierProvider)
+      ..invalidate(channelProvider)
+      ..invalidate(dmListProvider)
+      ..invalidate(selectedDmProvider)
+      ..invalidate(dmConversationActionsProvider)
+      ..invalidate(chatHistoryProvider)
+      ..invalidate(activeChatProvider)
+      ..invalidate(activeCallProvider)
+      ..invalidate(groupDmProvider)
+      ..invalidate(homeSidebarProvider)
+      ..invalidate(personalProfilePanelProvider)
+      ..invalidate(notificationSettingsProvider)
+      ..invalidate(filesProvider)
+      ..invalidate(filesListProvider)
+      ..invalidate(foldersListProvider);
+  }
+
+  /// Invalidates every in-flight status request and releases the presence
+  /// guard so a fresh session is never blocked by an older one.
+  void _bumpSession() {
+    _sessionGeneration++;
+    _presenceToggleInFlight = false;
+    // Drop writes still waiting in the queue (their send-time session check
+    // skips them) and start a fresh chain so the new session is never blocked
+    // behind an older one. Requests already sent to the backend are beyond
+    // client control.
+    _onlineWriteTail = Future<void>.value();
+    _clearConfirmedOnline();
+    _confirmedCustomStatus = null;
+    _mutationsStarted.removeWhere(
+      (k, _) => k.sessionGeneration < _sessionGeneration - 1,
+    );
+    _mutationsCompleted.removeWhere(
+      (k, _) => k.sessionGeneration < _sessionGeneration - 1,
+    );
+  }
+
+  /// The presence value the next server write should carry: the last
+  /// confirmed toggle or status write for the current session and identity,
+  /// falling back to the current user state.
+  bool _currentPresenceForSend() {
+    final user = state.user;
+    if (_confirmedOnline != null &&
+        _confirmedOnlineSessionGeneration == _sessionGeneration &&
+        _confirmedOnlineUserId == user?.id &&
+        _confirmedOnlineOrgId == user?.currentOrg) {
+      return _confirmedOnline!;
+    }
+    return user?.status.online ?? true;
+  }
+
+  /// Runs [operation] once every previous online-writing request has
+  /// completed, re-checking the session and context at send time. Resolves
+  /// `null` when the write was dropped (disposed, or the session/context
+  /// changed while it waited in the queue).
+  Future<T?> _enqueueOnlineWrite<T>(
+    Future<T> Function() operation, {
+    required int sessionGeneration,
+    required String? userId,
+    required String? orgId,
+  }) {
+    final task = _onlineWriteTail.then((_) async {
+      if (_disposed ||
+          _sessionGeneration != sessionGeneration ||
+          state.status != AuthStatus.authenticated ||
+          state.user?.id != userId ||
+          state.user?.currentOrg != orgId) {
+        return null;
+      }
+      return operation();
+    });
+    // Keep the chain alive regardless of individual outcomes; each
+    // operation maps its own failures to Result.
+    _onlineWriteTail = task.then<void>((_) {}, onError: (Object _) {});
+    return task;
+  }
+
+  void _syncMenuPresence(User user) {
+    ref.read(userMenuStateProvider.notifier).setAway(!user.status.online);
+  }
+
+  void _adoptSessionUser(User user) {
+    state = AuthState(status: AuthStatus.authenticated, user: user);
+    _syncMenuPresence(user);
+    _setConfirmedOnline(
+      online: user.status.online,
+      sessionGeneration: _sessionGeneration,
+      userId: user.id,
+      orgId: user.currentOrg,
+    );
+    _confirmedCustomStatus = _ConfirmedCustomStatus(
+      emoji: user.status.emoji,
+      text: user.status.text,
+      expiresAt: user.status.expiresAt,
+      pauseNotifications: user.status.pauseNotifications,
+      sessionGeneration: _sessionGeneration,
+      userId: user.id,
+      orgId: user.currentOrg,
+    );
   }
 
   Future<void> _restoreSession() async {
@@ -36,7 +265,7 @@ class AuthNotifier extends Notifier<AuthState> {
     switch (result) {
       case Success<User>():
         AppLogger.i('Session restored — ${result.value.email}', tag: _tag);
-        state = AuthState(status: AuthStatus.authenticated, user: result.value);
+        _adoptSessionUser(result.value);
       case Failure<User>():
         final failure = result.error;
         if (failure.kind == ApiFailureKind.unauthorized) {
@@ -49,8 +278,7 @@ class AuthNotifier extends Notifier<AuthState> {
           state = const AuthState(status: AuthStatus.unauthenticated);
         } else {
           // Network, timeout or server problem: the token may still be valid.
-          // Keep it so the next launch can restore the session, and tell the
-          // user why they are on the login screen.
+          // Keep it, and let the user try again instead of signing in again.
           AppLogger.w(
             'Session restore failed (${failure.kind.name}) — keeping token',
             tag: _tag,
@@ -58,24 +286,48 @@ class AuthNotifier extends Notifier<AuthState> {
           state = AuthState(
             status: AuthStatus.unauthenticated,
             error: failure.friendlyMessage,
+            sessionRestoreFailed: true,
           );
         }
     }
   }
 
-  Future<void> login({required String email, required String password}) async {
+  /// Tries the saved session again after the server could not be reached.
+  Future<void> retrySessionRestore() async {
+    state = const AuthState(status: AuthStatus.unknown);
+    await _restoreSession();
+  }
+
+  /// Leaves the retry screen for the login form. The token is kept, so the next
+  /// launch still tries to restore the session.
+  void showLoginForm() {
+    state = const AuthState(status: AuthStatus.unauthenticated);
+  }
+
+  /// With [rememberMe] false the session lasts until the app closes.
+  Future<void> login({
+    required String email,
+    required String password,
+    bool rememberMe = true,
+  }) async {
     AppLogger.d('Login attempt — $email', tag: _tag);
     state = state.copyWith(isLoading: true, clearError: true);
 
     final result = await _repository.login(email: email, password: password);
     switch (result) {
       case Success<AuthSession>():
-        AppLogger.i('Login succeeded — token persisted', tag: _tag);
-        await _storage.saveAccessToken(result.value.accessToken);
-        state = AuthState(
-          status: AuthStatus.authenticated,
-          user: result.value.user,
+        AppLogger.i(
+          rememberMe
+              ? 'Login succeeded — token persisted'
+              : 'Login succeeded — token kept for this run only',
+          tag: _tag,
         );
+        await _storage.saveAccessToken(
+          result.value.accessToken,
+          persist: rememberMe,
+        );
+        _bumpSession();
+        _adoptSessionUser(result.value.user);
       case Failure<AuthSession>():
         AppLogger.w('Login rejected — ${result.error.message}', tag: _tag);
         state = state.copyWith(
@@ -97,10 +349,8 @@ class AuthNotifier extends Notifier<AuthState> {
           tag: _tag,
         );
         await _storage.saveAccessToken(result.value.accessToken);
-        state = AuthState(
-          status: AuthStatus.authenticated,
-          user: result.value.user,
-        );
+        _bumpSession();
+        _adoptSessionUser(result.value.user);
       case Failure<AuthSession>():
         AppLogger.w(
           'Magic link verification failed — ${result.error.message}',
@@ -115,7 +365,18 @@ class AuthNotifier extends Notifier<AuthState> {
 
   Future<void> logout() async {
     AppLogger.i('Logout — clearing session', tag: _tag);
+    // Unsent DM drafts are private: don't leave them on a shared computer.
+    final userId = state.user?.id;
+    if (userId != null && userId.isNotEmpty) {
+      try {
+        await DmDraftStore.deleteAllForUser(_storage, userId);
+      } catch (error) {
+        AppLogger.w('Could not remove drafts on logout - $error', tag: _tag);
+      }
+    }
     await _storage.deleteAccessToken();
+    _bumpSession();
+    ref.read(userMenuStateProvider.notifier).reset();
     state = const AuthState(status: AuthStatus.unauthenticated);
   }
 
@@ -233,11 +494,93 @@ class AuthNotifier extends Notifier<AuthState> {
 
   Future<String?> get accessToken => _storage.getAccessToken();
 
+  /// Re-fetches the signed-in user and applies the fresh snapshot.
+  ///
+  /// A snapshot that overlaps a local presence or status mutation — one was
+  /// in flight when the refresh started, or one started while the refresh was
+  /// in flight — is merged with the locally newer status instead of replacing
+  /// it, so a slower refresh can never revert a confirmed change while still
+  /// bringing in fresh profile data. With no overlap the snapshot is adopted
+  /// wholesale, including a legitimately changed server-side presence.
   Future<void> refreshCurrentUser() async {
+    final requested = state.user;
+    if (_disposed ||
+        state.status != AuthStatus.authenticated ||
+        requested == null) {
+      return;
+    }
+    final sessionGeneration = _sessionGeneration;
+    final context = _MutationContext(
+      sessionGeneration: sessionGeneration,
+      userId: requested.id,
+      orgId: requested.currentOrg,
+    );
+    final mutationsStarted = _getMutationsStarted(context);
+    final mutationsCompleted = _getMutationsCompleted(context);
+
     final result = await _repository.getCurrentUser();
+
+    if (_disposed ||
+        _sessionGeneration != sessionGeneration ||
+        state.status != AuthStatus.authenticated) {
+      AppLogger.d('Discarding stale user refresh', tag: _tag);
+      return;
+    }
+    final current = state.user;
+    if (current == null ||
+        current.id != requested.id ||
+        current.currentOrg != requested.currentOrg) {
+      AppLogger.d(
+        'Discarding user refresh — session context changed',
+        tag: _tag,
+      );
+      return;
+    }
+
     switch (result) {
       case Success<User>():
-        state = state.copyWith(user: result.value);
+        final fresh = result.value;
+        final User adopted;
+        final orgChanged = fresh.currentOrg != current.currentOrg;
+        final currentMutationsStarted = _getMutationsStarted(context);
+        if (!orgChanged &&
+            (mutationsCompleted < mutationsStarted ||
+                currentMutationsStarted != mutationsStarted)) {
+          // The snapshot predates or overlaps local mutations in the same
+          // org: keep the locally newer status and take only the fresh profile fields.
+          adopted = fresh._withStatus(current.status);
+        } else {
+          // On a same-organisation refresh, the profile response supplies
+          // presence but not custom-status fields. Preserve those locally
+          // confirmed fields while adopting the server's latest presence.
+          // Do not carry them into a different organisation.
+          adopted = orgChanged
+              ? fresh
+              : fresh._withStatus(
+                  current.status.copyWith(online: fresh.status.online),
+                );
+          _setConfirmedOnline(
+            online: fresh.status.online,
+            sessionGeneration: sessionGeneration,
+            userId: fresh.id,
+            orgId: fresh.currentOrg,
+          );
+          _confirmedCustomStatus = _ConfirmedCustomStatus(
+            emoji: adopted.status.emoji,
+            text: adopted.status.text,
+            expiresAt: adopted.status.expiresAt,
+            pauseNotifications: adopted.status.pauseNotifications,
+            sessionGeneration: sessionGeneration,
+            userId: fresh.id,
+            orgId: fresh.currentOrg,
+          );
+        }
+        // The profile response has no organisation block, so it carries no
+        // credit balance or plan and they come back as 0 and 'free'. Keep the
+        // ones already loaded for this organisation.
+        final kept = orgChanged ? adopted : adopted._withOrgPlanOf(current);
+        state = state.copyWith(user: kept);
+        _syncMenuPresence(kept);
       case Failure<User>():
         AppLogger.w(
           'Failed to refresh user — ${result.error.message}',
@@ -275,7 +618,12 @@ class AuthNotifier extends Notifier<AuthState> {
 
       // 3. Wait for Google's redirect containing the authorization code
       String? grantCode;
-      await for (final request in server) {
+      await for (final request in server.timeout(
+        const Duration(seconds: 60),
+        onTimeout: (sink) {
+          sink.addError(TimeoutException('Google Sign-In redirect timed out'));
+        },
+      )) {
         grantCode = request.uri.queryParameters['code'];
 
         // Return a clean success page to the user in their browser
@@ -328,10 +676,8 @@ class AuthNotifier extends Notifier<AuthState> {
         case Success<AuthSession>():
           AppLogger.i('Google Sign-In succeeded — token persisted', tag: _tag);
           await _storage.saveAccessToken(result.value.accessToken);
-          state = AuthState(
-            status: AuthStatus.authenticated,
-            user: result.value.user,
-          );
+          _bumpSession();
+          _adoptSessionUser(result.value.user);
         case Failure<AuthSession>():
           AppLogger.w(
             'Google Sign-In rejected — ${result.error.message}',
@@ -342,6 +688,12 @@ class AuthNotifier extends Notifier<AuthState> {
             error: result.error.friendlyMessage,
           );
       }
+    } on TimeoutException {
+      AppLogger.w('Google Sign-In timed out', tag: _tag);
+      state = state.copyWith(
+        isLoading: false,
+        error: 'Google Sign-In timed out. Please try again.',
+      );
     } catch (e) {
       AppLogger.e('Google Sign-In failed', tag: _tag, error: e);
       state = state.copyWith(isLoading: false, error: 'Google Sign-In failed');
@@ -352,124 +704,457 @@ class AuthNotifier extends Notifier<AuthState> {
 
   // ── Status / Presence ────────────────────────────────────────────────────────
 
-  /// Updates user's custom status and online presence.
-  /// On success, the local [AuthState.user.status] is updated immediately
-  /// so every widget watching [authNotifierProvider] reacts without a re-fetch.
+  /// Updates user's custom status. The online flag is not a parameter: the
+  /// server write carries the latest confirmed presence at send time, so a
+  /// status dialog opened earlier can never push a stale presence value to
+  /// the backend. On success, the owned status fields are applied to the
+  /// local [AuthState.user] immediately so every widget watching
+  /// [authNotifierProvider] reacts without a re-fetch.
   Future<bool> changeStatus({
     required String icon,
     required String text,
     required StatusTimeout timeout,
     required bool pauseNotifications,
-    required bool online,
   }) async {
-    AppLogger.d('changeStatus — "$text" online=$online', tag: _tag);
+    final currentUser = state.user;
+    if (currentUser == null || state.status != AuthStatus.authenticated) {
+      return false;
+    }
+
+    AppLogger.d('changeStatus — "$text"', tag: _tag);
     state = state.copyWith(isLoading: true, clearError: true);
 
-    final result = await _repository.changeStatus(
-      icon: icon,
-      text: text,
-      pauseNotifications: pauseNotifications,
-      statusTimeout: timeout.apiValue,
-      clearStatus: false,
-      online: online,
+    final mutationSeq = ++_statusMutationSeq;
+    final sessionGeneration = _sessionGeneration;
+    final userId = currentUser.id;
+    final orgId = currentUser.currentOrg;
+    final context = _MutationContext(
+      sessionGeneration: sessionGeneration,
+      userId: userId,
+      orgId: orgId,
     );
+    _recordMutationStarted(context);
+    try {
+      bool? sentOnline;
+      final result = await _enqueueOnlineWrite<Result<void>>(
+        () async {
+          sentOnline = _currentPresenceForSend();
+          AppLogger.d(
+            'changeStatus send — "$text" online=$sentOnline',
+            tag: _tag,
+          );
+          final response = await _repository.changeStatus(
+            icon: icon,
+            text: text,
+            pauseNotifications: pauseNotifications,
+            statusTimeout: timeout.apiValue,
+            clearStatus: false,
+            online: sentOnline!,
+          );
+          // Confirmed presence and custom status are recorded inside the queue
+          // task: the next queued write runs one microtask before this caller
+          // resumes, and must observe the values this write just persisted.
+          if (!_disposed &&
+              _sessionGeneration == sessionGeneration &&
+              state.status == AuthStatus.authenticated &&
+              state.user?.id == userId &&
+              state.user?.currentOrg == orgId &&
+              response is Success<void>) {
+            _setConfirmedOnline(
+              online: sentOnline!,
+              sessionGeneration: sessionGeneration,
+              userId: userId,
+              orgId: orgId,
+            );
+            _confirmedCustomStatus = _ConfirmedCustomStatus(
+              emoji: icon.isEmpty ? null : icon,
+              text: text.isEmpty ? null : text,
+              expiresAt: _expiryFromTimeout(timeout),
+              pauseNotifications: pauseNotifications,
+              sessionGeneration: sessionGeneration,
+              userId: userId,
+              orgId: orgId,
+            );
+          }
+          return response;
+        },
+        sessionGeneration: sessionGeneration,
+        userId: userId,
+        orgId: orgId,
+      );
 
-    switch (result) {
-      case Success<void>():
-        AppLogger.i('Status changed successfully', tag: _tag);
-        final updatedStatus = UserStatus(
-          emoji: icon.isEmpty ? null : icon,
-          text: text.isEmpty ? null : text,
-          expiresAt: _expiryFromTimeout(timeout),
-          pauseNotifications: pauseNotifications,
-          online: online,
+      if (result == null) {
+        _resetDiscardedStatusLoading(
+          sessionGeneration: sessionGeneration,
+          mutationSeq: mutationSeq,
+          userId: userId,
         );
-        state = state.copyWith(
-          isLoading: false,
-          user: state.user?._withStatus(updatedStatus),
-        );
-        return true;
-
-      case Failure<void>():
-        AppLogger.w(
-          'Status change failed — ${result.error.message}',
-          tag: _tag,
-        );
-        state = state.copyWith(
-          isLoading: false,
-          error: result.error.friendlyMessage,
+        // Dropped before send (disposed, or the session changed while the
+        // write waited in the queue) — no feedback for a dead session.
+        return false;
+      }
+      if (_disposed ||
+          _sessionGeneration != sessionGeneration ||
+          state.status != AuthStatus.authenticated ||
+          state.user?.id != userId ||
+          state.user?.currentOrg != orgId) {
+        _resetDiscardedStatusLoading(
+          sessionGeneration: sessionGeneration,
+          mutationSeq: mutationSeq,
+          userId: userId,
         );
         return false;
+      }
+
+      switch (result) {
+        case Success<void>():
+          AppLogger.i('Status changed successfully', tag: _tag);
+          // Apply owned status fields to the LATEST user state so concurrent
+          // updates are preserved, and only while no newer mutation has
+          // started; presence (online) is owned by the presence flow.
+          if (mutationSeq == _statusMutationSeq) {
+            final latest = state.user;
+            if (latest != null) {
+              final updatedStatus = UserStatus(
+                emoji: icon.isEmpty ? null : icon,
+                text: text.isEmpty ? null : text,
+                expiresAt: _expiryFromTimeout(timeout),
+                pauseNotifications: pauseNotifications,
+                online: latest.status.online,
+              );
+              state = state.copyWith(
+                isLoading: false,
+                user: latest._withStatus(updatedStatus),
+                clearError: true,
+              );
+              return true;
+            }
+          }
+          state = state.copyWith(isLoading: false);
+          return true;
+
+        case Failure<void>():
+          AppLogger.w(
+            'Status change failed — ${result.error.message}',
+            tag: _tag,
+          );
+          if (mutationSeq == _statusMutationSeq) {
+            final confirmed = _confirmedCustomStatus;
+            final latest = state.user;
+            if (confirmed != null &&
+                latest != null &&
+                confirmed.sessionGeneration == sessionGeneration &&
+                confirmed.userId == userId &&
+                confirmed.orgId == orgId) {
+              final reconciledStatus = UserStatus(
+                emoji: confirmed.emoji,
+                text: confirmed.text,
+                expiresAt: confirmed.expiresAt,
+                pauseNotifications: confirmed.pauseNotifications,
+                online: latest.status.online,
+              );
+              state = state.copyWith(
+                isLoading: false,
+                user: latest._withStatus(reconciledStatus),
+                error: result.error.friendlyMessage,
+              );
+              return false;
+            }
+          }
+          state = state.copyWith(
+            isLoading: false,
+            error: result.error.friendlyMessage,
+          );
+          return false;
+      }
+    } finally {
+      _recordMutationCompleted(context);
     }
   }
 
-  /// Clears the current custom status while keeping presence unchanged.
+  /// Clears the current custom status while keeping presence unchanged. The
+  /// server write carries the latest confirmed presence at send time, like
+  /// [changeStatus].
   Future<bool> clearStatus() async {
+    final currentUser = state.user;
+    if (currentUser == null || state.status != AuthStatus.authenticated) {
+      return false;
+    }
+
     AppLogger.d('clearStatus', tag: _tag);
     state = state.copyWith(isLoading: true, clearError: true);
 
-    final currentOnline = state.user?.status.online ?? true;
-    final result = await _repository.changeStatus(
-      icon: '',
-      text: '',
-      pauseNotifications: false,
-      statusTimeout: StatusTimeout.dontRemove.apiValue,
-      clearStatus: true,
-      online: currentOnline,
+    final mutationSeq = ++_statusMutationSeq;
+    final sessionGeneration = _sessionGeneration;
+    final userId = currentUser.id;
+    final orgId = currentUser.currentOrg;
+    final context = _MutationContext(
+      sessionGeneration: sessionGeneration,
+      userId: userId,
+      orgId: orgId,
     );
+    _recordMutationStarted(context);
+    try {
+      bool? sentOnline;
+      final result = await _enqueueOnlineWrite<Result<void>>(
+        () async {
+          sentOnline = _currentPresenceForSend();
+          final response = await _repository.changeStatus(
+            icon: '',
+            text: '',
+            pauseNotifications: false,
+            statusTimeout: StatusTimeout.dontRemove.apiValue,
+            clearStatus: true,
+            online: sentOnline!,
+          );
+          // Same in-task bookkeeping as [changeStatus]: the next queued write
+          // runs before this caller resumes.
+          if (!_disposed &&
+              _sessionGeneration == sessionGeneration &&
+              state.status == AuthStatus.authenticated &&
+              state.user?.id == userId &&
+              state.user?.currentOrg == orgId &&
+              response is Success<void>) {
+            _setConfirmedOnline(
+              online: sentOnline!,
+              sessionGeneration: sessionGeneration,
+              userId: userId,
+              orgId: orgId,
+            );
+            _confirmedCustomStatus = _ConfirmedCustomStatus(
+              emoji: null,
+              text: null,
+              expiresAt: null,
+              pauseNotifications: false,
+              sessionGeneration: sessionGeneration,
+              userId: userId,
+              orgId: orgId,
+            );
+          }
+          return response;
+        },
+        sessionGeneration: sessionGeneration,
+        userId: userId,
+        orgId: orgId,
+      );
 
-    switch (result) {
-      case Success<void>():
-        state = state.copyWith(
-          isLoading: false,
-          user: state.user?._withStatus(UserStatus(online: currentOnline)),
-        );
-        return true;
-      case Failure<void>():
-        state = state.copyWith(
-          isLoading: false,
-          error: result.error.friendlyMessage,
+      if (result == null) {
+        _resetDiscardedStatusLoading(
+          sessionGeneration: sessionGeneration,
+          mutationSeq: mutationSeq,
+          userId: userId,
         );
         return false;
+      }
+      if (_disposed ||
+          _sessionGeneration != sessionGeneration ||
+          state.status != AuthStatus.authenticated ||
+          state.user?.id != userId ||
+          state.user?.currentOrg != orgId) {
+        _resetDiscardedStatusLoading(
+          sessionGeneration: sessionGeneration,
+          mutationSeq: mutationSeq,
+          userId: userId,
+        );
+        return false;
+      }
+
+      switch (result) {
+        case Success<void>():
+          if (mutationSeq == _statusMutationSeq) {
+            final latest = state.user;
+            if (latest != null) {
+              state = state.copyWith(
+                isLoading: false,
+                user: latest._withStatus(
+                  UserStatus(online: latest.status.online),
+                ),
+                clearError: true,
+              );
+              return true;
+            }
+          }
+          state = state.copyWith(isLoading: false);
+          return true;
+        case Failure<void>():
+          if (mutationSeq == _statusMutationSeq) {
+            final confirmed = _confirmedCustomStatus;
+            final latest = state.user;
+            if (confirmed != null &&
+                latest != null &&
+                confirmed.sessionGeneration == sessionGeneration &&
+                confirmed.userId == userId &&
+                confirmed.orgId == orgId) {
+              final reconciledStatus = UserStatus(
+                emoji: confirmed.emoji,
+                text: confirmed.text,
+                expiresAt: confirmed.expiresAt,
+                pauseNotifications: confirmed.pauseNotifications,
+                online: latest.status.online,
+              );
+              state = state.copyWith(
+                isLoading: false,
+                user: latest._withStatus(reconciledStatus),
+                error: result.error.friendlyMessage,
+              );
+              return false;
+            }
+          }
+          state = state.copyWith(
+            isLoading: false,
+            error: result.error.friendlyMessage,
+          );
+          return false;
+      }
+    } finally {
+      _recordMutationCompleted(context);
     }
   }
 
-  /// Toggles between Active (online=true) and Away (online=false).
-  Future<void> toggleOnlineStatus() async {
+  /// Toggles between Active (online=true) and Away (online=false) through the
+  /// dedicated `POST /profile/presence` endpoint, which writes only the
+  /// online flag — custom status text, emoji, expiry and notification
+  /// preferences are never sent or changed.
+  ///
+  /// Returns [PresenceConfirmed] only when the backend confirmed the change
+  /// and the confirming session is still current; [PresenceFailed] carries
+  /// the error message for a genuine failure; [PresenceSkipped] covers
+  /// duplicate clicks and responses that arrive after a logout, account or
+  /// organisation change (discarded silently).
+  Future<PresenceToggleResult> toggleOnlineStatus() async {
     final currentUser = state.user;
-    if (currentUser == null) return;
+    if (currentUser == null || state.status != AuthStatus.authenticated) {
+      return const PresenceSkipped();
+    }
+    // Ignore clicks while a toggle request is already in flight.
+    if (_presenceToggleInFlight) {
+      return const PresenceSkipped();
+    }
+    _presenceToggleInFlight = true;
 
-    final newOnline = !currentUser.status.online;
-    AppLogger.d('toggleOnlineStatus → online=$newOnline', tag: _tag);
-
-    final currentStatus = currentUser.status;
-    final result = await _repository.changeStatus(
-      icon: currentStatus.emoji ?? '',
-      text: currentStatus.text ?? '',
-      pauseNotifications: currentStatus.pauseNotifications,
-      statusTimeout: StatusTimeout.dontRemove.apiValue,
-      clearStatus: false,
-      online: newOnline,
+    final sessionGeneration = _sessionGeneration;
+    final userId = currentUser.id;
+    final orgId = currentUser.currentOrg;
+    final context = _MutationContext(
+      sessionGeneration: sessionGeneration,
+      userId: userId,
+      orgId: orgId,
     );
+    _recordMutationStarted(context);
 
-    if (result is Success<void>) {
-      state = state.copyWith(
-        user: currentUser._withStatus(
-          currentStatus.copyWith(online: newOnline),
-        ),
+    AppLogger.d('toggleOnlineStatus requested', tag: _tag);
+
+    try {
+      bool sentOnline = false;
+      final result = await _enqueueOnlineWrite<Result<void>>(
+        () async {
+          // Flip from the latest known presence at send time: an earlier
+          // queued write may have changed it since the click.
+          sentOnline = !_currentPresenceForSend();
+          AppLogger.d('toggleOnlineStatus → online=$sentOnline', tag: _tag);
+          final response = await _repository.setPresence(online: sentOnline);
+          // Record the confirmed presence inside the queue task: the next
+          // queued write runs one microtask before this caller resumes.
+          if (!_disposed &&
+              _sessionGeneration == sessionGeneration &&
+              state.status == AuthStatus.authenticated &&
+              state.user?.id == userId &&
+              state.user?.currentOrg == orgId &&
+              response is Success<void>) {
+            _setConfirmedOnline(
+              online: sentOnline,
+              sessionGeneration: sessionGeneration,
+              userId: userId,
+              orgId: orgId,
+            );
+          }
+          return response;
+        },
+        sessionGeneration: sessionGeneration,
+        userId: userId,
+        orgId: orgId,
       );
+
+      if (result == null) {
+        AppLogger.d('Presence toggle dropped before send', tag: _tag);
+        return const PresenceSkipped();
+      }
+
+      // Discard a stale response: the session, account or organisation
+      // changed while the request was in flight, so it no longer applies.
+      if (_disposed ||
+          _sessionGeneration != sessionGeneration ||
+          state.status != AuthStatus.authenticated ||
+          state.user?.id != userId ||
+          state.user?.currentOrg != orgId) {
+        AppLogger.d('Discarding stale presence response', tag: _tag);
+        return const PresenceSkipped();
+      }
+
+      switch (result) {
+        case Success<void>():
+          AppLogger.i('Presence toggled — online=$sentOnline', tag: _tag);
+          // Apply the confirmed flag to the LATEST user object so concurrent
+          // profile or status updates made while the request was in flight
+          // are preserved.
+          final latest = state.user!;
+          state = state.copyWith(
+            user: latest._withStatus(
+              latest.status.copyWith(online: sentOnline),
+            ),
+            clearError: true,
+          );
+          _syncMenuPresence(state.user!);
+          return const PresenceConfirmed();
+        case Failure<void>():
+          AppLogger.w(
+            'Presence toggle failed — ${result.error.message}',
+            tag: _tag,
+          );
+          final message = result.error.friendlyMessage;
+          state = state.copyWith(error: message);
+          return PresenceFailed(message);
+      }
+    } finally {
+      // Release the guard only for the session this request belongs to; a
+      // session boundary already released it for the next session.
+      if (_sessionGeneration == sessionGeneration) {
+        _presenceToggleInFlight = false;
+      }
+      _recordMutationCompleted(context);
     }
   }
 
-  DateTime? _expiryFromTimeout(StatusTimeout timeout) {
-    final now = DateTime.now();
-    return switch (timeout) {
-      StatusTimeout.thirtyMinutes => now.add(const Duration(minutes: 30)),
-      StatusTimeout.oneHour => now.add(const Duration(hours: 1)),
-      StatusTimeout.today => DateTime(now.year, now.month, now.day, 23, 59),
-      StatusTimeout.thisWeek => now.add(Duration(days: 7 - now.weekday)),
-      StatusTimeout.dontRemove => null,
-    };
+  DateTime? _expiryFromTimeout(StatusTimeout timeout) =>
+      timeout.expiryFrom(DateTime.now());
+
+  Timer? _statusExpiryTimer;
+
+  /// Arms one timer for the current custom status's "Clear after" time, so it
+  /// disappears while the app stays open. A status that has already expired is
+  /// cleared straight away. Signing out or changing the status re-arms it.
+  void _scheduleStatusExpiry(AuthState next) {
+    _statusExpiryTimer?.cancel();
+    _statusExpiryTimer = null;
+    final status = next.user?.status;
+    final expiresAt = status?.expiresAt;
+    if (status == null || expiresAt == null) return;
+    if (status.emoji == null && (status.text ?? '').isEmpty) return;
+    final left = expiresAt.difference(DateTime.now());
+    _statusExpiryTimer = Timer(
+      left.isNegative ? Duration.zero : left,
+      _clearExpiredStatus,
+    );
+  }
+
+  void _clearExpiredStatus() {
+    final user = state.user;
+    final expiresAt = user?.status.expiresAt;
+    if (_disposed || user == null || expiresAt == null) return;
+    // The status may have been changed since the timer was armed.
+    if (DateTime.now().isBefore(expiresAt)) return;
+    AppLogger.d('custom status expired — clearing', tag: _tag);
+    state = state.copyWith(user: user._withStatus(user.status.cleared()));
   }
 }
 
@@ -494,4 +1179,68 @@ extension _UserStatusSwap on User {
     aiCreditsPurchasable: aiCreditsPurchasable,
     status: newStatus,
   );
+
+  User _withOrgPlanOf(User other) => User(
+    id: id,
+    firstName: firstName,
+    lastName: lastName,
+    email: email,
+    phone: phone,
+    username: username,
+    isVerified: isVerified,
+    isOnboarded: isOnboarded,
+    createdAt: createdAt,
+    currentOrg: currentOrg,
+    currentOrganisationSlug: currentOrganisationSlug,
+    avatarUrl: avatarUrl,
+    defaultAvatarUrl: defaultAvatarUrl,
+    creditBalance: other.creditBalance,
+    subscriptionPlanId: other.subscriptionPlanId,
+    aiCreditsPurchasable: other.aiCreditsPurchasable,
+    status: status,
+  );
+}
+
+class _MutationContext {
+  final int sessionGeneration;
+  final String? userId;
+  final String? orgId;
+
+  const _MutationContext({
+    required this.sessionGeneration,
+    required this.userId,
+    required this.orgId,
+  });
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is _MutationContext &&
+          runtimeType == other.runtimeType &&
+          sessionGeneration == other.sessionGeneration &&
+          userId == other.userId &&
+          orgId == other.orgId;
+
+  @override
+  int get hashCode => Object.hash(sessionGeneration, userId, orgId);
+}
+
+class _ConfirmedCustomStatus {
+  final String? emoji;
+  final String? text;
+  final DateTime? expiresAt;
+  final bool pauseNotifications;
+  final int sessionGeneration;
+  final String? userId;
+  final String? orgId;
+
+  const _ConfirmedCustomStatus({
+    this.emoji,
+    this.text,
+    this.expiresAt,
+    this.pauseNotifications = false,
+    required this.sessionGeneration,
+    required this.userId,
+    required this.orgId,
+  });
 }

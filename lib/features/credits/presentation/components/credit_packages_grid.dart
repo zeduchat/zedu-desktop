@@ -149,28 +149,42 @@ class CreditPackagesGrid extends StatelessWidget {
     }).toList();
   }
 
+  static int getCrossAxisCount(double maxWidth) {
+    if (maxWidth < 680) return 1;
+    if (maxWidth < 1024) return 2;
+    return 3;
+  }
+
   @override
   Widget build(BuildContext context) {
     final items = _displayPackages;
 
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: items.length,
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 3,
-        crossAxisSpacing: 20,
-        mainAxisSpacing: 20,
-        mainAxisExtent: 520, // Increased to fit the longest benefits list
-      ),
-      itemBuilder: (context, index) {
-        final package = items[index];
-        return CreditPackageCard(
-          package: package,
-          accentColor: _getColorForPackage(package.name),
-          isCurrentPlan: _isCurrentPlan(package),
-          isLoading: purchasingPackageId == package.id,
-          onPurchase: package.isFree ? null : () => onPurchase(package),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final crossAxisCount = getCrossAxisCount(constraints.maxWidth);
+        return GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: items.length,
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: crossAxisCount,
+            crossAxisSpacing: 20,
+            mainAxisSpacing: 20,
+            mainAxisExtent:
+                660, // Sized to comfortably fit the longest benefits list
+          ),
+          itemBuilder: (context, index) {
+            final package = items[index];
+            return CreditPackageCard(
+              package: package,
+              accentColor: _getColorForPackage(package.name),
+              isCurrentPlan: _isCurrentPlan(package),
+              isLoading: purchasingPackageId == package.id,
+              onPurchase: package.isFree || purchasingPackageId != null
+                  ? null
+                  : () => onPurchase(package),
+            );
+          },
         );
       },
     );

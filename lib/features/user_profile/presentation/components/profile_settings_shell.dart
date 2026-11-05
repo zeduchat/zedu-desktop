@@ -140,79 +140,105 @@ class _SettingsNavigation extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Settings',
-            style: context.textTheme.titleLarge?.copyWith(
-              color: Colors.white,
-              fontWeight: FontWeight.w700,
+          // Scrolls so the version row stays on screen in a short window.
+          Expanded(
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Settings',
+                    style: context.textTheme.titleLarge?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          userName,
+                          style: context.textTheme.bodyMedium?.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      const Icon(
+                        Icons.keyboard_arrow_down,
+                        color: Colors.white70,
+                        size: 18,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 30),
+                  const _NavigationGroupLabel(label: 'Personal'),
+                  _NavigationTile(
+                    icon: Icons.person_outline,
+                    label: 'Account',
+                    selected: selectedSection == UserProfileSection.account,
+                    onTap: () => onSectionSelected(UserProfileSection.account),
+                  ),
+                  _NavigationTile(
+                    icon: Icons.notifications_none,
+                    label: 'Notifications',
+                    selected:
+                        selectedSection == UserProfileSection.notifications,
+                    onTap: () =>
+                        onSectionSelected(UserProfileSection.notifications),
+                  ),
+                  _NavigationTile(
+                    icon: Icons.lock_outline,
+                    label: 'Security',
+                    selected: selectedSection == UserProfileSection.security,
+                    onTap: () => onSectionSelected(UserProfileSection.security),
+                  ),
+                  const SizedBox(height: 18),
+                  const _NavigationGroupLabel(label: 'Organization'),
+                  _NavigationTile(
+                    icon: Icons.settings_outlined,
+                    label: 'General',
+                    selected:
+                        selectedSection == UserProfileSection.organization,
+                    onTap: () =>
+                        onSectionSelected(UserProfileSection.organization),
+                  ),
+                  _NavigationTile(
+                    icon: Icons.groups_outlined,
+                    label: 'User management',
+                    selected:
+                        selectedSection == UserProfileSection.userManagement,
+                    onTap: () =>
+                        onSectionSelected(UserProfileSection.userManagement),
+                  ),
+                  _NavigationTile(
+                    icon: Icons.person_outline,
+                    label: 'Roles & permissions',
+                    selected:
+                        selectedSection ==
+                        UserProfileSection.rolesAndPermissions,
+                    onTap: () => onSectionSelected(
+                      UserProfileSection.rolesAndPermissions,
+                    ),
+                  ),
+                  _NavigationTile(
+                    icon: Icons.webhook_outlined,
+                    label: 'Webhooks',
+                    selected: selectedSection == UserProfileSection.webhooks,
+                    onTap: () => onSectionSelected(UserProfileSection.webhooks),
+                  ),
+                  _NavigationTile(
+                    icon: Icons.credit_card_outlined,
+                    label: 'Billing',
+                    selected: selectedSection == UserProfileSection.billing,
+                    onTap: () => onSectionSelected(UserProfileSection.billing),
+                  ),
+                ],
+              ),
             ),
           ),
-          const SizedBox(height: 24),
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  userName,
-                  style: context.textTheme.bodyMedium?.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-              const Icon(
-                Icons.keyboard_arrow_down,
-                color: Colors.white70,
-                size: 18,
-              ),
-            ],
-          ),
-          const SizedBox(height: 30),
-          const _NavigationGroupLabel(label: 'Personal'),
-          _NavigationTile(
-            icon: Icons.person_outline,
-            label: 'Account',
-            selected: selectedSection == UserProfileSection.account,
-            onTap: () => onSectionSelected(UserProfileSection.account),
-          ),
-          _NavigationTile(
-            icon: Icons.notifications_none,
-            label: 'Notifications',
-            selected: selectedSection == UserProfileSection.notifications,
-            onTap: () => onSectionSelected(UserProfileSection.notifications),
-          ),
-          _NavigationTile(
-            icon: Icons.lock_outline,
-            label: 'Security',
-            selected: selectedSection == UserProfileSection.security,
-            onTap: () => onSectionSelected(UserProfileSection.security),
-          ),
-          const SizedBox(height: 18),
-          const _NavigationGroupLabel(label: 'Organization'),
-          _NavigationTile(
-            icon: Icons.settings_outlined,
-            label: 'General',
-            selected: selectedSection == UserProfileSection.organization,
-            onTap: () => onSectionSelected(UserProfileSection.organization),
-          ),
-          _NavigationTile(
-            icon: Icons.groups_outlined,
-            label: 'User management',
-            selected: selectedSection == UserProfileSection.userManagement,
-            onTap: () => onSectionSelected(UserProfileSection.userManagement),
-          ),
-          _NavigationTile(
-            icon: Icons.person_outline,
-            label: 'Roles & permissions',
-            selected: selectedSection == UserProfileSection.rolesAndPermissions,
-            onTap: () =>
-                onSectionSelected(UserProfileSection.rolesAndPermissions),
-          ),
-          _NavigationTile(
-            icon: Icons.credit_card_outlined,
-            label: 'Billing',
-            selected: selectedSection == UserProfileSection.billing,
-            onTap: () => onSectionSelected(UserProfileSection.billing),
-          ),
+          const AppVersionRow(),
         ],
       ),
     );

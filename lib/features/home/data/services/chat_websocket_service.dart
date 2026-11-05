@@ -16,54 +16,50 @@ class ChatWebsocketMessage {
   });
 }
 
+/// Real-time messages for group DMs.
+///
+/// There is no group DM socket on the server yet, so [messageStream] only
+/// carries what [receive] is given. It used to invent a "Mock Member" message
+/// every 15 seconds, which showed up as real messages in people's group DMs.
 class ChatWebsocketService {
   final _messageController = StreamController<ChatWebsocketMessage>.broadcast();
-  Timer? _mockTimer;
+  List<String> _activeGroupDmIds = const [];
+  bool _isDisposed = false;
 
   Stream<ChatWebsocketMessage> get messageStream => _messageController.stream;
+  bool get isDisposed => _isDisposed;
+
+  /// Nothing is scheduled any more: there is no simulated connection delay.
+  bool get hasPendingConnect => false;
+
+  /// The group DMs this client is in, for when a real socket subscribes to them.
+  List<String> get activeGroupDmIds => List.unmodifiable(_activeGroupDmIds);
 
   void connect(List<String> activeGroupDmIds) {
-    // Simulate connection establishing
-    Future<void>.delayed(const Duration(milliseconds: 500), () {
-      debugPrint('Mock WebSocket Connected');
-      _startMockingMessages(activeGroupDmIds);
-    });
+    if (_isDisposed) return;
+    _activeGroupDmIds = List.of(activeGroupDmIds);
   }
 
   void disconnect() {
-    _mockTimer?.cancel();
-    debugPrint('Mock WebSocket Disconnected');
+    _activeGroupDmIds = const [];
   }
 
-  void _startMockingMessages(List<String> activeGroupDmIds) {
-    if (activeGroupDmIds.isEmpty) return;
-
-    // Periodically send a fake incoming message to simulate real-time activity
-    _mockTimer?.cancel();
-    _mockTimer = Timer.periodic(const Duration(seconds: 15), (timer) {
-      // Pick a random group DM
-      final groupId = activeGroupDmIds[timer.tick % activeGroupDmIds.length];
-
-      _messageController.add(
-        ChatWebsocketMessage(
-          groupDmId: groupId,
-          text:
-              'This is a simulated real-time incoming message (#${timer.tick})',
-          authorName: 'Mock Member',
-          timestamp: DateTime.now(),
-        ),
-      );
-    });
+  /// Delivers a message that arrived from the server to the listeners.
+  void receive(ChatWebsocketMessage message) {
+    if (_isDisposed || _messageController.isClosed) return;
+    _messageController.add(message);
   }
 
   void sendMessage(String groupDmId, String text) {
-    // In a real implementation, this sends over the WebSocket.
-    // For mock, we assume success or handle failure outside.
+    // No group DM socket on the server yet: sending is handled by the caller.
   }
 
   void dispose() {
-    _mockTimer?.cancel();
-    _messageController.close();
+    _isDisposed = true;
+    _activeGroupDmIds = const [];
+    if (!_messageController.isClosed) {
+      _messageController.close();
+    }
   }
 }
 

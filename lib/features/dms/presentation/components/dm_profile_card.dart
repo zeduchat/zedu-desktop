@@ -4,7 +4,14 @@ import 'package:zedu/features/features.dart';
 class DmProfileCard extends StatelessWidget {
   final DmConversation conversation;
 
-  const DmProfileCard({super.key, required this.conversation});
+  /// Opens the person's profile, the same as "View profile" in the DM menu.
+  final VoidCallback onViewProfile;
+
+  const DmProfileCard({
+    super.key,
+    required this.conversation,
+    required this.onViewProfile,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -28,7 +35,7 @@ class DmProfileCard extends StatelessWidget {
                 : null,
             child: conversation.effectiveAvatarUrl == null
                 ? Text(
-                    name.isNotEmpty ? name[0].toUpperCase() : '?',
+                    avatarInitial(name),
                     style: const TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.bold,
@@ -69,7 +76,7 @@ class DmProfileCard extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           OutlinedButton(
-            onPressed: () {},
+            onPressed: onViewProfile,
             style: OutlinedButton.styleFrom(
               side: BorderSide(color: colors.divider),
               shape: RoundedRectangleBorder(

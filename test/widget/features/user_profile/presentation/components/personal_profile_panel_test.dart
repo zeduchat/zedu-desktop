@@ -37,19 +37,21 @@ class _FakeAuth extends AuthNotifier {
       AuthState(status: AuthStatus.authenticated, user: _user());
 
   @override
-  Future<void> toggleOnlineStatus() async {
-    if (fails) return;
+  Future<PresenceToggleResult> toggleOnlineStatus() async {
+    if (fails) return const PresenceFailed('Status update failed');
     final online = !state.user!.status.online;
     state = AuthState(
       status: AuthStatus.authenticated,
       user: _user(online: online),
     );
+    return const PresenceConfirmed();
   }
 }
 
 Future<ProviderContainer> _pump(
   WidgetTester tester, {
   String username = 'hassanat',
+  String phoneNumber = '',
   bool statusFails = false,
 }) async {
   tester.view.physicalSize = const Size(1400, 1000);
@@ -64,6 +66,7 @@ Future<ProviderContainer> _pump(
             email: 'hassanat@example.com',
             timezone: 'Africa/Lagos',
             username: username,
+            phoneNumber: phoneNumber,
           ),
         ),
       ),
@@ -84,6 +87,12 @@ Future<ProviderContainer> _pump(
   );
   return container;
 }
+
+/// The copy icon in the contact row showing [label].
+Finder _copyIconBeside(String label) => find.descendant(
+  of: find.ancestor(of: find.text(label), matching: find.byType(Row)).first,
+  matching: find.byIcon(Icons.copy_outlined),
+);
 
 /// Taps [finder] and checks the toast, then lets the toast time out.
 Future<void> _tapAndExpectToast(
@@ -200,5 +209,47 @@ void main() {
       'Copied hassanat@example.com',
     );
     expect(copied, 'hassanat@example.com');
+  });
+
+  testWidgets('Contact rows copy the phone number and the email', (t) async {
+    String? copied;
+    t.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (call) async {
+        if (call.method == 'Clipboard.setData') {
+          copied = (call.arguments as Map)['text'] as String?;
+        }
+        return null;
+      },
+    );
+    addTearDown(
+      () => t.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        null,
+      ),
+    );
+
+    await _pump(t, phoneNumber: '+234 800 000 0000');
+
+    await _tapAndExpectToast(
+      t,
+      _copyIconBeside('+234 800 000 0000'),
+      'Copied +234 800 000 0000',
+    );
+    expect(copied, '+234 800 000 0000');
+
+    await _tapAndExpectToast(
+      t,
+      _copyIconBeside('hassanat@example.com'),
+      'Copied hassanat@example.com',
+    );
+    expect(copied, 'hassanat@example.com');
+  });
+
+  testWidgets('A phone row with no number offers nothing to copy', (t) async {
+    await _pump(t);
+    expect(find.text('Not provided'), findsOneWidget);
+    expect(_copyIconBeside('Not provided'), findsNothing);
+    expect(_copyIconBeside('hassanat@example.com'), findsOneWidget);
   });
 }

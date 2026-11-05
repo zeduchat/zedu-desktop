@@ -82,8 +82,7 @@ Future<void> showEditAccountDialog(
                 keyboardType: TextInputType.emailAddress,
                 validator: (v) {
                   if (v == null || v.trim().isEmpty) return 'Email is required';
-                  if (!v.contains('@')) return 'Enter a valid email';
-                  return null;
+                  return Validators.validateEmail(context, v.trim());
                 },
               ),
               const SizedBox(height: 16),
@@ -127,29 +126,84 @@ Future<void> showEditAccountDialog(
   timezoneCtrl.dispose();
 }
 
-/// Dialog for changing password.
+/// Dialog for changing password. It stays open while [onSave] runs and closes
+/// only when [onSave] succeeds; a failure is shown in the dialog.
 Future<void> showChangePasswordDialog(
   BuildContext context,
-  Future<void> Function({
+  Future<Result<void>> Function({
     required String currentPassword,
     required String newPassword,
   })
   onSave,
-) async {
-  final currentCtrl = TextEditingController();
-  final newCtrl = TextEditingController();
-  final confirmCtrl = TextEditingController();
-  final formKey = GlobalKey<FormState>();
-  bool hasAttemptedSubmit = false;
-
-  await showDialog<void>(
+) {
+  return showDialog<void>(
     context: context,
-    builder: (ctx) => StatefulBuilder(
-      builder: (ctx, setDialogState) => AlertDialog(
+    builder: (_) => _ChangePasswordDialog(onSave: onSave),
+  );
+}
+
+class _ChangePasswordDialog extends StatefulWidget {
+  const _ChangePasswordDialog({required this.onSave});
+
+  final Future<Result<void>> Function({
+    required String currentPassword,
+    required String newPassword,
+  })
+  onSave;
+
+  @override
+  State<_ChangePasswordDialog> createState() => _ChangePasswordDialogState();
+}
+
+class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
+  final _currentCtrl = TextEditingController();
+  final _newCtrl = TextEditingController();
+  final _confirmCtrl = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
+  bool _hasAttemptedSubmit = false;
+  bool _isSubmitting = false;
+  String? _submitError;
+
+  @override
+  void dispose() {
+    _currentCtrl.dispose();
+    _newCtrl.dispose();
+    _confirmCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    setState(() => _hasAttemptedSubmit = true);
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+
+    setState(() {
+      _isSubmitting = true;
+      _submitError = null;
+    });
+    final result = await widget.onSave(
+      currentPassword: _currentCtrl.text,
+      newPassword: _newCtrl.text,
+    );
+    if (!mounted) return;
+    setState(() {
+      _isSubmitting = false;
+      if (result case Failure(:final error)) {
+        _submitError = error.friendlyMessage;
+      }
+    });
+    if (result is Success) Navigator.pop(context);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return PopScope(
+      // The dialog closes only once the request has finished.
+      canPop: !_isSubmitting,
+      child: AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         title: Text(
-          'Change Password',
-          style: ctx.textTheme.titleMedium?.copyWith(
+          'Change password',
+          style: context.textTheme.titleMedium?.copyWith(
             fontWeight: FontWeight.w700,
           ),
         ),
@@ -157,43 +211,53 @@ Future<void> showChangePasswordDialog(
           width: 480,
           child: SingleChildScrollView(
             child: Form(
-              key: formKey,
+              key: _formKey,
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   AppTextField(
                     label: 'Current Password',
-                    controller: currentCtrl,
+                    controller: _currentCtrl,
                     hint: 'Enter current password',
                     isPassword: true,
                     validator: (v) =>
                         (v == null || v.isEmpty) ? 'Required' : null,
                   ),
+                  if (_submitError != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Text(
+                        _submitError!,
+                        style: context.textTheme.bodySmall?.copyWith(
+                          color: context.colors.error,
+                        ),
+                      ),
+                    ),
                   const SizedBox(height: 16),
                   AppTextField(
                     label: 'New Password',
-                    controller: newCtrl,
+                    controller: _newCtrl,
                     hint: 'Enter new password',
                     isPassword: true,
                     onChanged: (_) {
-                      setDialogState(() {});
-                      if (hasAttemptedSubmit) {
-                        formKey.currentState?.validate();
+                      setState(() {});
+                      if (_hasAttemptedSubmit) {
+                        _formKey.currentState?.validate();
                       }
                     },
-                    validator: (v) => Validators.validatePassword(ctx, v),
+                    validator: (v) => Validators.validatePassword(context, v),
                   ),
                   const SizedBox(height: 10),
                   Text(
                     'Password requirements',
-                    style: ctx.textTheme.bodySmall?.copyWith(
-                      color: ctx.colors.textSecondary,
+                    style: context.textTheme.bodySmall?.copyWith(
+                      color: context.colors.textSecondary,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
                   const SizedBox(height: 8),
-                  ...Validators.passwordRequirements(newCtrl.text).map(
+                  ...Validators.passwordRequirements(_newCtrl.text).map(
                     (requirement) => Padding(
                       padding: const EdgeInsets.only(bottom: 6),
                       child: Row(
@@ -205,15 +269,15 @@ Future<void> showChangePasswordDialog(
                                 : Icons.circle_outlined,
                             size: 16,
                             color: requirement.isMet
-                                ? ctx.colors.primary
-                                : ctx.colors.textSecondary,
+                                ? context.colors.primary
+                                : context.colors.textSecondary,
                           ),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
                               requirement.label,
-                              style: ctx.textTheme.bodySmall?.copyWith(
-                                color: ctx.colors.textSecondary,
+                              style: context.textTheme.bodySmall?.copyWith(
+                                color: context.colors.textSecondary,
                               ),
                             ),
                           ),
@@ -224,34 +288,34 @@ Future<void> showChangePasswordDialog(
                   const SizedBox(height: 10),
                   AppTextField(
                     label: 'Confirm New Password',
-                    controller: confirmCtrl,
+                    controller: _confirmCtrl,
                     hint: 'Re-enter new password',
                     isPassword: true,
                     onChanged: (_) {
-                      setDialogState(() {});
-                      if (hasAttemptedSubmit) {
-                        formKey.currentState?.validate();
+                      setState(() {});
+                      if (_hasAttemptedSubmit) {
+                        _formKey.currentState?.validate();
                       }
                     },
                     validator: (v) {
                       if (v == null || v.isEmpty) {
                         return 'Please confirm your new password';
                       }
-                      if (v != newCtrl.text) {
+                      if (v != _newCtrl.text) {
                         return 'Passwords do not match';
                       }
                       return null;
                     },
                   ),
-                  if (!hasAttemptedSubmit &&
-                      confirmCtrl.text.isNotEmpty &&
-                      confirmCtrl.text != newCtrl.text)
+                  if (!_hasAttemptedSubmit &&
+                      _confirmCtrl.text.isNotEmpty &&
+                      _confirmCtrl.text != _newCtrl.text)
                     Padding(
                       padding: const EdgeInsets.only(top: 8),
                       child: Text(
                         'Passwords do not match',
-                        style: ctx.textTheme.bodySmall?.copyWith(
-                          color: ctx.colors.textSecondary,
+                        style: context.textTheme.bodySmall?.copyWith(
+                          color: context.colors.textSecondary,
                         ),
                       ),
                     ),
@@ -262,35 +326,20 @@ Future<void> showChangePasswordDialog(
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(ctx),
+            onPressed: _isSubmitting ? null : () => Navigator.pop(context),
             child: const Text('Cancel'),
           ),
           AppButton(
             label: 'Update Password',
             expand: false,
             height: 40,
-            onPressed: () async {
-              setDialogState(() {
-                hasAttemptedSubmit = true;
-              });
-
-              if (formKey.currentState?.validate() ?? false) {
-                Navigator.pop(ctx);
-                await onSave(
-                  currentPassword: currentCtrl.text,
-                  newPassword: newCtrl.text,
-                );
-              }
-            },
+            loading: _isSubmitting,
+            onPressed: _submit,
           ),
         ],
       ),
-    ),
-  );
-
-  currentCtrl.dispose();
-  newCtrl.dispose();
-  confirmCtrl.dispose();
+    );
+  }
 }
 
 /// Dialog for editing organization information.
@@ -412,8 +461,7 @@ Future<void> showInviteMemberDialog(
                     if (v == null || v.trim().isEmpty) {
                       return 'Email is required';
                     }
-                    if (!v.contains('@')) return 'Enter a valid email';
-                    return null;
+                    return Validators.validateEmail(context, v.trim());
                   },
                 ),
                 const SizedBox(height: 16),

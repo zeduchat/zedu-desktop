@@ -199,4 +199,64 @@ void main() {
       ).called(1);
     });
   });
+
+  group('ChannelNotifier.leaveChannel', () {
+    late MockChannelRepository repository;
+    late ProviderContainer container;
+
+    setUp(() {
+      repository = MockChannelRepository();
+      when(() => repository.fetchChannels(any())).thenAnswer(
+        (_) async =>
+            Success<List<Channel>>([_channel('general'), _channel('random')]),
+      );
+
+      container = ProviderContainer(
+        overrides: [
+          channelRepositoryProvider.overrideWithValue(repository),
+          workspaceProvider.overrideWith(FakeWorkspaceNotifier.new),
+          authNotifierProvider.overrideWith(FakeAuthNotifier.new),
+        ],
+      );
+      addTearDown(container.dispose);
+    });
+
+    test(
+      'calls the repository and removes the channel from the list',
+      () async {
+        when(
+          () => repository.leaveChannel(any()),
+        ).thenAnswer((_) async => const Success<void>(null));
+        await container.read(channelProvider.future);
+
+        final result = await container
+            .read(channelProvider.notifier)
+            .leaveChannel('channel-random');
+
+        expect(result, isA<Success<void>>());
+        verify(() => repository.leaveChannel('channel-random')).called(1);
+        expect(
+          container.read(channelProvider).requireValue.map((c) => c.name),
+          ['general'],
+        );
+      },
+    );
+
+    test('keeps the list and returns the error when leaving fails', () async {
+      when(() => repository.leaveChannel(any())).thenAnswer(
+        (_) async => const Failure<void>(ApiFailure(message: 'Not allowed')),
+      );
+      await container.read(channelProvider.future);
+
+      final result = await container
+          .read(channelProvider.notifier)
+          .leaveChannel('channel-random');
+
+      expect(result, isA<Failure<void>>());
+      expect((result as Failure<void>).error.message, 'Not allowed');
+      final state = container.read(channelProvider);
+      expect(state.requireValue.map((c) => c.name), ['general', 'random']);
+      expect(state.hasError, isFalse);
+    });
+  });
 }

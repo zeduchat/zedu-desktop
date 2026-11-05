@@ -71,6 +71,7 @@ class OrganizationSection extends StatelessWidget {
                   right: 0,
                   child: SquareIconButton(
                     icon: Icons.edit_outlined,
+                    tooltip: 'Edit organization',
                     onTap: () => showEditOrganizationDialog(
                       context,
                       organization,

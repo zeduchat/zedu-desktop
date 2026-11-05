@@ -9,21 +9,57 @@ class BuyCreditsView extends ConsumerStatefulWidget {
 }
 
 class _BuyCreditsViewState extends ConsumerState<BuyCreditsView> {
+  String? _lastLoadedOrgId;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadCredits());
   }
 
-  void _loadCredits() {
-    final orgId = ref.read(authNotifierProvider).user?.currentOrg;
-    if (orgId != null && orgId.isNotEmpty) {
+  void _loadCredits([String? explicitOrgId, bool force = false]) {
+    final orgId = explicitOrgId ?? _resolveOrgId();
+    if (orgId != null &&
+        orgId.isNotEmpty &&
+        (force || orgId != _lastLoadedOrgId)) {
+      _lastLoadedOrgId = orgId;
       ref.read(creditsNotifierProvider.notifier).load(orgId: orgId);
     }
   }
 
+  String? _resolveOrgId() {
+    final currentOrgId = ref.read(currentOrgIdProvider);
+    if (currentOrgId.isNotEmpty) return currentOrgId;
+
+    final workspaceOrgId = ref.read(workspaceProvider).selectedWorkspace?.id;
+    if (workspaceOrgId != null && workspaceOrgId.isNotEmpty) {
+      return workspaceOrgId;
+    }
+
+    final authOrgId = ref.read(authNotifierProvider).user?.currentOrg;
+    if (authOrgId != null && authOrgId.isNotEmpty) {
+      return authOrgId;
+    }
+
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
+    ref.listen<String>(currentOrgIdProvider, (previous, next) {
+      if (next.isNotEmpty && previous != next) {
+        _loadCredits(next);
+      }
+    });
+
+    ref.listen<String?>(
+      authNotifierProvider.select((s) => s.user?.currentOrg),
+      (previous, next) {
+        if (next != null && next.isNotEmpty && previous != next) {
+          _loadCredits(next);
+        }
+      },
+    );
     ref.listen<CreditsState>(creditsNotifierProvider, (previous, next) {
       if (next.successMessage != null &&
           previous?.successMessage != next.successMessage) {
@@ -113,11 +149,7 @@ class _BuyCreditsViewState extends ConsumerState<BuyCreditsView> {
 
   Future<void> _onPurchase(BuildContext context, CreditPackage package) async {
     if (package.name.toLowerCase() == 'enterprise') {
-      AppToastService.show(
-        context,
-        type: AppToastType.success,
-        message: 'Contacting Sales... We will reach out to you shortly!',
-      );
+      await _openContactSales(context);
       return;
     }
 
@@ -157,6 +189,25 @@ class _BuyCreditsViewState extends ConsumerState<BuyCreditsView> {
           message: 'Error launching payment page: $e',
         );
       }
+    }
+  }
+
+  Future<void> _openContactSales(BuildContext context) async {
+    var opened = false;
+    try {
+      opened = await launchUrl(
+        Uri.parse(locator<AppConfig>().contactSalesUrl),
+        mode: LaunchMode.platformDefault,
+      );
+    } catch (_) {
+      opened = false;
+    }
+    if (!opened && context.mounted) {
+      AppToastService.show(
+        context,
+        type: AppToastType.error,
+        message: 'Could not open the Contact Sales page.',
+      );
     }
   }
 }

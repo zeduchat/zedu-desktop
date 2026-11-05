@@ -238,4 +238,19 @@ class AuthRepositoryImpl implements AuthRepository {
       return Failure(ApiFailure.unknown(error));
     }
   }
+
+  @override
+  Future<Result<void>> setPresence({required bool online}) async {
+    try {
+      await _remote.setPresence(online: online);
+      AppLogger.i('Presence updated — online=$online', tag: _tag);
+      return const Success(null);
+    } on ApiFailure catch (failure) {
+      AppLogger.w('Presence update failed — ${failure.message}', tag: _tag);
+      return Failure(failure);
+    } catch (error) {
+      AppLogger.e('Unexpected presence update error', tag: _tag, error: error);
+      return Failure(ApiFailure.unknown(error));
+    }
+  }
 }

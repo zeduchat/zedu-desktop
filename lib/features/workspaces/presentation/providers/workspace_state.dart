@@ -16,12 +16,15 @@ class WorkspaceState {
   WorkspaceState copyWith({
     List<Workspace>? workspaces,
     Workspace? selectedWorkspace,
+    bool clearSelectedWorkspace = false,
     bool? isLoading,
     String? errorMessage,
   }) {
     return WorkspaceState(
       workspaces: workspaces ?? this.workspaces,
-      selectedWorkspace: selectedWorkspace ?? this.selectedWorkspace,
+      selectedWorkspace: clearSelectedWorkspace
+          ? null
+          : selectedWorkspace ?? this.selectedWorkspace,
       isLoading: isLoading ?? this.isLoading,
       errorMessage: errorMessage ?? this.errorMessage,
     );

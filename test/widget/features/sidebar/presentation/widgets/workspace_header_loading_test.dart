@@ -66,6 +66,42 @@ void main() {
       expect(notifier.fetchCalls, 1);
     });
 
+    testWidgets('offers to create an organisation when there is none', (
+      tester,
+    ) async {
+      final router = GoRouter(
+        routes: [
+          GoRoute(
+            path: '/',
+            builder: (_, _) => const Scaffold(body: WorkspaceSwitcherHeader()),
+          ),
+          GoRoute(
+            path: AppRouter.createOrganization,
+            builder: (_, _) => const Text('create organization page'),
+          ),
+        ],
+      );
+      addTearDown(router.dispose);
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            workspaceProvider.overrideWith(
+              () => FakeWorkspaceNotifier(const WorkspaceState()),
+            ),
+          ],
+          child: MaterialApp.router(routerConfig: router),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('No organization'), findsOneWidget);
+
+      await tester.tap(find.text('Create one'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('create organization page'), findsOneWidget);
+    });
+
     testWidgets('shows nothing while there is no organisation and no error', (
       tester,
     ) async {
