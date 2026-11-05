@@ -41,6 +41,11 @@ class UserProfileRepositoryImpl implements UserProfileRepository {
   }
 
   @override
+  Future<Result<void>> revokeSecuritySession(String sessionId) {
+    return _guard(() => _remote.revokeSecuritySession(sessionId));
+  }
+
+  @override
   Future<Result<List<SecuritySession>>> getSecuritySessions() {
     return _guard(_remote.getSecuritySessions);
   }

@@ -176,6 +176,28 @@ class UserProfileNotifier extends Notifier<UserProfileState> {
 
   /// Returns the outcome so the change password dialog can stay open and show
   /// a failure itself, which is why a failure doesn't also set the state error.
+  Future<Result<void>> revokeSecuritySession(String sessionId) async {
+    final previousSessions = state.securitySessions;
+    state = state.copyWith(
+      securitySessions: previousSessions.where((s) => s.id != sessionId).toList(),
+      clearError: true,
+      clearSuccess: true,
+    );
+    final result = await _repository.revokeSecuritySession(sessionId);
+    switch (result) {
+      case Success<void>():
+        state = state.copyWith(
+          successMessage: 'Session revoked successfully.',
+        );
+      case Failure<void>(:final error):
+        state = state.copyWith(
+          securitySessions: previousSessions,
+          error: error.friendlyMessage,
+        );
+    }
+    return result;
+  }
+
   Future<Result<void>> changePassword({
     required String currentPassword,
     required String newPassword,

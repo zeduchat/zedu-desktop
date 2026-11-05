@@ -15,6 +15,7 @@ abstract interface class UserProfileRemoteDataSource {
     required NotificationPreferences preferences,
   });
   Future<List<SecuritySessionModel>> getSecuritySessions();
+  Future<void> revokeSecuritySession(String sessionId);
   Future<void> changePassword({
     required String currentPassword,
     required String newPassword,
@@ -239,6 +240,16 @@ class UserProfileRemoteDataSourceImpl implements UserProfileRemoteDataSource {
     } catch (error) {
       AppLogger.w('Could not remember mobile override - $error', tag: _tag);
     }
+  }
+
+  @override
+  Future<void> revokeSecuritySession(String sessionId) async {
+    if (_config.usesMockData) {
+      return;
+    }
+    await _apiBaseService.delete<Map<String, dynamic>>(
+      path: '/profile/security/sessions/$sessionId',
+    );
   }
 
   @override

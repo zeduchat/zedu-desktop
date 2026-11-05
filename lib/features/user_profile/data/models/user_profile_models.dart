@@ -220,6 +220,7 @@ class OrganizationProfileModel extends OrganizationProfile {
 
 class SecuritySessionModel extends SecuritySession {
   const SecuritySessionModel({
+    super.id,
     required super.device,
     required super.location,
     required super.date,
@@ -229,6 +230,7 @@ class SecuritySessionModel extends SecuritySession {
 
   factory SecuritySessionModel.fromJson(Map<String, dynamic> json) {
     return SecuritySessionModel(
+      id: json['id'] as String? ?? '',
       device: json['device'] as String? ?? 'Chrome',
       location: json['location'] as String? ?? 'Lagos',
       date: json['date'] as String? ?? 'May 8, 2026 1:07 PM',

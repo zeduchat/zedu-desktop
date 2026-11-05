@@ -15,6 +15,7 @@ abstract interface class UserProfileRepository {
   });
 
   Future<Result<List<SecuritySession>>> getSecuritySessions();
+  Future<Result<void>> revokeSecuritySession(String sessionId);
   Future<Result<void>> changePassword({
     required String currentPassword,
     required String newPassword,
