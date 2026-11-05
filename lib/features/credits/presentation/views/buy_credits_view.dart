@@ -233,7 +233,7 @@ class _BalanceChip extends StatelessWidget {
           Icon(Icons.auto_awesome, size: 18, color: colors.primary),
           const SizedBox(width: 8),
           Text(
-            '$balance AI credits',
+            aiCreditsLabel(balance),
             style: context.textTheme.labelLarge?.copyWith(
               color: colors.primary,
               fontWeight: FontWeight.w600,

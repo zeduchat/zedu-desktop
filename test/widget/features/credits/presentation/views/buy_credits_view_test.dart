@@ -190,7 +190,7 @@ void main() {
     });
   });
 
-  for (final balance in [0, 25]) {
+  for (final balance in [0, 1, 25]) {
     testWidgets('Billing and user menu show the loaded balance of $balance', (
       tester,
     ) async {
@@ -253,13 +253,13 @@ void main() {
         CreditsStatus.ready,
       );
       expect(container.read(authNotifierProvider).user!.creditBalance, 100);
-      expect(find.text('$balance AI credits'), findsOneWidget);
+      expect(find.text(aiCreditsLabel(balance)), findsOneWidget);
       expect(find.text('100 AI credits'), findsNothing);
 
       await tester.tap(find.byType(TopUserMenu));
       await tester.pumpAndSettle();
       expect(find.text('AI Credits: $balance'), findsOneWidget);
-      expect(find.text('$balance AI credits'), findsOneWidget);
+      expect(find.text(aiCreditsLabel(balance)), findsOneWidget);
       expect(tester.takeException(), isNull);
       verify(() => repository.getUsage('test-org')).called(1);
     });
