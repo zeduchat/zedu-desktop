@@ -55,8 +55,9 @@ class MentionSuggestionList extends StatelessWidget {
               itemCount: suggestions.length,
               itemBuilder: (context, index) {
                 final p = suggestions[index];
-                final initial = p.username.isNotEmpty
-                    ? p.username[0].toUpperCase()
+                final trimmed = p.username.trim();
+                final initial = trimmed.isNotEmpty
+                    ? trimmed.characters.first.toUpperCase()
                     : '?';
                 return InkWell(
                   onTap: () => onSelect(p),
