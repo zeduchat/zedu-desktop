@@ -33,15 +33,26 @@ String formatFileDateTime(DateTime? date) {
 String formatFileSize(int bytes) {
   if (bytes < 1024) return '$bytes B';
   const units = ['KB', 'MB', 'GB', 'TB'];
+
+  // The number is rounded to what it will be shown as: whole numbers from 10
+  // up, one decimal below that.
+  double roundedFor(double value) => value >= 10
+      ? value.roundToDouble()
+      : double.parse(value.toStringAsFixed(1));
+
   var size = bytes / 1024;
   var unit = 0;
-  while (size >= 1024 && unit < units.length - 1) {
+  var rounded = roundedFor(size);
+  // Rounding comes first, so a value that reaches the next unit (1023.9 KB is
+  // 1 MB, not 1024 KB) is carried into it.
+  while (rounded >= 1024 && unit < units.length - 1) {
     size /= 1024;
     unit++;
+    rounded = roundedFor(size);
   }
-  final text = size >= 10 || size == size.roundToDouble()
-      ? size.round().toString()
-      : size.toStringAsFixed(1);
+  final text = rounded == rounded.roundToDouble()
+      ? rounded.round().toString()
+      : rounded.toStringAsFixed(1);
   return '$text ${units[unit]}';
 }
 
