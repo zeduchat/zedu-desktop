@@ -15,8 +15,10 @@ class App extends ConsumerWidget {
         child: CreditsPaymentDeepLinkListener(
           child: AuthDeepLinkListener(
             child: SessionExpiryListener(
-              child: QuickSwitcherShortcut(
-                child: child ?? const SizedBox.shrink(),
+              child: DialogEscapeShortcut(
+                child: QuickSwitcherShortcut(
+                  child: child ?? const SizedBox.shrink(),
+                ),
               ),
             ),
           ),
