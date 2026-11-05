@@ -31,35 +31,38 @@ class _RoleCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ProfileCard(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Text(
-                role.role,
-                style: context.textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
+    return GestureDetector(
+      onTap: () {},
+      child: ProfileCard(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Text(
+                  role.role,
+                  style: context.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
-              ),
-              const Spacer(),
-              const Icon(
-                Icons.keyboard_arrow_right,
-                size: 20,
-                color: Color(0xFF6B7280),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Text(
-            role.description,
-            style: context.textTheme.bodySmall?.copyWith(
-              color: const Color(0xFF6B7280),
+                const Spacer(),
+                const Icon(
+                  Icons.keyboard_arrow_right,
+                  size: 20,
+                  color: Color(0xFF6B7280),
+                ),
+              ],
             ),
-          ),
-        ],
+            const SizedBox(height: 4),
+            Text(
+              role.description,
+              style: context.textTheme.bodySmall?.copyWith(
+                color: const Color(0xFF6B7280),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
