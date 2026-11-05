@@ -11,7 +11,39 @@ class _FakeProfileNotifier extends UserProfileNotifier {
   Future<void> load() async {}
 }
 
+class _FakeAuthNotifier extends AuthNotifier {
+  @override
+  AuthState build() => const AuthState(status: AuthStatus.authenticated);
+}
+
+class _MockDmRepository extends Mock implements DmRepository {}
+
+class _MockStorage extends Mock implements SecureStorageService {}
+
 void main() {
+  late _MockDmRepository repository;
+
+  setUp(() {
+    repository = _MockDmRepository();
+    final storage = _MockStorage();
+    locator.registerSingleton<SecureStorageService>(storage);
+    when(() => storage.readData(any())).thenAnswer((_) async => null);
+    when(
+      () => repository.getMessages(any(), page: any(named: 'page')),
+    ).thenAnswer((_) async => const []);
+    when(
+      () => repository.sendMessage(
+        any(),
+        any(),
+        media: any(named: 'media'),
+        mentions: any(named: 'mentions'),
+        isChannel: any(named: 'isChannel'),
+      ),
+    ).thenAnswer((_) async => 'thread-id');
+  });
+
+  tearDown(() => locator.reset());
+
   Future<List<String>> pumpComposer(
     WidgetTester tester,
     List<String> sent,
@@ -20,6 +52,8 @@ void main() {
       ProviderScope(
         overrides: [
           userProfileNotifierProvider.overrideWith(_FakeProfileNotifier.new),
+          authNotifierProvider.overrideWith(_FakeAuthNotifier.new),
+          dmRepositoryProvider.overrideWithValue(repository),
         ],
         child: buildTestMaterialApp(
           Scaffold(

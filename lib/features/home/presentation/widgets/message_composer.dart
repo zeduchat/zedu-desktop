@@ -23,7 +23,8 @@ class _MessageComposerState extends ConsumerState<MessageComposer> {
   bool _isFocused = false;
   bool _isRecording = false;
   bool _showMentions = false;
-  final List<String> _attachedFiles = [];
+  final List<XFile> _attachedFiles = [];
+  XFile? _voiceNote;
   final AudioRecorder _audioRecorder = AudioRecorder();
 
   @override
@@ -41,14 +42,18 @@ class _MessageComposerState extends ConsumerState<MessageComposer> {
     _controller.dispose();
     _focusNode.dispose();
     _audioRecorder.dispose();
+    if (_voiceNote != null) {
+      File(_voiceNote!.path).delete();
+    }
     super.dispose();
   }
 
   Future<void> _startRecording() async {
     if (await _audioRecorder.hasPermission()) {
       setState(() => _isRecording = true);
-      // In a real app we'd specify a path. Using default temp path for mock.
-      await _audioRecorder.start(const RecordConfig(), path: '');
+      final path =
+          '${Directory.systemTemp.path}${Platform.pathSeparator}zedu-voice-${DateTime.now().millisecondsSinceEpoch}.m4a';
+      await _audioRecorder.start(const RecordConfig(), path: path);
     }
   }
 
@@ -57,7 +62,11 @@ class _MessageComposerState extends ConsumerState<MessageComposer> {
     setState(() {
       _isRecording = false;
       if (path != null) {
-        _controller.text = '[Voice Note Attached]';
+        _voiceNote = XFile(
+          path,
+          name: 'voice-message-${DateTime.now().millisecondsSinceEpoch}.m4a',
+          mimeType: 'audio/mp4',
+        );
       }
     });
   }
@@ -68,6 +77,7 @@ class _MessageComposerState extends ConsumerState<MessageComposer> {
 
     SimpleFileFormat? matchedFormat;
     String ext = 'png';
+    String mime = 'image/png';
 
     if (clipReader.canProvide(Formats.png)) {
       matchedFormat = Formats.png;
@@ -98,11 +108,21 @@ class _MessageComposerState extends ConsumerState<MessageComposer> {
                     '${Directory.systemTemp.path}${Platform.pathSeparator}$fileName';
                 final tempFile = File(tempPath);
                 await tempFile.writeAsBytes(bytes);
-              } catch (_) {}
-              if (mounted) {
-                setState(() {
-                  _attachedFiles.add(fileName);
-                });
+                if (mounted) {
+                  setState(() {
+                    _attachedFiles.add(
+                      XFile(tempPath, name: fileName, mimeType: mime),
+                    );
+                  });
+                }
+              } catch (_) {
+                if (mounted) {
+                  setState(() {
+                    _attachedFiles.add(
+                      XFile.fromData(bytes, name: fileName, mimeType: mime),
+                    );
+                  });
+                }
               }
             }
             if (!completer.isCompleted) completer.complete(true);
@@ -133,7 +153,7 @@ class _MessageComposerState extends ConsumerState<MessageComposer> {
             final fileName = filePath.split(Platform.pathSeparator).last;
             if (mounted) {
               setState(() {
-                _attachedFiles.add(fileName);
+                _attachedFiles.add(XFile(filePath, name: fileName));
               });
             }
           }
@@ -147,20 +167,27 @@ class _MessageComposerState extends ConsumerState<MessageComposer> {
 
   void _handleSend() {
     final text = _controller.text.trim();
-    if (text.isEmpty && _attachedFiles.isEmpty) return;
+    final channelId = widget.activeChat.channelId ?? widget.activeChat.id;
+    if (text.isEmpty && _attachedFiles.isEmpty && _voiceNote == null) return;
+    if (channelId == null || channelId.isEmpty) return;
 
-    String finalMessage = text;
-    if (_attachedFiles.isNotEmpty) {
-      final attachmentsStr = _attachedFiles
-          .map((f) => '[Attachment: $f]')
-          .join(' ');
-      finalMessage = text.isEmpty ? attachmentsStr : '$text\n$attachmentsStr';
-    }
+    final media = <XFile>[];
+    media.addAll(_attachedFiles);
+    if (_voiceNote != null) media.add(_voiceNote!);
 
-    widget.onSend(finalMessage);
+    ref
+        .read(chatHistoryProvider(channelId))
+        .sendMessage(
+          text,
+          media: media,
+          isChannel: widget.activeChat.type == ActiveChatType.channel,
+        );
+
+    widget.onSend(text);
     _controller.clear();
     setState(() {
       _attachedFiles.clear();
+      _voiceNote = null;
       _isRecording = false;
       _showMentions = false;
     });
@@ -368,7 +395,10 @@ class _MessageComposerState extends ConsumerState<MessageComposer> {
                     );
                     if (result != null) {
                       setState(() {
-                        _attachedFiles.addAll(result.names.whereType<String>());
+                        for (final filePath
+                            in result.names.whereType<String>()) {
+                          _attachedFiles.add(XFile(filePath));
+                        }
                       });
                     }
                   },
@@ -420,7 +450,10 @@ class _MessageComposerState extends ConsumerState<MessageComposer> {
                     ),
                   ),
                 ),
-                if (_controller.text.isEmpty && !_isRecording)
+                if (_controller.text.isEmpty &&
+                    _attachedFiles.isEmpty &&
+                    _voiceNote == null &&
+                    !_isRecording)
                   IconButton(
                     onPressed: _startRecording,
                     icon: Icon(Icons.mic_none, color: colors.textHint),
@@ -458,10 +491,10 @@ class _MessageComposerState extends ConsumerState<MessageComposer> {
               child: Wrap(
                 spacing: 8,
                 runSpacing: 8,
-                children: _attachedFiles.map((fileName) {
+                children: _attachedFiles.map((file) {
                   return Chip(
                     label: Text(
-                      fileName,
+                      file.name,
                       style: TextStyle(fontSize: 12, color: colors.textPrimary),
                     ),
                     deleteIcon: Icon(
@@ -471,7 +504,7 @@ class _MessageComposerState extends ConsumerState<MessageComposer> {
                     ),
                     onDeleted: () {
                       setState(() {
-                        _attachedFiles.remove(fileName);
+                        _attachedFiles.remove(file);
                       });
                     },
                     backgroundColor: colors.background,
