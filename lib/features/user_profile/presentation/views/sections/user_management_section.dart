@@ -19,12 +19,14 @@ class UserManagementSection extends StatefulWidget {
     required this.onUpdate,
     required this.onRemove,
     this.invites,
+    this.onCopyInviteLink,
   });
 
   final List<TeamMember> members;
   final bool isSaving;
   final Future<void> Function({required String email, required String role})
   onInvite;
+  final Future<String?> Function()? onCopyInviteLink;
   final ValueChanged<TeamMember> onUpdate;
   final ValueChanged<String> onRemove;
   final List<TeamMember>? invites;
@@ -121,6 +123,8 @@ class _UserManagementSectionState extends State<UserManagementSection> {
                 }
               },
             ),
+            if (widget.onCopyInviteLink != null)
+              _CopyInviteLinkButton(onCopy: widget.onCopyInviteLink!),
           ],
         ),
         const SizedBox(height: 24),
@@ -546,5 +550,79 @@ class _MemberIdentity extends StatelessWidget {
         ),
       ],
     );
+  }
+}
+
+class _CopyInviteLinkButton extends ConsumerStatefulWidget {
+  final Future<String?> Function() onCopy;
+
+  const _CopyInviteLinkButton({required this.onCopy});
+
+  @override
+  ConsumerState<_CopyInviteLinkButton> createState() =>
+      _CopyInviteLinkButtonState();
+}
+
+class _CopyInviteLinkButtonState extends ConsumerState<_CopyInviteLinkButton> {
+  bool _isCopying = false;
+  bool _copied = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    return SizedBox(
+      height: 32,
+      child: OutlinedButton.icon(
+        onPressed: _isCopying ? null : _handleCopy,
+        icon: _copied
+            ? const Icon(Icons.check, size: 16)
+            : const Icon(Icons.link, size: 16),
+        label: Text(
+          _copied ? 'Copied!' : 'Copy invite link',
+          style: TextStyle(fontSize: 12, color: colors.textPrimary),
+        ),
+        style: OutlinedButton.styleFrom(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          minimumSize: Size.zero,
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _handleCopy() async {
+    setState(() {
+      _isCopying = true;
+      _copied = false;
+    });
+    try {
+      final link = await widget.onCopy();
+      if (link != null && link.isNotEmpty) {
+        if (!mounted) return;
+        await Clipboard.setData(ClipboardData(text: link));
+        if (!mounted) return;
+        final copyColors = context.colors;
+        setState(() => _copied = true);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Invite link copied to clipboard!'),
+            duration: const Duration(seconds: 2),
+            backgroundColor: copyColors.success,
+          ),
+        );
+        // Reset after 2 seconds
+        Future.delayed(const Duration(seconds: 2), () {
+          if (mounted) setState(() => _copied = false);
+        });
+      } else if (mounted) {
+        AppToastService.show(
+          context,
+          type: AppToastType.error,
+          message: 'Failed to generate invite link',
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isCopying = false);
+    }
   }
 }
