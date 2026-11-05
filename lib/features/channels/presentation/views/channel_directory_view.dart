@@ -137,12 +137,31 @@ class _ChannelDirectoryViewState extends ConsumerState<ChannelDirectoryView> {
                               ),
                             )
                           : null,
-                      trailing: Text(
-                        '${channel.membersCount} members',
-                        style: textTheme.bodySmall?.copyWith(
-                          color: colors.textSecondary,
-                        ),
-                      ),
+                      trailing: channel.unreadCount > 0
+                          ? Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: colors.error,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Text(
+                                '${channel.unreadCount}',
+                                style: textTheme.bodySmall?.copyWith(
+                                  color: colors.onError,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            )
+                          : Text(
+                              '${channel.membersCount} members',
+                              style: textTheme.bodySmall?.copyWith(
+                                color: colors.textSecondary,
+                              ),
+                            ),
                       onTap: () {
                         ref
                             .read(activeChatProvider.notifier)
