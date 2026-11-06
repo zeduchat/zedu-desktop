@@ -1,6 +1,4 @@
 import 'dart:async';
-
-import 'package:connectivity_plus/connectivity_plus.dart';
 import 'dart:io';
 
 import 'package:zedu/core/core.dart';
@@ -15,46 +13,28 @@ final reachabilityCheckerProvider = Provider<ReachabilityChecker>((ref) {
 });
 
 class NetworkStatusNotifier extends Notifier<NetworkStatus> {
-  final _connectivity = Connectivity();
-  StreamSubscription<ConnectivityResult>? _connectivitySubscription;
+  Timer? _checkTimer;
 
-  @override
-  NetworkStatus build() {
-    _checkAndSetConnectivity();
-    _startListening();
-    return _isOnline ? NetworkStatus.online : NetworkStatus.offline;
-  }
-
-  Future<void> _checkAndSetConnectivity() async {
+  static Future<bool> defaultReachabilityChecker() async {
     try {
-      final result = await _connectivity.checkConnectivity();
-      final isOnline = result.contains(ConnectivityResult.wifi) ||
-          result.contains(ConnectivityResult.mobile) ||
-          result.contains(ConnectivityResult.ethernet);
-      if (!ref.mounted) return;
-      state = isOnline ? NetworkStatus.online : NetworkStatus.offline;
+      final result = await InternetAddress.lookup(
+        'one.one.one.one',
+      ).timeout(const Duration(seconds: 3));
+      return result.isNotEmpty && result.first.rawAddress.isNotEmpty;
     } catch (_) {
-      if (!ref.mounted) return;
-      state = NetworkStatus.offline;
+      return false;
     }
   }
 
-  void _startListening() {
-    _connectivitySubscription = _connectivity.onConnectivityChanged.listen(
-      (result) {
-        final isOnline = result.contains(ConnectivityResult.wifi) ||
-            result.contains(ConnectivityResult.mobile) ||
-            result.contains(ConnectivityResult.ethernet);
-        if (!ref.mounted) return;
-        state = isOnline ? NetworkStatus.online : NetworkStatus.offline;
-      },
-    );
-  }
-
   @override
-  void dispose() {
-    _connectivitySubscription?.cancel();
-    super.dispose();
+  NetworkStatus build() {
+    final checker = ref.watch(reachabilityCheckerProvider);
+    _startMonitoring(checker);
+    ref.onDispose(() {
+      _checkTimer?.cancel();
+      _checkTimer = null;
+    });
+    return NetworkStatus.online;
   }
 
   void _startMonitoring(ReachabilityChecker checker) {
@@ -91,7 +71,9 @@ class NetworkStatusNotifier extends Notifier<NetworkStatus> {
   }
 
   void toggle() {
-    state = state == NetworkStatus.online ? NetworkStatus.offline : NetworkStatus.online;
+    state = state == NetworkStatus.online
+        ? NetworkStatus.offline
+        : NetworkStatus.online;
   }
 }
 
