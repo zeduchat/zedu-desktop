@@ -423,6 +423,49 @@ void main() {
         await tester.pump(const Duration(seconds: 5));
       },
     );
+
+    group('search in a channel (Ziki #2849)', () {
+      Future<void> openSearch(WidgetTester tester) async {
+        await tester.tap(find.byKey(const ValueKey('channel-header-menu')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Search in channel'));
+        await tester.pumpAndSettle();
+      }
+
+      testWidgets('opens the full-history search for this channel', (
+        tester,
+      ) async {
+        await pumpSidebarAndChat(tester);
+        expect(find.byType(SearchPanel), findsNothing);
+
+        await openSearch(tester);
+
+        final panel = tester.widget<SearchPanel>(find.byType(SearchPanel));
+        expect(panel.channelId, 'channel-general');
+        expect(find.text('# general'), findsOneWidget);
+      });
+
+      testWidgets('Close search hides it again', (tester) async {
+        await pumpSidebarAndChat(tester);
+        await openSearch(tester);
+
+        await tester.tap(find.byTooltip('Close search'));
+        await tester.pumpAndSettle();
+
+        expect(find.byType(SearchPanel), findsNothing);
+      });
+
+      testWidgets('another channel opens without the search', (tester) async {
+        await pumpSidebarAndChat(tester);
+        await openSearch(tester);
+
+        await tester.tap(find.text('random'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('# random'), findsOneWidget);
+        expect(find.byType(SearchPanel), findsNothing);
+      });
+    });
   });
 
   group('ResizableSidebar', () {
