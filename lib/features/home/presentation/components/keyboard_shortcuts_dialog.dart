@@ -9,7 +9,7 @@ class _Shortcut {
 
 /// Lists the keyboard shortcuts the app supports, grouped by where they work.
 /// Keep this in step with the key handlers: `QuickSwitcherShortcut`,
-/// `QuickSwitcherDialog`, `DmMessageComposer` and `MessageComposer`.
+/// `QuickSwitcherDialog` and `DmMessageComposer`.
 class KeyboardShortcutsDialog extends StatelessWidget {
   const KeyboardShortcutsDialog({super.key});
 

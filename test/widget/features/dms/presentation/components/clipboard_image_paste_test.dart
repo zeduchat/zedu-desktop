@@ -73,11 +73,6 @@ class FakeDataReaderFile extends Fake implements DataReaderFile {
   Stream<Uint8List> getStream() => Stream.value(bytes);
 }
 
-class _FakeUserProfileNotifier extends UserProfileNotifier {
-  @override
-  UserProfileState build() => const UserProfileState();
-}
-
 void main() {
   setUp(() {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
@@ -185,49 +180,5 @@ void main() {
       expect(find.byType(AttachmentPreviewBar), findsOneWidget);
       expect(find.textContaining('.jpg'), findsOneWidget);
     });
-
-    testWidgets(
-      'MessageComposer attaches pasted image and displays attachment Chip',
-      (tester) async {
-        final composerKey = GlobalKey();
-
-        await tester.pumpWidget(
-          ProviderScope(
-            overrides: [
-              userProfileNotifierProvider.overrideWith(
-                _FakeUserProfileNotifier.new,
-              ),
-            ],
-            child: buildTestMaterialApp(
-              Scaffold(
-                body: MessageComposer(
-                  key: composerKey,
-                  activeChat: const ActiveChatState(
-                    id: 'general',
-                    type: ActiveChatType.channel,
-                  ),
-                  onSend: (_) {},
-                ),
-              ),
-            ),
-          ),
-        );
-        await tester.pumpAndSettle();
-
-        final dummyPng = Uint8List.fromList([0x89, 0x50, 0x4E, 0x47]);
-        final reader = FakeDataReader(formats: {Formats.png: dummyPng});
-
-        final dynamic state = tester.state(find.byType(MessageComposer));
-        final handled = await tester.runAsync(
-          () => state.handlePaste(reader: reader) as Future<bool>,
-        );
-        expect(handled, isTrue);
-
-        await tester.pumpAndSettle();
-
-        expect(find.byType(Chip), findsOneWidget);
-        expect(find.textContaining('pasted_image_'), findsOneWidget);
-      },
-    );
   });
 }
