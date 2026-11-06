@@ -96,10 +96,25 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
 
   late String selectedTimezone;
   late String selectedCountry;
+  bool _confirmingDiscard = false;
+
+  bool get _isDirty {
+    final initialTimezone = normalizeProfileTimezone(widget.account.timezone);
+    return nameCtrl.text.trim() != widget.account.name.trim() ||
+        displayNameCtrl.text.trim() != widget.account.displayName.trim() ||
+        usernameCtrl.text.trim() != widget.account.username.trim() ||
+        emailCtrl.text.trim() != widget.account.email.trim() ||
+        phoneCtrl.text.trim() != widget.account.phoneNumber.trim() ||
+        titleCtrl.text.trim() != widget.account.title.trim() ||
+        pronunciationCtrl.text.trim() !=
+            widget.account.namePronunciation.trim() ||
+        selectedTimezone != initialTimezone ||
+        _canonicalCountryName(selectedCountry) !=
+            _canonicalCountryName(widget.account.country);
+  }
 
   bool _saving = false;
   String? _saveError;
-  bool _confirmingDiscard = false;
 
   @override
   void initState() {
@@ -130,69 +145,12 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
     super.dispose();
   }
 
-  /// Whether the form differs from what was loaded, so leaving now would
-  /// drop edits. Comparisons ignore surrounding whitespace and use the same
-  /// normalised values the save would send.
-  bool get _isDirty {
-    final account = widget.account;
-    String norm(String value) => value.trim();
-    return norm(nameCtrl.text) != norm(account.name) ||
-        norm(displayNameCtrl.text) != norm(account.displayName) ||
-        norm(usernameCtrl.text) != norm(account.username) ||
-        norm(emailCtrl.text) != norm(account.email) ||
-        norm(phoneCtrl.text) != norm(account.phoneNumber) ||
-        norm(titleCtrl.text) != norm(account.title) ||
-        norm(pronunciationCtrl.text) != norm(account.namePronunciation) ||
-        selectedTimezone != normalizeProfileTimezone(account.timezone) ||
-        _canonicalCountryName(selectedCountry) !=
-            _canonicalCountryName(account.country);
-  }
-
-  /// Closes the editor. The header close button, Cancel, a scrim tap and the
-  /// system back gesture all come through here, so an edited form asks before
-  /// discarding while an unchanged one closes straight away.
-  Future<void> _maybeClose() async {
-    if (!mounted) return;
-    // While a save is running it owns the dialog and pops it when it ends.
-    if (_saving || !_isDirty) {
-      Navigator.pop(context);
-      return;
-    }
-    if (_confirmingDiscard) return;
-    _confirmingDiscard = true;
-    try {
-      await showProfileConfirmDialog(
-        context,
-        title: 'Discard changes?',
-        message:
-            'Your edits to your profile have not been saved. Discard them?',
-        confirmLabel: 'Discard',
-        destructive: true,
-        onConfirm: () async {
-          if (mounted) Navigator.pop(context);
-        },
-      );
-    } finally {
-      _confirmingDiscard = false;
-    }
-  }
-
   Future<void> _save() async {
     if (_saving || !(formKey.currentState?.validate() ?? false)) return;
     setState(() {
       _saving = true;
       _saveError = null;
     });
-
-    final canonicalCountry = _canonicalCountryName(selectedCountry);
-    if (selectedCountry.isNotEmpty && !kCountries.contains(canonicalCountry)) {
-      setState(() {
-        _saving = false;
-        _saveError = 'Select a country from the list';
-      });
-      return;
-    }
-
     final error = await widget.onSave(
       widget.account.copyWith(
         name: nameCtrl.text.trim(),
@@ -203,7 +161,7 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
         title: titleCtrl.text.trim(),
         namePronunciation: pronunciationCtrl.text.trim(),
         timezone: selectedTimezone,
-        country: canonicalCountry,
+        country: _canonicalCountryName(selectedCountry),
       ),
     );
     // Closed with Cancel while saving: nothing left to update or pop.
@@ -216,6 +174,30 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
       _saving = false;
       _saveError = error;
     });
+  }
+
+  Future<void> _maybeClose() async {
+    if (!mounted) return;
+    if (_saving || !_isDirty) {
+      Navigator.pop(context);
+      return;
+    }
+    if (_confirmingDiscard) return;
+    _confirmingDiscard = true;
+    try {
+      await showProfileConfirmDialog(
+        context,
+        title: 'Discard changes?',
+        message: 'Your profile changes have not been saved.',
+        confirmLabel: 'Discard',
+        destructive: true,
+        onConfirm: () async {
+          if (mounted) Navigator.pop(context);
+        },
+      );
+    } finally {
+      _confirmingDiscard = false;
+    }
   }
 
   @override
@@ -300,12 +282,6 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
                               label: 'Username',
                               controller: usernameCtrl,
                               hint: 'Enter username',
-                              validator: (value) {
-                                if (value == null || value.trim().isEmpty) {
-                                  return 'Username is required';
-                                }
-                                return null;
-                              },
                             ),
                             const SizedBox(height: 16),
                             AppTextField(
@@ -430,9 +406,8 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
                                     return TextFormField(
                                       controller: controller,
                                       focusNode: focusNode,
-                                      onChanged: (value) => setState(() {
-                                        selectedCountry = value;
-                                      }),
+                                      onChanged: (value) => selectedCountry =
+                                          _canonicalCountryName(value),
                                       validator: (value) {
                                         final country = _canonicalCountryName(
                                           value ?? '',
@@ -478,45 +453,37 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
                                           onFieldSubmitted(),
                                     );
                                   },
-                              optionsViewBuilder: (context, onSelected, options) {
-                                return Align(
-                                  alignment: Alignment.topLeft,
-                                  child: Material(
-                                    elevation: 4,
-                                    borderRadius: BorderRadius.circular(8),
-                                    child: Container(
-                                      width: 360,
-                                      constraints: const BoxConstraints(
-                                        maxHeight: 240,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: colors.background,
+                              optionsViewBuilder:
+                                  (context, onSelected, options) {
+                                    return Align(
+                                      alignment: Alignment.topLeft,
+                                      child: Material(
+                                        elevation: 4,
                                         borderRadius: BorderRadius.circular(8),
-                                        border: Border.all(
-                                          color: colors.divider,
-                                        ),
-                                      ),
-                                      child: ListView.builder(
-                                        padding: EdgeInsets.zero,
-                                        shrinkWrap: true,
-                                        itemCount: options.length,
-                                        itemBuilder: (context, index) {
-                                          final option = options.elementAt(
-                                            index,
-                                          );
-                                          final isHighlighted =
-                                              AutocompleteHighlightedOption.of(
-                                                context,
-                                              ) ==
-                                              index;
-                                          return Semantics(
-                                            selected: isHighlighted,
-                                            child: InkWell(
-                                              onTap: () => onSelected(option),
-                                              child: ColoredBox(
-                                                color: isHighlighted
-                                                    ? colors.primaryBg
-                                                    : Colors.transparent,
+                                        child: Container(
+                                          width: 360,
+                                          constraints: const BoxConstraints(
+                                            maxHeight: 240,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: colors.background,
+                                            borderRadius: BorderRadius.circular(
+                                              8,
+                                            ),
+                                            border: Border.all(
+                                              color: colors.divider,
+                                            ),
+                                          ),
+                                          child: ListView.builder(
+                                            padding: EdgeInsets.zero,
+                                            shrinkWrap: true,
+                                            itemCount: options.length,
+                                            itemBuilder: (context, index) {
+                                              final option = options.elementAt(
+                                                index,
+                                              );
+                                              return InkWell(
+                                                onTap: () => onSelected(option),
                                                 child: Padding(
                                                   padding:
                                                       const EdgeInsets.symmetric(
@@ -527,24 +494,16 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
                                                     option,
                                                     style: context
                                                         .textTheme
-                                                        .bodySmall
-                                                        ?.copyWith(
-                                                          color: isHighlighted
-                                                              ? colors.primary
-                                                              : colors
-                                                                    .textPrimary,
-                                                        ),
+                                                        .bodySmall,
                                                   ),
                                                 ),
-                                              ),
-                                            ),
-                                          );
-                                        },
+                                              );
+                                            },
+                                          ),
+                                        ),
                                       ),
-                                    ),
-                                  ),
-                                );
-                              },
+                                    );
+                                  },
                             ),
                             const SizedBox(height: 16),
                           ],
@@ -582,41 +541,35 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
                               ),
                             ),
                             const SizedBox(height: 12),
-                            // Photo upload isn't supported yet, so both
-                            // buttons are disabled and say why (Ziki #117).
                             Center(
-                              child: Tooltip(
-                                message: 'Coming soon',
-                                child: TextButton.icon(
-                                  onPressed: null,
-                                  icon: Icon(
-                                    Icons.upload_outlined,
-                                    size: 16,
-                                    color: colors.textHint,
-                                  ),
-                                  label: Text(
-                                    'Upload photo',
-                                    style: context.textTheme.bodySmall
-                                        ?.copyWith(
-                                          color: colors.textHint,
-                                          fontWeight: FontWeight.w500,
-                                        ),
+                              child: TextButton.icon(
+                                onPressed: () {
+                                  // Upload photo placeholder
+                                },
+                                icon: Icon(
+                                  Icons.upload_outlined,
+                                  size: 16,
+                                  color: colors.primary,
+                                ),
+                                label: Text(
+                                  'Upload photo',
+                                  style: context.textTheme.bodySmall?.copyWith(
+                                    color: colors.primary,
+                                    fontWeight: FontWeight.w500,
                                   ),
                                 ),
                               ),
                             ),
                             Center(
-                              child: Tooltip(
-                                message: 'Coming soon',
-                                child: TextButton(
-                                  onPressed: null,
-                                  child: Text(
-                                    'Remove photo',
-                                    style: context.textTheme.bodySmall
-                                        ?.copyWith(
-                                          color: colors.textHint,
-                                          fontWeight: FontWeight.w500,
-                                        ),
+                              child: TextButton(
+                                onPressed: () {
+                                  // Remove photo placeholder
+                                },
+                                child: Text(
+                                  'Remove photo',
+                                  style: context.textTheme.bodySmall?.copyWith(
+                                    color: colors.error,
+                                    fontWeight: FontWeight.w500,
                                   ),
                                 ),
                               ),
@@ -668,12 +621,10 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
         ),
       ),
     );
-
-    // A scrim tap, Escape and the system back gesture arrive as a route pop
-    // rather than a button press, so the dirty check intercepts them here.
-    return PopScope(
+    // Route-level exits (scrim, Escape and system back) use the same guard.
+    return PopScope<void>(
       canPop: false,
-      onPopInvokedWithResult: (didPop, result) {
+      onPopInvokedWithResult: (didPop, _) {
         if (!didPop) _maybeClose();
       },
       child: dialog,
