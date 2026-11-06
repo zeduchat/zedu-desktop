@@ -116,6 +116,47 @@ void main() {
     await _unmount(tester);
   });
 
+  testWidgets('every menu row has a handler and no dead rows are offered', (
+    tester,
+  ) async {
+    await _pumpChatArea(tester);
+    await tester.tap(find.byTooltip('More options'));
+    await tester.pumpAndSettle();
+
+    final menuValues = tester
+        .widgetList<PopupMenuItem<String>>(
+          find.byWidgetPredicate((w) => w is PopupMenuItem<String>),
+        )
+        .map((item) => item.value)
+        .toList();
+
+    expect(menuValues, isNotEmpty);
+    expect(menuValues, isNot(contains('block_user')));
+    expect(find.text('Block User'), findsNothing);
+
+    // Keys _handleMenuAction responds to; keep in sync with the switch.
+    const handled = {
+      'view_profile',
+      'mute_notifications',
+      'pin_conversation',
+      'search_in_conversation',
+      'view_files',
+      'clear_history',
+      'delete_conversation',
+    };
+    // Handled by a separate fix already in review for Ziki #2687 (PR 1296).
+    const pendingElsewhere = {'pinned_messages'};
+
+    for (final value in menuValues) {
+      expect(
+        handled.contains(value) || pendingElsewhere.contains(value),
+        isTrue,
+        reason: 'menu action "$value" has no handler in _handleMenuAction',
+      );
+    }
+    await _unmount(tester);
+  });
+
   group('View profile', () {
     testWidgets('shows the person without their internal user id', (
       tester,

@@ -131,6 +131,11 @@ class _DmChatAreaState extends ConsumerState<DmChatArea> {
         if (!deleted && mounted) {
           _showActionNotice("Couldn't delete the conversation. Try again.");
         }
+      default:
+        AppLogger.w(
+          'Unhandled DM menu action: $action',
+          tag: 'DmChatArea',
+        );
     }
   }
 
@@ -949,7 +954,6 @@ class _DmChatHeader extends StatelessWidget {
               menuItem('view_files', 'View files'),
               const PopupMenuDivider(height: 1),
               menuItem('clear_history', 'Clear history'),
-              menuItem('block_user', 'Block User'),
               menuItem(
                 'delete_conversation',
                 'Delete conversation',
