@@ -14,6 +14,44 @@ class _DmChatAreaState extends ConsumerState<DmChatArea> {
   bool _isDragging = false;
   bool _searchOpen = false;
   final _composerKey = GlobalKey<DmMessageComposerState>();
+  final _scrollController = ScrollController();
+  final _messageKeys = <String, GlobalKey>{};
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _consumePendingJump();
+    });
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  /// Jumps to the message a chat deep link pointed at, once this chat area
+  /// is the one showing that conversation.
+  void _consumePendingJump() {
+    final pending = ref.read(pendingMessageJumpProvider);
+    if (pending == null || pending.messageId.isEmpty) return;
+    if (pending.channelId != widget.conversation.channelId) return;
+    ref.read(pendingMessageJumpProvider.notifier).state = null;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _jumpToMessage(pending.messageId);
+    });
+  }
+
+  Future<void> _copyMessageLink(String messageId) async {
+    final link = ChatDeepLinkParser.buildUri(
+      widget.conversation.channelId,
+      messageId: messageId,
+    );
+    await Clipboard.setData(ClipboardData(text: link.toString()));
+    if (!mounted) return;
+    _showActionNotice('Link copied');
+  }
 
   String get _recipientHandle {
     final parts = widget.conversation.displayName
@@ -240,6 +278,79 @@ class _DmChatAreaState extends ConsumerState<DmChatArea> {
     );
   }
 
+  /// The messages the chat shows: everything, or the own-space view with the
+  /// "started a conversation with yourself" system events hidden.
+  List<Map<String, dynamic>> _visibleMessages(ChatHistoryNotifier history) {
+    if (!_isOwnSpace) return history.messages;
+    return history.messages
+        .where((message) => !_isOwnSpaceSystemEvent(message))
+        .toList();
+  }
+
+  /// Scrolls the list so [messageId] is visible, loading older pages first
+  /// when the message is not in the loaded history yet.
+  Future<void> _jumpToMessage(String messageId) async {
+    final history = ref.read(
+      chatHistoryProvider(widget.conversation.channelId),
+    );
+    final isLoaded = history.messages.any(
+      (message) => message['id']?.toString() == messageId,
+    );
+    if (!isLoaded) {
+      await history.loadAll();
+      final stillMissing = !history.messages.any(
+        (message) => message['id']?.toString() == messageId,
+      );
+      if (stillMissing) {
+        if (mounted) {
+          _showActionNotice("Couldn't find that message in this conversation.");
+        }
+        return;
+      }
+      // Let the rebuilt list register the message's key before scrolling.
+      await WidgetsBinding.instance.endOfFrame;
+      if (!mounted) return;
+    }
+    if (!_scrollController.hasClients) return;
+    final messages = _visibleMessages(history);
+    final targetIndex = messages.indexWhere(
+      (message) => message['id']?.toString() == messageId,
+    );
+    if (targetIndex == -1) return;
+    final position = _scrollController.position;
+    final maxExtent = position.maxScrollExtent;
+    if (messages.length > 1 && maxExtent > 0) {
+      // Jump close to the target first, so the lazy list builds it and
+      // registers its key, then narrow in with viewport-sized steps.
+      final estimate = maxExtent * (targetIndex / (messages.length - 1));
+      _scrollController.jumpTo(estimate.clamp(0.0, maxExtent));
+    }
+    var key = _messageKeys[messageId];
+    var guard = 0;
+    var direction = 1;
+    while (key?.currentContext == null && guard < 120) {
+      final position = _scrollController.position;
+      final bottom = position.maxScrollExtent;
+      if (direction == 1 && position.pixels >= bottom - 1) direction = -1;
+      final step = position.viewportDimension * 0.8 * direction;
+      final next = (position.pixels + step).clamp(0.0, bottom);
+      if ((next - position.pixels).abs() < 1) break;
+      _scrollController.jumpTo(next);
+      await WidgetsBinding.instance.endOfFrame;
+      guard++;
+      key = _messageKeys[messageId];
+    }
+    final targetContext = key?.currentContext;
+    if (targetContext != null && targetContext.mounted) {
+      await Scrollable.ensureVisible(
+        targetContext,
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeInOut,
+        alignment: 0.3,
+      );
+    }
+  }
+
   void _showActionNotice(String message) {
     ScaffoldMessenger.of(
       context,
@@ -248,6 +359,11 @@ class _DmChatAreaState extends ConsumerState<DmChatArea> {
 
   @override
   Widget build(BuildContext context) {
+    // Registered during build so Riverpod manages the listener's lifetime;
+    // a deep link may land while this chat area is already on screen.
+    ref.listen(pendingMessageJumpProvider, (previous, next) {
+      if (next != null) _consumePendingJump();
+    });
     final colors = context.colors;
     final isMuted = ref.watch(
       notificationSettingsProvider.select(
@@ -297,14 +413,7 @@ class _DmChatAreaState extends ConsumerState<DmChatArea> {
                               ),
                             );
                             final isOwnSpace = _isOwnSpace;
-                            final messages = isOwnSpace
-                                ? historyState.messages
-                                      .where(
-                                        (message) =>
-                                            !_isOwnSpaceSystemEvent(message),
-                                      )
-                                      .toList()
-                                : historyState.messages;
+                            final messages = _visibleMessages(historyState);
 
                             return NotificationListener<ScrollNotification>(
                               onNotification: (ScrollNotification scrollInfo) {
@@ -326,6 +435,7 @@ class _DmChatAreaState extends ConsumerState<DmChatArea> {
                                 return false;
                               },
                               child: CustomScrollView(
+                                controller: _scrollController,
                                 reverse: true,
                                 slivers: [
                                   SliverPadding(
@@ -339,14 +449,24 @@ class _DmChatAreaState extends ConsumerState<DmChatArea> {
                                         index,
                                       ) {
                                         final msg = messages[index];
-                                        return _MessageBubble(
-                                          message: msg,
-                                          conversation: widget.conversation,
-                                          channelId:
-                                              widget.conversation.channelId,
-                                          onEdit: (id, text) => _composerKey
-                                              .currentState
-                                              ?.enterEditMode(id, text),
+                                        final messageId =
+                                            msg['id']?.toString() ??
+                                            'message-$index';
+                                        return KeyedSubtree(
+                                          key: _messageKeys.putIfAbsent(
+                                            messageId,
+                                            GlobalKey.new,
+                                          ),
+                                          child: _MessageBubble(
+                                            message: msg,
+                                            conversation: widget.conversation,
+                                            channelId:
+                                                widget.conversation.channelId,
+                                            onEdit: (id, text) => _composerKey
+                                                .currentState
+                                                ?.enterEditMode(id, text),
+                                            onCopyLink: _copyMessageLink,
+                                          ),
                                         );
                                       }, childCount: messages.length),
                                     ),
@@ -883,12 +1003,14 @@ class _MessageBubble extends ConsumerWidget {
   final DmConversation conversation;
   final String channelId;
   final void Function(String messageId, String content) onEdit;
+  final void Function(String messageId) onCopyLink;
 
   const _MessageBubble({
     required this.message,
     required this.conversation,
     required this.channelId,
     required this.onEdit,
+    required this.onCopyLink,
   });
 
   TextSpan _parseRichText(
@@ -1102,6 +1224,8 @@ class _MessageBubble extends ConsumerWidget {
                   _MessageMenu(
                     enabled: status == null,
                     onPin: () => _pin(context, ref, messageId),
+                    isOwn: isMe,
+                    onCopyLink: () => onCopyLink(messageId),
                     onEdit: isMe ? () => onEdit(messageId, content) : null,
                     onDelete: isMe
                         ? () => _confirmDelete(context, ref, messageId)
@@ -1132,10 +1256,13 @@ class _MessageBubble extends ConsumerWidget {
                     child: content.isNotEmpty
                         ? _AttachmentBubbleList(media: media, isMe: isMe)
                         // No text to hang the menu on, so it goes on the
-                        // attachments (no Edit: there is nothing to edit).
+                        // attachments (Copy link and Delete only: there is
+                        // nothing to edit).
                         : _MessageMenu(
                             enabled: status == null,
                             onPin: () => _pin(context, ref, messageId),
+                            isOwn: isMe,
+                            onCopyLink: () => onCopyLink(messageId),
                             onEdit: null,
                             onDelete: isMe
                                 ? () => _confirmDelete(context, ref, messageId)
@@ -1357,12 +1484,15 @@ class MessageAttachmentList extends StatelessWidget {
 }
 
 /// Shows a "more" button on hover, and a right-click or long-press menu, for
-/// a sent message: Pin on every message, and Edit and Delete on your own. The
-/// long press is for touch input, where there is no hover or right click.
+/// a sent message: Pin and Copy link on every message, plus Edit and Delete
+/// for your own. The long press is for touch input, where there is no hover
+/// or right click.
 class _MessageMenu extends StatefulWidget {
   const _MessageMenu({
     required this.enabled,
     required this.onPin,
+    required this.isOwn,
+    required this.onCopyLink,
     required this.onEdit,
     required this.onDelete,
     required this.child,
@@ -1370,8 +1500,8 @@ class _MessageMenu extends StatefulWidget {
 
   final bool enabled;
   final VoidCallback onPin;
-
-  /// Null on other people's messages, which can't be edited or deleted.
+  final bool isOwn;
+  final VoidCallback onCopyLink;
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
   final Widget child;
@@ -1405,11 +1535,16 @@ class _MessageMenuState extends State<_MessageMenu> {
                 icon: const Icon(Icons.more_horiz, size: 18),
                 onSelected: (value) => switch (value) {
                   'pin' => widget.onPin(),
+                  'copy_link' => widget.onCopyLink(),
                   'edit' => widget.onEdit?.call(),
                   _ => widget.onDelete?.call(),
                 },
                 itemBuilder: (_) => [
                   const PopupMenuItem(value: 'pin', child: Text('Pin message')),
+                  const PopupMenuItem(
+                    value: 'copy_link',
+                    child: Text('Copy link'),
+                  ),
                   if (widget.onEdit != null)
                     const PopupMenuItem(
                       value: 'edit',
