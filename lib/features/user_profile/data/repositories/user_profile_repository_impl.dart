@@ -115,8 +115,8 @@ class UserProfileRepositoryImpl implements UserProfileRepository {
   }
 
   @override
-  Future<Result<List<RolePermission>>> getRolesAndPermissions() {
-    return _guard(_remote.getRolesAndPermissions);
+  Future<Result<List<RolePermission>>> getRolesAndPermissions({String? orgId}) {
+    return _guard(() => _remote.getRolesAndPermissions(orgId: orgId));
   }
 
   @override

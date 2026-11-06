@@ -38,7 +38,7 @@ abstract interface class UserProfileRemoteDataSource {
   });
   Future<TeamMemberModel> updateMember(TeamMember member);
   Future<void> removeMember(String memberId);
-  Future<List<RolePermissionModel>> getRolesAndPermissions();
+  Future<List<RolePermissionModel>> getRolesAndPermissions({String? orgId});
   Future<BillingInfoModel> getBillingInfo();
 }
 
@@ -542,17 +542,23 @@ class UserProfileRemoteDataSourceImpl implements UserProfileRemoteDataSource {
   }
 
   @override
-  Future<List<RolePermissionModel>> getRolesAndPermissions() async {
+  Future<List<RolePermissionModel>> getRolesAndPermissions({
+    String? orgId,
+  }) async {
     if (_config.usesMockData) {
       return _roles.map(RolePermissionModel.fromJson).toList();
     }
+    // Roles belong to an organisation: with none selected there are none to show.
+    if (orgId == null || orgId.isEmpty) return const [];
     final response = await _apiBaseService.get<Map<String, dynamic>>(
-      path: '/profile/organization/roles',
+      path: '/organisations/$orgId/roles',
     );
-    final data = response.data['data'] as List<dynamic>;
+    final data = response.data['data'] as List<dynamic>? ?? const [];
     return data
-        .cast<Map<String, dynamic>>()
-        .map(RolePermissionModel.fromJson)
+        .whereType<Map<dynamic, dynamic>>()
+        .map(
+          (role) => RolePermissionModel.fromJson(role.cast<String, dynamic>()),
+        )
         .toList();
   }
 

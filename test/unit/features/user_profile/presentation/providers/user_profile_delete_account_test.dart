@@ -47,7 +47,9 @@ void main() {
     when(
       () => repo.getTeamMembers(orgId: any(named: 'orgId')),
     ).thenAnswer((_) => failed());
-    when(() => repo.getRolesAndPermissions()).thenAnswer((_) => failed());
+    when(
+      () => repo.getRolesAndPermissions(orgId: any(named: 'orgId')),
+    ).thenAnswer((_) => failed());
     when(() => repo.getBillingInfo()).thenAnswer((_) => failed());
   });
 

@@ -616,7 +616,7 @@ class UserProfileNotifier extends Notifier<UserProfileState> {
       _repository.getSecuritySessions(),
       _repository.getOrganization(orgId: orgId),
       _repository.getTeamMembers(orgId: orgId),
-      _repository.getRolesAndPermissions(),
+      _repository.getRolesAndPermissions(orgId: orgId),
       _repository.getBillingInfo(),
     ]);
 

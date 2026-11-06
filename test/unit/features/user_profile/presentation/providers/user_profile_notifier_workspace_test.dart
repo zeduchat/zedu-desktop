@@ -72,7 +72,9 @@ void main() {
 
       when(() => repo.getAccount()).thenAnswer((_) => _failed());
       when(() => repo.getSecuritySessions()).thenAnswer((_) => _failed());
-      when(() => repo.getRolesAndPermissions()).thenAnswer((_) => _failed());
+      when(
+        () => repo.getRolesAndPermissions(orgId: any(named: 'orgId')),
+      ).thenAnswer((_) => _failed());
       when(() => repo.getBillingInfo()).thenAnswer((_) => _failed());
       when(
         () => repo.getNotificationPreferences(orgId: any(named: 'orgId')),
@@ -304,7 +306,9 @@ void main() {
       when(() => storage.readData(any())).thenAnswer((_) async => null);
       when(() => repo.getAccount()).thenAnswer((_) => _failed());
       when(() => repo.getSecuritySessions()).thenAnswer((_) => _failed());
-      when(() => repo.getRolesAndPermissions()).thenAnswer((_) => _failed());
+      when(
+        () => repo.getRolesAndPermissions(orgId: any(named: 'orgId')),
+      ).thenAnswer((_) => _failed());
       when(() => repo.getBillingInfo()).thenAnswer((_) => _failed());
       when(
         () => repo.getNotificationPreferences(orgId: any(named: 'orgId')),

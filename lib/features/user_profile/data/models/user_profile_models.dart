@@ -278,13 +278,42 @@ class RolePermissionModel extends RolePermission {
     required super.permissions,
   });
 
+  /// Reads a role from `GET /organisations/{orgId}/roles`, shaped like
+  /// `{"name": "Admin", "description": "...", "permissions":
+  /// {"permission_list": {"can_manage_channels": true, ...}}}`.
+  /// The older `{"role": ..., "permissions": ["..."]}` shape (mock data)
+  /// still reads.
   factory RolePermissionModel.fromJson(Map<String, dynamic> json) {
+    final name = json['name'] ?? json['role'];
     return RolePermissionModel(
-      role: json['role'] as String? ?? 'User',
+      role: name is String && name.trim().isNotEmpty ? name : 'User',
       description: json['description'] as String? ?? '',
-      permissions:
-          (json['permissions'] as List<dynamic>?)?.cast<String>() ?? const [],
+      permissions: _readPermissions(json['permissions']),
     );
+  }
+
+  static List<String> _readPermissions(Object? raw) {
+    if (raw is List) {
+      return raw.whereType<String>().toList();
+    }
+    if (raw is Map) {
+      final list = raw['permission_list'];
+      final flags = list is Map ? list : raw;
+      return [
+        for (final entry in flags.entries)
+          if (entry.value == true) _permissionLabel(entry.key.toString()),
+      ];
+    }
+    return const [];
+  }
+
+  /// `can_manage_channels` -> `Manage channels`.
+  static String _permissionLabel(String key) {
+    final words = key.replaceFirst(RegExp('^can_'), '').split('_')
+      ..removeWhere((w) => w.isEmpty);
+    if (words.isEmpty) return key;
+    final text = words.join(' ');
+    return text[0].toUpperCase() + text.substring(1);
   }
 }
 

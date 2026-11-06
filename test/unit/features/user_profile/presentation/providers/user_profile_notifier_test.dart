@@ -223,7 +223,7 @@ void main() {
         () => repository.getTeamMembers(orgId: any(named: 'orgId')),
       ).thenAnswer((_) async => const Success(<TeamMember>[]));
       when(
-        () => repository.getRolesAndPermissions(),
+        () => repository.getRolesAndPermissions(orgId: any(named: 'orgId')),
       ).thenAnswer((_) async => const Success(<RolePermission>[]));
       when(
         () => repository.getBillingInfo(),
@@ -361,7 +361,7 @@ void main() {
         () => repository.getTeamMembers(orgId: any(named: 'orgId')),
       ).thenAnswer((_) async => Success(<TeamMember>[]));
       when(
-        () => repository.getRolesAndPermissions(),
+        () => repository.getRolesAndPermissions(orgId: any(named: 'orgId')),
       ).thenAnswer((_) async => Success(<RolePermission>[]));
       when(
         () => repository.getBillingInfo(),
