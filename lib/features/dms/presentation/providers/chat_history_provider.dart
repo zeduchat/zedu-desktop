@@ -538,9 +538,6 @@ class ChatHistoryNotifier extends ChangeNotifier {
       }
       return m;
     }).toList();
-    if (editingMessageId == messageId) {
-      editingMessageId = null;
-    }
     notifyListeners();
 
     _editsInFlight.add(messageId);
@@ -551,6 +548,10 @@ class ChatHistoryNotifier extends ChangeNotifier {
         content: newContent,
         threadId: threadId,
       );
+      // Only clear editing state after successful save
+      if (editingMessageId == messageId) {
+        editingMessageId = null;
+      }
     } catch (_) {
       messages = messages.map((m) {
         if (m['id'] == messageId && m['content'] == newContent) {
