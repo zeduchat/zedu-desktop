@@ -277,6 +277,35 @@ void main() {
       return repository;
     }
 
+    testWidgets('DM bubble dates distinguish older messages from today', (
+      tester,
+    ) async {
+      final now = DateTime.now();
+      final older = DateTime(now.year - 1, now.month, now.day, 9, 5);
+      final today = DateTime(now.year, now.month, now.day, 10, 15);
+      await pumpChat(tester, [
+        {
+          'id': 'old',
+          'content': 'Last year discussion',
+          'user_id': 'u-2',
+          'created_at': older.toUtc().toIso8601String(),
+        },
+        {
+          'id': 'today',
+          'content': 'Today discussion',
+          'user_id': 'u-2',
+          'created_at': today.toUtc().toIso8601String(),
+        },
+      ]);
+      const localizations = DefaultMaterialLocalizations();
+      expect(
+        find.text('${localizations.formatShortDate(older)} · 9:05 AM'),
+        findsOneWidget,
+      );
+      expect(find.text('10:15 AM'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+    });
     testWidgets('own space explains privacy and hides its system event', (
       tester,
     ) async {

@@ -1023,12 +1023,12 @@ class _MessageBubble extends ConsumerWidget {
     final status = message['status'] as String?;
     final messageId = message['id'] as String? ?? '';
 
-    final hour = createdAt.hour > 12
-        ? createdAt.hour - 12
-        : (createdAt.hour == 0 ? 12 : createdAt.hour);
-    final minute = createdAt.minute.toString().padLeft(2, '0');
-    final period = createdAt.hour >= 12 ? 'PM' : 'AM';
-    final timeString = '$hour:$minute $period';
+    final timeString = formatDmMessageTimestamp(
+      createdAt,
+      now: DateTime.now(),
+      localizations: MaterialLocalizations.of(context),
+      use24HourFormat: MediaQuery.alwaysUse24HourFormatOf(context),
+    );
 
     final senderName = isMe
         ? history.currentUserName
@@ -1079,8 +1079,9 @@ class _MessageBubble extends ConsumerWidget {
               children: [
                 Padding(
                   padding: const EdgeInsets.only(bottom: 4),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
+                  child: Wrap(
+                    spacing: 8,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
                       Text(
                         senderName,
@@ -1090,7 +1091,6 @@ class _MessageBubble extends ConsumerWidget {
                           fontSize: 14,
                         ),
                       ),
-                      const SizedBox(width: 8),
                       Text(
                         timeString,
                         style: TextStyle(color: colors.textHint, fontSize: 11),
