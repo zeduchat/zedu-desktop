@@ -43,6 +43,8 @@ class SidebarChannelList extends ConsumerWidget {
               onTap: () => ref
                   .read(activeChatProvider.notifier)
                   .selectChannel(channel.name, channelId: channel.id),
+              onSecondaryTap: (position) =>
+                  showChannelRowMenu(context, ref, channel, position),
             ),
         ],
       ),
@@ -55,10 +57,14 @@ class _SidebarChannelItem extends StatelessWidget {
   final bool selected;
   final VoidCallback onTap;
 
+  /// Called with the global position of a right-click on the row.
+  final ValueChanged<Offset> onSecondaryTap;
+
   const _SidebarChannelItem({
     required this.label,
     required this.selected,
     required this.onTap,
+    required this.onSecondaryTap,
   });
 
   @override
@@ -78,6 +84,7 @@ class _SidebarChannelItem extends StatelessWidget {
         child: InkWell(
           borderRadius: borderRadius,
           onTap: onTap,
+          onSecondaryTapUp: (details) => onSecondaryTap(details.globalPosition),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
             child: Row(

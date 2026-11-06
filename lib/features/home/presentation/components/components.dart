@@ -1,3 +1,4 @@
+export 'sidebar_row_menu.dart';
 export 'user_menu_button.dart';
 export 'user_menu_dialog.dart';
 export 'update_status_dialog.dart';

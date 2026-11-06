@@ -67,6 +67,8 @@ class DmListTile extends ConsumerWidget {
           onTap: () {
             ref.read(selectedDmProvider.notifier).select(conversation);
           },
+          onSecondaryTapUp: (details) =>
+              showDmRowMenu(context, ref, conversation, details.globalPosition),
           child: Stack(
             children: [
               if (isSelected)

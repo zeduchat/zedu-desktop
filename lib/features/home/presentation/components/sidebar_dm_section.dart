@@ -142,6 +142,8 @@ class SidebarDmList extends ConsumerWidget {
                       .read(homeSidebarProvider.notifier)
                       .setType(HomeSidebarType.dms);
                 },
+                onSecondaryTap: (position) =>
+                    showDmRowMenu(context, ref, conversation, position),
               ),
           ],
         ),
@@ -156,11 +158,15 @@ class _SidebarDmItem extends StatelessWidget {
   final bool selected;
   final VoidCallback onTap;
 
+  /// Called with the global position of a right-click on the row.
+  final ValueChanged<Offset> onSecondaryTap;
+
   const _SidebarDmItem({
     required this.conversation,
     required this.isOwnSpace,
     required this.selected,
     required this.onTap,
+    required this.onSecondaryTap,
   });
 
   @override
@@ -185,6 +191,7 @@ class _SidebarDmItem extends StatelessWidget {
         child: InkWell(
           borderRadius: borderRadius,
           onTap: onTap,
+          onSecondaryTapUp: (details) => onSecondaryTap(details.globalPosition),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
             child: Row(
