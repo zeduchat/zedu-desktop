@@ -186,11 +186,57 @@ class ChannelDayDivider extends StatelessWidget {
   }
 }
 
-class ChannelMessageTile extends StatelessWidget {
+/// The text of a channel message as people read it, without the Markdown
+/// marks, for "Copy text".
+String channelMessagePlainText(String text) =>
+    buildInlineMarkdownSpan(text, const TextStyle()).toPlainText();
+
+/// Copies [message]'s plain text and confirms it with a short toast.
+Future<void> copyChannelMessageText(
+  BuildContext context,
+  ChannelMessage message,
+) async {
+  final text = channelMessagePlainText(message.text);
+  if (text.trim().isEmpty) return;
+  await Clipboard.setData(ClipboardData(text: text));
+  if (!context.mounted) return;
+  AppToastService.show(context, type: AppToastType.success, message: 'Copied');
+}
+
+class ChannelMessageTile extends StatefulWidget {
   const ChannelMessageTile({super.key, required this.message, this.onRetry});
 
   final ChannelMessage message;
   final VoidCallback? onRetry;
+
+  @override
+  State<ChannelMessageTile> createState() => _ChannelMessageTileState();
+}
+
+class _ChannelMessageTileState extends State<ChannelMessageTile> {
+  bool _hovered = false;
+
+  ChannelMessage get message => widget.message;
+
+  /// Opens the message menu with "Copy text" at [position] (global). [anchor]
+  /// only places the menu: the hover button that opened it goes away once the
+  /// pointer moves onto the menu, so the copy runs on the tile's own context.
+  Future<void> _openMenu(BuildContext anchor, Offset position) async {
+    final overlay = Overlay.of(anchor).context.findRenderObject()! as RenderBox;
+    final choice = await showMenu<String>(
+      context: anchor,
+      position: RelativeRect.fromRect(
+        position & const Size(1, 1),
+        Offset.zero & overlay.size,
+      ),
+      items: const [
+        PopupMenuItem<String>(value: 'copy', child: Text('Copy text')),
+      ],
+    );
+    if (choice == 'copy' && mounted) {
+      await copyChannelMessageText(context, message);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -199,7 +245,63 @@ class ChannelMessageTile extends StatelessWidget {
     final time = message.createdAt;
     final initial = avatarInitial(message.senderName);
     final status = message.status;
+    final onRetry = widget.onRetry;
 
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onSecondaryTapUp: (details) =>
+            _openMenu(context, details.globalPosition),
+        child: Stack(
+          children: [
+            _buildBody(
+              context,
+              colors,
+              avatarUrl,
+              time,
+              initial,
+              status,
+              onRetry,
+            ),
+            Positioned(
+              top: 0,
+              right: 0,
+              child: Visibility(
+                visible: _hovered,
+                child: Builder(
+                  builder: (buttonContext) => IconButton(
+                    tooltip: 'Message actions',
+                    iconSize: 18,
+                    visualDensity: VisualDensity.compact,
+                    icon: Icon(Icons.more_horiz, color: colors.textSecondary),
+                    onPressed: () {
+                      final box = buttonContext.findRenderObject() as RenderBox;
+                      _openMenu(
+                        buttonContext,
+                        box.localToGlobal(box.size.bottomLeft(Offset.zero)),
+                      );
+                    },
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBody(
+    BuildContext context,
+    AppPalette colors,
+    String? avatarUrl,
+    DateTime? time,
+    String initial,
+    String? status,
+    VoidCallback? onRetry,
+  ) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Row(
@@ -242,6 +344,22 @@ class ChannelMessageTile extends StatelessWidget {
                 const SizedBox(height: 4),
                 MessageLinkScope(
                   builder: (context, links) => SelectableText.rich(
+                    // Right-clicking the text opens the text's own menu, not
+                    // the tile's, so "Copy text" has to be added to it.
+                    contextMenuBuilder: (context, editableTextState) =>
+                        AdaptiveTextSelectionToolbar.buttonItems(
+                          anchors: editableTextState.contextMenuAnchors,
+                          buttonItems: [
+                            ContextMenuButtonItem(
+                              label: 'Copy text',
+                              onPressed: () {
+                                editableTextState.hideToolbar();
+                                copyChannelMessageText(this.context, message);
+                              },
+                            ),
+                            ...editableTextState.contextMenuButtonItems,
+                          ],
+                        ),
                     buildInlineMarkdownSpan(
                       message.text,
                       TextStyle(fontSize: 15, color: colors.textPrimary),
