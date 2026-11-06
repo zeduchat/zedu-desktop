@@ -150,6 +150,24 @@ class ChannelRepositoryImpl implements ChannelRepository {
   }
 
   @override
+  Future<Result<bool>> toggleStarChannel({
+    required String orgId,
+    required String channelId,
+  }) async {
+    try {
+      final isStarred = await remoteDataSource.toggleStarChannel(
+        orgId: orgId,
+        channelId: channelId,
+      );
+      return Success(isStarred);
+    } on ApiFailure catch (e) {
+      return Failure(e);
+    } catch (e) {
+      return Failure(ApiFailure(message: e.toString()));
+    }
+  }
+
+  @override
   Future<Result<List<String>>> fetchOrganisationMemberIds(String orgId) async {
     try {
       final ids = await remoteDataSource.fetchOrganisationMemberIds(orgId);

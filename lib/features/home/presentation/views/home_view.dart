@@ -627,11 +627,29 @@ class _ChannelHeaderMenu extends ConsumerWidget {
       position: PopupMenuPosition.under,
       icon: Icon(Icons.more_vert, color: colors.textHint),
       onSelected: (value) {
+        if (value == 'star') _toggleStar(context, ref);
         if (value == 'leave') _confirmLeave(context, ref);
         if (value == 'archive') _confirmArchive(context, ref);
         if (value == 'unarchive') _setArchived(context, ref, archived: false);
       },
       itemBuilder: (_) => [
+        PopupMenuItem(
+          value: 'star',
+          child: Row(
+            children: [
+              Icon(
+                channel.isStarred ? Icons.star : Icons.star_border,
+                size: 18,
+                color: colors.textPrimary,
+              ),
+              const SizedBox(width: 12),
+              Text(
+                channel.isStarred ? 'Unstar channel' : 'Star channel',
+                style: TextStyle(color: colors.textPrimary),
+              ),
+            ],
+          ),
+        ),
         PopupMenuItem(
           value: channel.archived ? 'unarchive' : 'archive',
           child: Row(
@@ -663,6 +681,22 @@ class _ChannelHeaderMenu extends ConsumerWidget {
         ),
       ],
     );
+  }
+
+  Future<void> _toggleStar(BuildContext context, WidgetRef ref) async {
+    final overlay = Overlay.of(context, rootOverlay: true);
+    final result = await ref
+        .read(channelProvider.notifier)
+        .toggleStar(channel.id);
+    if (result case Failure<bool>(:final error)) {
+      AppToastService.showWith(
+        overlay,
+        type: AppToastType.error,
+        message: error.message.isEmpty
+            ? 'Could not update the star on #${channel.name}'
+            : error.message,
+      );
+    }
   }
 
   Future<void> _confirmArchive(BuildContext context, WidgetRef ref) async {

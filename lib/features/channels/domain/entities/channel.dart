@@ -11,6 +11,9 @@ class Channel {
   final String? topic;
   final bool hasAccess;
 
+  /// Whether the current user starred this channel.
+  final bool isStarred;
+
   Channel({
     required this.id,
     required this.name,
@@ -23,6 +26,7 @@ class Channel {
     this.membersCount = 0,
     this.topic,
     this.hasAccess = true,
+    this.isStarred = false,
   });
 
   factory Channel.fromJson(Map<String, dynamic> json) {
@@ -49,6 +53,7 @@ class Channel {
       unreadCount: json['unread_count'] as int? ?? 0,
       membersCount: json['members_count'] as int? ?? 0,
       hasAccess: hasAccess,
+      isStarred: json['is_starred'] as bool? ?? false,
     );
   }
 
@@ -65,6 +70,7 @@ class Channel {
       'unread_count': unreadCount,
       'members_count': membersCount,
       'access': hasAccess,
+      'is_starred': isStarred,
     };
   }
 
@@ -80,6 +86,7 @@ class Channel {
     int? membersCount,
     String? topic,
     bool? hasAccess,
+    bool? isStarred,
   }) {
     return Channel(
       id: id ?? this.id,
@@ -93,6 +100,7 @@ class Channel {
       membersCount: membersCount ?? this.membersCount,
       topic: topic ?? this.topic,
       hasAccess: hasAccess ?? this.hasAccess,
+      isStarred: isStarred ?? this.isStarred,
     );
   }
 }

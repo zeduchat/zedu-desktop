@@ -125,6 +125,7 @@ class ChannelNotifier extends AsyncNotifier<List<Channel>> {
             unreadCount: c.unreadCount,
             membersCount: c.membersCount,
             hasAccess: c.hasAccess,
+            isStarred: c.isStarred,
           );
         }
         return c;
@@ -189,6 +190,44 @@ class ChannelNotifier extends AsyncNotifier<List<Channel>> {
     state = AsyncData(
       archived ? others : [...others, channel.copyWith(archived: false)],
     );
+    return result;
+  }
+
+  final Set<String> _starring = {};
+
+  /// Stars or unstars the channel and stores the state the server answers
+  /// with. The endpoint flips the star, so a second call while one is still
+  /// running is refused instead of flipping it back.
+  Future<Result<bool>> toggleStar(String channelId) async {
+    final orgId = ref.read(workspaceProvider).selectedWorkspace?.id;
+    if (orgId == null || !_starring.add(channelId)) {
+      return const Failure<bool>(
+        ApiFailure(
+          message: 'Could not update the star. Please try again.',
+          kind: ApiFailureKind.client,
+        ),
+      );
+    }
+
+    final Result<bool> result;
+    try {
+      result = await ref
+          .read(channelRepositoryProvider)
+          .toggleStarChannel(orgId: orgId, channelId: channelId);
+    } finally {
+      _starring.remove(channelId);
+    }
+
+    // The workspace changed meanwhile, and its list was reloaded.
+    if (ref.read(workspaceProvider).selectedWorkspace?.id != orgId) {
+      return result;
+    }
+    if (result case Success<bool>(:final value)) {
+      state = AsyncData([
+        for (final c in state.value ?? const <Channel>[])
+          c.id == channelId ? c.copyWith(isStarred: value) : c,
+      ]);
+    }
     return result;
   }
 }

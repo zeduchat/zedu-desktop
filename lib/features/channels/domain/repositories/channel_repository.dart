@@ -22,6 +22,13 @@ abstract class ChannelRepository {
   /// Removes the current user from the channel.
   Future<Result<void>> leaveChannel(String channelId);
   Future<Result<void>> joinChannel(String channelId);
+
+  /// Stars the channel for the current user, or unstars it if it is
+  /// starred. Succeeds with whether it is starred now.
+  Future<Result<bool>> toggleStarChannel({
+    required String orgId,
+    required String channelId,
+  });
   Future<Result<List<String>>> fetchOrganisationMemberIds(String orgId);
   Future<Result<List<String>>> fetchChannelMemberIds(String channelId);
   Future<Result<List<DmParticipant>>> fetchChannelMembers(String channelId);

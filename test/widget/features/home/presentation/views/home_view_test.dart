@@ -64,6 +64,33 @@ class _ArchivingChannelRepository extends _EmptyChannelRepository {
       const Success(<Channel>[]);
 }
 
+/// Flips a channel's star on each toggle, or fails when [fail] is set.
+class _StarringChannelRepository extends _EmptyChannelRepository {
+  _StarringChannelRepository({this.fail = false});
+
+  final bool fail;
+  final starred = <String>{};
+  final toggled = <String>[];
+
+  @override
+  Future<Result<List<Channel>>> fetchChannels(String orgId) async =>
+      Success([_channel('general'), _channel('random')]);
+
+  @override
+  Future<Result<bool>> toggleStarChannel({
+    required String orgId,
+    required String channelId,
+  }) async {
+    toggled.add(channelId);
+    if (fail) {
+      return const Failure(ApiFailure(message: 'Could not star the channel'));
+    }
+    final nowStarred = !starred.contains(channelId);
+    nowStarred ? starred.add(channelId) : starred.remove(channelId);
+    return Success(nowStarred);
+  }
+}
+
 class FakeSecureStorageService extends Fake implements SecureStorageService {
   final _values = <String, String>{};
 
@@ -423,6 +450,61 @@ void main() {
         await tester.pump(const Duration(seconds: 5));
       },
     );
+
+    Future<void> openRandomMenu(WidgetTester tester) async {
+      await tester.tap(find.byKey(const ValueKey('channel-header-menu')));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('the header menu stars and unstars the channel (Ziki #2628)', (
+      tester,
+    ) async {
+      final repository = _StarringChannelRepository();
+      await pumpSidebarAndChat(
+        tester,
+        channels: ChannelNotifier.new,
+        repository: repository,
+      );
+      await tester.tap(find.text('random'));
+      await tester.pumpAndSettle();
+
+      await openRandomMenu(tester);
+      expect(find.text('Star channel'), findsOneWidget);
+      await tester.tap(find.text('Star channel'));
+      await tester.pumpAndSettle();
+
+      await openRandomMenu(tester);
+      expect(find.text('Unstar channel'), findsOneWidget);
+      await tester.tap(find.text('Unstar channel'));
+      await tester.pumpAndSettle();
+
+      await openRandomMenu(tester);
+      expect(find.text('Star channel'), findsOneWidget);
+      expect(repository.toggled, ['channel-random', 'channel-random']);
+    });
+
+    testWidgets('a failed star shows the error and keeps the label', (
+      tester,
+    ) async {
+      final repository = _StarringChannelRepository(fail: true);
+      await pumpSidebarAndChat(
+        tester,
+        channels: ChannelNotifier.new,
+        repository: repository,
+      );
+
+      await openRandomMenu(tester);
+      await tester.tap(find.text('Star channel'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Could not star the channel'), findsOneWidget);
+      // The toast sits over the header's top-right corner; let it go first.
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pumpAndSettle();
+
+      await openRandomMenu(tester);
+      expect(find.text('Star channel'), findsOneWidget);
+    });
   });
 
   group('ResizableSidebar', () {
