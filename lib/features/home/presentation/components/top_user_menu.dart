@@ -20,8 +20,12 @@ class TopUserMenu extends ConsumerWidget {
             context.go(AppRouter.buyCredits);
           }
         } else if (value == 'profile') {
-          // Toggle the personal profile panel overlay
+          // The panel renders only on Home, so open it there from any screen.
           ref.read(personalProfilePanelProvider.notifier).state = true;
+          if (context.mounted &&
+              GoRouterState.of(context).uri.path != AppRouter.home) {
+            context.go(AppRouter.home);
+          }
         } else if (value == 'preferences') {
           if (context.mounted) {
             context.go(AppRouter.profile);
