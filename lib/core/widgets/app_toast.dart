@@ -44,7 +44,8 @@ class AppToastService {
     required AppToastType type,
     required String message,
   }) {
-    _current?.remove();
+    final previous = _current;
+    if (previous != null && previous.mounted) previous.remove();
     _current = null;
 
     late OverlayEntry entry;
@@ -62,7 +63,9 @@ class AppToastService {
             message: message,
             scale: scale,
             onDismiss: () {
-              entry.remove();
+              // The close button and the timer can both end the same toast,
+              // and a newer toast may already have removed this one.
+              if (entry.mounted) entry.remove();
               if (_current == entry) _current = null;
             },
           ),
@@ -125,10 +128,14 @@ class _AppToastWidgetState extends State<_AppToastWidget>
     _dismissTimer = null;
   }
 
+  bool _dismissing = false;
+
   Future<void> _dismiss() async {
-    if (!mounted) return;
+    if (!mounted || _dismissing) return;
+    _dismissing = true;
     _pauseDismissTimer();
     await _controller.reverse();
+    if (!mounted) return;
     widget.onDismiss();
   }
 
