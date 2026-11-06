@@ -47,7 +47,7 @@ class FakeAuthNotifier extends AuthNotifier {
   }
 
   @override
-  Future<void> loginWithGoogle() async {
+  Future<void> loginWithGoogle({bool rememberMe = false}) async {
     googleCalls++;
     state = state.copyWith(isLoading: true, clearError: true);
     await _pendingGoogle;

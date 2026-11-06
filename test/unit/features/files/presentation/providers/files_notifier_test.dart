@@ -274,6 +274,53 @@ class _PagedRepository implements FilesRepository {
     required String orgId,
     String? parentId,
   }) async => const Success(null);
+
+  @override
+  Future<Result<void>> deleteFolder(String id) async => const Success(null);
+
+  @override
+  Future<Result<void>> deleteFile(String fileId, {bool permanent = false}) async => const Success(null);
+
+  @override
+  Future<Result<void>> downloadFile({
+    required WorkspaceFile file,
+    required String savePath,
+    void Function(double? progress)? onProgress,
+  }) async => const Success(null);
+
+  @override
+  Future<Result<void>> renameFile(String fileId, String name) async => const Success(null);
+
+  @override
+  Future<Result<void>> moveFile(String fileId, String folderId) async => const Success(null);
+
+  @override
+  Future<Result<FileShareResult>> shareFile({
+    required String fileId,
+    required List<String> recipientIds,
+    required FileSharePermission permission,
+    required FileShareAccess access,
+    String note = '',
+  }) async => const Success(FileShareResult(sentTo: []));
+
+  @override
+  Future<Result<Uint8List>> fetchFilePreview(
+    WorkspaceFile file,
+    FilePreviewKind kind,
+  ) async => Success(Uint8List(0));
+
+  @override
+  Future<Result<WorkspaceFile>> fetchFileDetails(String fileId) async =>
+      Success(WorkspaceFile(id: fileId, name: 'file', size: 0));
+
+  @override
+  Future<Result<Set<String>>> fetchPinnedFileIds() async => const Success({});
+
+  @override
+  Future<Result<void>> pinFile(String fileId) async => const Success(null);
+
+  @override
+  Future<Result<void>> unpinFile(String fileId) async => const Success(null);
 }
 
 class _UploadRepository implements FilesRepository {
@@ -357,4 +404,7 @@ class _UploadRepository implements FilesRepository {
 
   @override
   Future<Result<void>> unpinFile(String fileId) async => const Success(null);
+
+  @override
+  Future<Result<void>> deleteFolder(String id) async => const Success(null);
 }

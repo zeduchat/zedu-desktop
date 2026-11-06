@@ -1,6 +1,4 @@
 import 'dart:async';
-import 'dart:io' show File;
-
 import 'package:zedu/core/core.dart';
 import 'package:zedu/features/features.dart';
 
@@ -250,6 +248,16 @@ class ChatHistoryNotifier extends ChangeNotifier {
     }
   }
 
+  /// Returns true if [a] and [b] have the same keys and equal values.
+  bool _sameJsonValue(Map<String, dynamic> a, Map<String, dynamic> b) {
+    if (a.length != b.length) return false;
+    for (final key in a.keys) {
+      if (!b.containsKey(key)) return false;
+      if (a[key] != b[key]) return false;
+    }
+    return true;
+  }
+
   /// Merges the server's current fields onto every loaded message with the
   /// same id. Skips locally pending messages and messages being edited here,
   /// and returns whether anything changed.
@@ -295,11 +303,7 @@ class ChatHistoryNotifier extends ChangeNotifier {
       final repository = ref.read(dmRepositoryProvider);
       final page = await repository.getMessages(channelId, page: 1);
       if (_isDisposed) return null;
-      return findDeliveredCopy(
-        page,
-        send: send,
-        senderId: _currentUserId,
-      );
+      return findDeliveredCopy(page, send: send, senderId: _currentUserId);
     } catch (_) {
       return null;
     }
@@ -575,11 +579,7 @@ class ChatHistoryNotifier extends ChangeNotifier {
 
     final now = DateTime.now();
     _outboundSends[messageId] = record == null
-        ? OutboundSend.starting(
-            clientId: messageId,
-            content: content,
-            at: now,
-          )
+        ? OutboundSend.starting(clientId: messageId, content: content, at: now)
         : record.withAnotherAttempt(now);
 
     failedMsg['status'] = 'sending';

@@ -19,8 +19,10 @@ class NetworkStatusNotifier extends Notifier<NetworkStatus> {
   /// DNS resolution failure (no connection / resolver unavailable) maps to offline.
   static Future<bool> defaultReachabilityChecker() async {
     try {
-      final result = await InternetAddress.lookup('ziki.dev');
-      return result.any((record) => record.address.isNotEmpty);
+      final result = await InternetAddress.lookup(
+        'one.one.one.one',
+      ).timeout(const Duration(seconds: 3));
+      return result.isNotEmpty && result.first.rawAddress.isNotEmpty;
     } catch (_) {
       return false;
     }
@@ -28,11 +30,12 @@ class NetworkStatusNotifier extends Notifier<NetworkStatus> {
 
   @override
   NetworkStatus build() {
+    final checker = ref.watch(reachabilityCheckerProvider);
+    _startMonitoring(checker);
     ref.onDispose(() {
       _checkTimer?.cancel();
       _checkTimer = null;
     });
-    _startMonitoring(ref.read(reachabilityCheckerProvider));
     return NetworkStatus.online;
   }
 

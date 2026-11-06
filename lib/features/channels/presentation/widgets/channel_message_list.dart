@@ -32,8 +32,9 @@ class ChannelMessageList extends ConsumerWidget {
                 ? m['avatar_url'] as String
                 : chatHistory.currentUserAvatarUrl,
             text: m['content']?.toString() ?? '',
-            createdAt: DateTime.tryParse(m['created_at']?.toString() ?? '')
-                ?.toLocal(),
+            createdAt: DateTime.tryParse(
+              m['created_at']?.toString() ?? '',
+            )?.toLocal(),
             status: m['status']?.toString(),
             media: ChannelMessage.mediaFrom(m['media'] ?? m['files']),
           ),
@@ -458,6 +459,42 @@ class _OwnMessageMenu extends StatelessWidget {
             ),
         ],
       ),
+    );
+  }
+}
+
+/// A menu button to report a message, wrapping the message's [child].
+class ReportMessageMenu extends StatelessWidget {
+  const ReportMessageMenu({
+    super.key,
+    required this.senderName,
+    required this.messageText,
+    required this.child,
+  });
+
+  final String senderName;
+  final String messageText;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(child: child),
+        PopupMenuButton<String>(
+          tooltip: 'Report message',
+          iconSize: 18,
+          icon: const Icon(Icons.flag, size: 18),
+          onSelected: (value) {
+            if (value == 'report') {
+              // TODO: Implement message reporting
+            }
+          },
+          itemBuilder: (_) => [
+            const PopupMenuItem(value: 'report', child: Text('Report message')),
+          ],
+        ),
+      ],
     );
   }
 }
