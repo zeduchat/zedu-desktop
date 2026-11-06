@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io' show File;
 
 import 'package:zedu/core/core.dart';
@@ -30,6 +31,21 @@ class ChatHistoryNotifier extends ChangeNotifier {
   /// Messages whose edit is still being sent. A poll that lands meanwhile must
   /// not put the old text back over the edit.
   final Set<String> _editsInFlight = {};
+
+  /// Messages being sent right now, so a second send of the same message is a
+  /// no-op instead of a duplicate.
+  final Set<String> _sendsInFlight = {};
+
+  /// What is known about messages that failed to send: how many attempts they
+  /// had and when the first one started, which is what lets a retry recognise
+  /// a copy that already reached the server.
+  final Map<String, OutboundSend> _outboundSends = {};
+
+  /// Automatic retries waiting to run, cancelled when the message gets through
+  /// or the conversation closes.
+  final Map<String, Timer> _retryTimers = {};
+
+  static const SendRetryPolicy _retryPolicy = SendRetryPolicy();
 
   ChatHistoryNotifier(this.channelId, this.ref) {
     _loadInitial();
@@ -309,9 +325,83 @@ class ChatHistoryNotifier extends ChangeNotifier {
     return true;
   }
 
+  /// Whether [messageId] is being sent right now.
+  bool isSending(String messageId) => _sendsInFlight.contains(messageId);
+
+  /// How long until [messageId] is retried by itself, or null when it will not
+  /// be retried again and the person has to choose.
+  Duration? retryIn(String messageId) {
+    final record = _outboundSends[messageId];
+    if (record == null || !_retryPolicy.canRetry(record.attempts)) return null;
+    return _retryPolicy.delayBefore(record.attempts + 1);
+  }
+
+  /// The newest message on the server that is already a copy of [send].
+  ///
+  /// Best effort: if the lookup fails the retry still runs, which is exactly
+  /// what happened before this check existed.
+  Future<Map<String, dynamic>?> _findDeliveredCopy(OutboundSend send) async {
+    try {
+      final repository = ref.read(dmRepositoryProvider);
+      final page = await repository.getMessages(channelId, page: 1);
+      if (_disposed) return null;
+      return findDeliveredCopy(
+        page,
+        send: send,
+        senderId: _currentUserId,
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Treats [messageId] as sent, using the copy that is already on the server.
+  void _markDelivered(String messageId, Map<String, dynamic> delivered) {
+    _outboundSends.remove(messageId);
+    _cancelRetry(messageId);
+    // The attempt that already landed keeps its recording only until now: the
+    // message is delivered, so the local copy is no longer needed for a retry.
+    _deleteRecordings(_sendOptions.remove(messageId)?.media);
+    final threadId = (delivered['thread_id'] ?? delivered['id'])?.toString();
+    messages = messages.map((m) {
+      if (m['id'] != messageId) return m;
+      final updated = Map<String, dynamic>.from(m);
+      updated.remove('status');
+      if (threadId != null && threadId.isNotEmpty) {
+        updated['thread_id'] = threadId;
+      }
+      return updated;
+    }).toList();
+    notifyListeners();
+  }
+
+  void _scheduleRetry(String messageId) {
+    final record = _outboundSends[messageId];
+    if (record == null || !_retryPolicy.canRetry(record.attempts)) return;
+    _cancelRetry(messageId);
+    _retryTimers[messageId] = Timer(
+      _retryPolicy.delayBefore(record.attempts + 1),
+      () {
+        _retryTimers.remove(messageId);
+        if (_disposed) return;
+        unawaited(retryMessage(messageId));
+      },
+    );
+  }
+
+  void _cancelRetry(String messageId) {
+    _retryTimers.remove(messageId)?.cancel();
+  }
+
   @override
   void dispose() {
     _disposed = true;
+    for (final timer in _retryTimers.values) {
+      timer.cancel();
+    }
+    _retryTimers.clear();
+    _sendsInFlight.clear();
+    _outboundSends.clear();
     (_pollingTimer as dynamic)?.cancel();
     // Recordings kept for messages that never sent are no longer needed.
     for (final options in _sendOptions.values) {
@@ -437,11 +527,27 @@ class ChatHistoryNotifier extends ChangeNotifier {
         ],
     };
 
+    // The same text must not be in flight twice. A double Enter, or a double
+    // click on Send, would otherwise post two messages before either resolves.
+    final normalised = normaliseMessageText(content);
+    final sameTextInFlight = _outboundSends.entries.any(
+      (entry) =>
+          _sendsInFlight.contains(entry.key) &&
+          normaliseMessageText(entry.value.content) == normalised,
+    );
+    if (sameTextInFlight) return;
+
     _sendOptions[tempId] = (
       media: media,
       mentions: mentions,
       isChannel: isChannel,
     );
+    _outboundSends[tempId] = OutboundSend.starting(
+      clientId: tempId,
+      content: content,
+      at: DateTime.now(),
+    );
+    _sendsInFlight.add(tempId);
     messages = [optimisticMessage, ...messages];
     notifyListeners();
 
@@ -455,6 +561,8 @@ class ChatHistoryNotifier extends ChangeNotifier {
         isChannel: isChannel,
       );
       _sendOptions.remove(tempId);
+      _outboundSends.remove(tempId);
+      _cancelRetry(tempId);
       _deleteRecordings(media);
       if (_disposed) return;
 
@@ -477,17 +585,57 @@ class ChatHistoryNotifier extends ChangeNotifier {
         }
         return m;
       }).toList();
+      // Try again by itself, within the policy's attempt budget.
+      _scheduleRetry(tempId);
     } finally {
+      _sendsInFlight.remove(tempId);
       notifyListeners();
     }
   }
 
   Future<void> retryMessage(String messageId) async {
+    // A message already being sent cannot be sent again: a second tap on
+    // Retry would otherwise post it twice. The slot is taken before the first
+    // await, because the delivered-copy lookup below is itself asynchronous
+    // and a second tap during it would otherwise start a second request.
+    if (!_sendsInFlight.add(messageId)) return;
+    try {
+      await _retryMessageNow(messageId);
+    } finally {
+      _sendsInFlight.remove(messageId);
+    }
+  }
+
+  Future<void> _retryMessageNow(String messageId) async {
+    _cancelRetry(messageId);
+
     final idx = messages.indexWhere((m) => m['id'] == messageId);
     if (idx == -1) return;
 
     final failedMsg = Map<String, dynamic>.from(messages[idx]);
     final content = failedMsg['content'] as String? ?? '';
+
+    // An earlier attempt may have been committed even though the client saw a
+    // failure (a response timeout, for example). Adopt that copy instead of
+    // sending a second one.
+    final record = _outboundSends[messageId];
+    if (record != null && record.hasBeenAttempted) {
+      final delivered = await _findDeliveredCopy(record);
+      if (_disposed) return;
+      if (delivered != null) {
+        _markDelivered(messageId, delivered);
+        return;
+      }
+    }
+
+    final now = DateTime.now();
+    _outboundSends[messageId] = record == null
+        ? OutboundSend.starting(
+            clientId: messageId,
+            content: content,
+            at: now,
+          )
+        : record.withAnotherAttempt(now);
 
     failedMsg['status'] = 'sending';
     messages = List<Map<String, dynamic>>.from(messages);
@@ -506,6 +654,8 @@ class ChatHistoryNotifier extends ChangeNotifier {
             failedMsg['is_channel'] as bool? ?? options?.isChannel ?? false,
       );
       _sendOptions.remove(messageId);
+      _outboundSends.remove(messageId);
+      _cancelRetry(messageId);
       _deleteRecordings(options?.media);
       if (_disposed) return;
 
@@ -528,6 +678,7 @@ class ChatHistoryNotifier extends ChangeNotifier {
         }
         return m;
       }).toList();
+      _scheduleRetry(messageId);
     } finally {
       notifyListeners();
     }
