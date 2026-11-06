@@ -97,6 +97,10 @@ final desktopWindowTitleProvider = Provider<String>((ref) {
     case ActiveChatType.newGroupChat:
       contextName = 'New Group Chat';
       break;
+
+    case ActiveChatType.saved:
+      contextName = 'Saved';
+      break;
   }
 
   int unreadCount = 0;

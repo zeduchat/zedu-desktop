@@ -11,3 +11,4 @@ export 'files/files.dart';
 export 'people/people.dart';
 export 'buzz/buzz.dart';
 export 'inbox/inbox.dart';
+export 'saved/saved.dart';

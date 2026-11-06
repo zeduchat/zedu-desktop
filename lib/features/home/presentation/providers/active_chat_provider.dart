@@ -7,6 +7,7 @@ enum ActiveChatType {
   newGroupChat,
   directMessage,
   channelDirectory,
+  saved,
 }
 
 class ActiveChatState {
@@ -29,6 +30,7 @@ class ActiveChatState {
   static const channelDirectory = ActiveChatState(
     type: ActiveChatType.channelDirectory,
   );
+  static const saved = ActiveChatState(type: ActiveChatType.saved);
 
   @override
   bool operator ==(Object other) =>
@@ -74,6 +76,10 @@ class ActiveChatNotifier extends Notifier<ActiveChatState> {
 
   void selectNewGroupChat() {
     state = ActiveChatState.newGroupChat;
+  }
+
+  void selectSaved() {
+    state = ActiveChatState.saved;
   }
 }
 

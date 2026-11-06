@@ -1100,7 +1100,11 @@ class _MessageBubble extends ConsumerWidget {
                 ),
                 if (content.isNotEmpty)
                   _MessageMenu(
-                    enabled: status == null,
+                    enabled: status == null && messageId.isNotEmpty,
+                    target: SavedTarget(
+                      channelId: channelId,
+                      threadId: messageId,
+                    ),
                     onPin: () => _pin(context, ref, messageId),
                     onEdit: isMe ? () => onEdit(messageId, content) : null,
                     onDelete: isMe
@@ -1134,7 +1138,11 @@ class _MessageBubble extends ConsumerWidget {
                         // No text to hang the menu on, so it goes on the
                         // attachments (no Edit: there is nothing to edit).
                         : _MessageMenu(
-                            enabled: status == null,
+                            enabled: status == null && messageId.isNotEmpty,
+                            target: SavedTarget(
+                              channelId: channelId,
+                              threadId: messageId,
+                            ),
                             onPin: () => _pin(context, ref, messageId),
                             onEdit: null,
                             onDelete: isMe
@@ -1334,12 +1342,13 @@ class _AttachmentBubbleList extends StatelessWidget {
 /// Shows a "more" button on hover, and a right-click or long-press menu, for
 /// a sent message: Pin on every message, and Edit and Delete on your own. The
 /// long press is for touch input, where there is no hover or right click.
-class _MessageMenu extends StatefulWidget {
+class _MessageMenu extends ConsumerStatefulWidget {
   const _MessageMenu({
     required this.enabled,
     required this.onPin,
     required this.onEdit,
     required this.onDelete,
+    required this.target,
     required this.child,
   });
 
@@ -1349,19 +1358,40 @@ class _MessageMenu extends StatefulWidget {
   /// Null on other people's messages, which can't be edited or deleted.
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
+
+  /// Identifies the message for saving and reminders.
+  final SavedTarget target;
+
   final Widget child;
 
   @override
-  State<_MessageMenu> createState() => _MessageMenuState();
+  ConsumerState<_MessageMenu> createState() => _MessageMenuState();
 }
 
-class _MessageMenuState extends State<_MessageMenu> {
+class _MessageMenuState extends ConsumerState<_MessageMenu> {
   final _menuKey = GlobalKey<PopupMenuButtonState<String>>();
   bool _hovered = false;
+
+  Future<void> _onSelected(String value) async {
+    switch (value) {
+      case 'pin':
+        widget.onPin();
+        return;
+      case 'edit':
+        widget.onEdit?.call();
+        return;
+      case 'delete':
+        widget.onDelete?.call();
+        return;
+    }
+    await handleSavedMenuAction(context, ref, value, widget.target);
+  }
 
   @override
   Widget build(BuildContext context) {
     if (!widget.enabled) return widget.child;
+
+    final isSaved = ref.watch(savedKeysProvider).contains(widget.target.key);
 
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
@@ -1378,11 +1408,7 @@ class _MessageMenuState extends State<_MessageMenu> {
                 key: _menuKey,
                 tooltip: 'Message actions',
                 icon: const Icon(Icons.more_horiz, size: 18),
-                onSelected: (value) => switch (value) {
-                  'pin' => widget.onPin(),
-                  'edit' => widget.onEdit?.call(),
-                  _ => widget.onDelete?.call(),
-                },
+                onSelected: _onSelected,
                 itemBuilder: (_) => [
                   const PopupMenuItem(value: 'pin', child: Text('Pin message')),
                   if (widget.onEdit != null)
@@ -1395,6 +1421,8 @@ class _MessageMenuState extends State<_MessageMenu> {
                       value: 'delete',
                       child: Text('Delete message'),
                     ),
+                  const PopupMenuDivider(height: 1),
+                  ...savedMenuEntries(isSaved: isSaved),
                 ],
               ),
             ),

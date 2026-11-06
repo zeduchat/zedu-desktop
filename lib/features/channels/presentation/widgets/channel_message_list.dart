@@ -77,6 +77,7 @@ class ChannelMessageList extends ConsumerWidget {
         final message = messages[index];
         final tile = ChannelMessageTile(
           message: message,
+          channelId: channelId,
           onRetry: message.id != null
               ? () => ref
                     .read(chatHistoryProvider(channelId))
@@ -187,10 +188,31 @@ class ChannelDayDivider extends StatelessWidget {
 }
 
 class ChannelMessageTile extends StatelessWidget {
-  const ChannelMessageTile({super.key, required this.message, this.onRetry});
+  const ChannelMessageTile({
+    super.key,
+    required this.message,
+    this.onRetry,
+    this.channelId,
+  });
 
   final ChannelMessage message;
   final VoidCallback? onRetry;
+
+  /// The channel the message is in. Needed to save it or set a reminder on
+  /// it; when absent the message simply has no menu.
+  final String? channelId;
+
+  /// Null for a message the server does not have yet, or when the channel is
+  /// unknown: neither can be saved.
+  SavedTarget? get _target {
+    final id = message.id;
+    final channel = channelId;
+    if (id == null || id.isEmpty || channel == null || channel.isEmpty) {
+      return null;
+    }
+    if (message.status != null) return null;
+    return SavedTarget(channelId: channel, threadId: id);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -240,12 +262,15 @@ class ChannelMessageTile extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 4),
-                MessageLinkScope(
-                  builder: (context, links) => SelectableText.rich(
-                    buildInlineMarkdownSpan(
-                      message.text,
-                      TextStyle(fontSize: 15, color: colors.textPrimary),
-                      plainText: links.span,
+                _ChannelMessageMenu(
+                  target: _target,
+                  child: MessageLinkScope(
+                    builder: (context, links) => SelectableText.rich(
+                      buildInlineMarkdownSpan(
+                        message.text,
+                        TextStyle(fontSize: 15, color: colors.textPrimary),
+                        plainText: links.span,
+                      ),
                     ),
                   ),
                 ),
@@ -287,6 +312,57 @@ class ChannelMessageTile extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+/// Adds Save for later and Remind me about this to a channel message. The
+/// menu appears on every message, the user's own and other people's alike.
+class _ChannelMessageMenu extends ConsumerStatefulWidget {
+  const _ChannelMessageMenu({required this.target, required this.child});
+
+  final SavedTarget? target;
+  final Widget child;
+
+  @override
+  ConsumerState<_ChannelMessageMenu> createState() =>
+      _ChannelMessageMenuState();
+}
+
+class _ChannelMessageMenuState extends ConsumerState<_ChannelMessageMenu> {
+  final _menuKey = GlobalKey<PopupMenuButtonState<String>>();
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final target = widget.target;
+    if (target == null) return widget.child;
+
+    final isSaved = ref.watch(savedKeysProvider).contains(target.key);
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: GestureDetector(
+        onSecondaryTap: () => _menuKey.currentState?.showButtonMenu(),
+        onLongPress: () => _menuKey.currentState?.showButtonMenu(),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Flexible(child: widget.child),
+            Opacity(
+              opacity: _hovered ? 1 : 0,
+              child: PopupMenuButton<String>(
+                key: _menuKey,
+                tooltip: 'Message actions',
+                icon: const Icon(Icons.more_horiz, size: 18),
+                onSelected: (value) =>
+                    handleSavedMenuAction(context, ref, value, target),
+                itemBuilder: (_) => savedMenuEntries(isSaved: isSaved),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
