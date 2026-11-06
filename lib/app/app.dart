@@ -23,7 +23,9 @@ class App extends ConsumerWidget {
             child: AuthDeepLinkListener(
               child: SessionExpiryListener(
                 child: QuickSwitcherShortcut(
-                  child: child ?? const SizedBox.shrink(),
+                  child: RailNumberShortcuts(
+                    child: child ?? const SizedBox.shrink(),
+                  ),
                 ),
               ),
             ),
