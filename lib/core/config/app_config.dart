@@ -31,6 +31,10 @@ String defaultApiBaseUrl({required bool isRelease}) =>
 /// The website's Contact Sales page, opened from the Enterprise plan.
 const String kDefaultContactSalesUrl = 'https://zedu.chat/contact-sales';
 
+/// Where in-app reports of messages and people go, until the backend has a
+/// report endpoint.
+const String kReportEmail = 'support@emerj.net';
+
 /// The live Centrifugo websocket, used when `CONNECT_URL` comes from neither
 /// `--dart-define` nor `.env`. It carries realtime events such as incoming
 /// Buzz calls; the web app reads the same URL from `NEXT_PUBLIC_CONNECT_URL`.

@@ -228,7 +228,7 @@ void main() {
 
 /// Server pages of ten files, newest first: page 1 holds the newest files and
 /// every later page holds older ones.
-class _PagedRepository implements FilesRepository {
+class _PagedRepository extends Fake implements FilesRepository {
   int totalPages = 1;
   final pages = <int>[];
 
@@ -276,7 +276,7 @@ class _PagedRepository implements FilesRepository {
   }) async => const Success(null);
 }
 
-class _UploadRepository implements FilesRepository {
+class _UploadRepository extends Fake implements FilesRepository {
   final uploaded = <String>[];
   ApiFailure? folderError;
 

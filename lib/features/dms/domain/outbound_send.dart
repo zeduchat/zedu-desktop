@@ -173,7 +173,8 @@ bool isDeliveredCopyOf(
   }
 
   final createdAt = DateTime.tryParse(
-    (serverMessage['created_at'] ?? serverMessage['createdAt'] ?? '').toString(),
+    (serverMessage['created_at'] ?? serverMessage['createdAt'] ?? '')
+        .toString(),
   );
   if (createdAt == null) return false;
 
@@ -204,7 +205,8 @@ Map<String, dynamic>? findDeliveredCopy(
     final at = DateTime.tryParse(
       (message['created_at'] ?? message['createdAt'] ?? '').toString(),
     );
-    if (newest == null || (at != null && (newestAt == null || at.isAfter(newestAt)))) {
+    if (newest == null ||
+        (at != null && (newestAt == null || at.isAfter(newestAt)))) {
       newest = message;
       newestAt = at;
     }

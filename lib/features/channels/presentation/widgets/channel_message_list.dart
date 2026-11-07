@@ -32,8 +32,9 @@ class ChannelMessageList extends ConsumerWidget {
                 ? m['avatar_url'] as String
                 : chatHistory.currentUserAvatarUrl,
             text: m['content']?.toString() ?? '',
-            createdAt: DateTime.tryParse(m['created_at']?.toString() ?? '')
-                ?.toLocal(),
+            createdAt: DateTime.tryParse(
+              m['created_at']?.toString() ?? '',
+            )?.toLocal(),
             status: m['status']?.toString(),
             media: ChannelMessage.mediaFrom(m['media'] ?? m['files']),
           ),

@@ -111,7 +111,10 @@ class _OrganizationSectionState extends State<OrganizationSection> {
           ),
         ),
         const SizedBox(height: 48),
-        Row(
+        // Wraps so both buttons stay visible in a narrow window.
+        Wrap(
+          spacing: 16,
+          runSpacing: 12,
           children: [
             AppButton.outlined(
               label: 'Sign out of workspace',
@@ -125,7 +128,6 @@ class _OrganizationSectionState extends State<OrganizationSection> {
               loading: _pending == _OrganizationAction.leave,
               onPressed: () => _confirmLeave(context),
             ),
-            const SizedBox(width: 16),
             AppButton.outlined(
               label: 'Delete organization',
               expand: false,

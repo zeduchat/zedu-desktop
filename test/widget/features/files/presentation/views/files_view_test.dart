@@ -57,28 +57,6 @@ class _FakeProfileNotifier extends UserProfileNotifier {
 
 /// Signed in as Ada (`u-1`), who owns the listed files. The share dialog reads
 /// the signed-in user to leave them out of its suggestions.
-class _FakeAuthNotifier extends AuthNotifier {
-  @override
-  AuthState build() => AuthState(
-    status: AuthStatus.authenticated,
-    user: User(
-      id: 'u-1',
-      firstName: 'Ada',
-      lastName: 'Lovelace',
-      email: 'ada@zedu.test',
-      phone: '',
-      username: 'ada',
-      isVerified: true,
-      isOnboarded: true,
-      createdAt: DateTime(2026, 1, 1),
-      currentOrg: 'org-1',
-      currentOrganisationSlug: 'org-1',
-      avatarUrl: '',
-      defaultAvatarUrl: '',
-    ),
-  );
-}
-
 class _FakePeopleRepository implements PeopleRepository {
   static const members = [
     OrgMember(id: 'u-2', name: 'Grace Hopper', email: 'grace@zedu.test'),
@@ -107,7 +85,7 @@ class _FakePeopleRepository implements PeopleRepository {
   }
 }
 
-class _FakeFilesRepository implements FilesRepository {
+class _FakeFilesRepository extends Fake implements FilesRepository {
   _FakeFilesRepository({
     this.failFolders = false,
     this.failCreate = false,

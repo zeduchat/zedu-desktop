@@ -5,13 +5,13 @@ import 'package:zedu/features/features.dart';
 
 import '../../../../../helpers/helpers.dart';
 
-class _DeferredUploads implements FilesRepository {
+class _DeferredUploads extends Fake implements FilesRepository {
   String workspace = 'A';
   final destinations = <String>[];
   final first = Completer<Result<WorkspaceFile>>();
 
   @override
-  Future<Result<WorkspaceFile>> uploadFile(XFile file) {
+  Future<Result<WorkspaceFile>> uploadFile(XFile file, {String? parentId}) {
     destinations.add(workspace);
     if (destinations.length == 1) return first.future;
     return Future.value(Success(WorkspaceFile(id: file.name, name: file.name)));
