@@ -448,4 +448,58 @@ void main() {
       expect(find.byType(QuickSwitcherDialog), findsOneWidget);
     });
   });
+
+  group('Cmd/Ctrl+1 to 4 (#3434)', () {
+    Future<void> press(
+      WidgetTester tester,
+      LogicalKeyboardKey digit, {
+      LogicalKeyboardKey modifier = LogicalKeyboardKey.controlLeft,
+    }) async {
+      await tester.sendKeyDownEvent(modifier);
+      await tester.sendKeyEvent(digit);
+      await tester.sendKeyUpEvent(modifier);
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('Ctrl+1 to 4 open Home, DMs, People and Files', (tester) async {
+      final container = await _pump(tester, withTextField: false);
+
+      await press(tester, LogicalKeyboardKey.digit2);
+      expect(container.read(homeSidebarProvider), HomeSidebarType.dms);
+      // It also goes to the home screen, where the rail is.
+      expect(find.text('home screen'), findsOneWidget);
+
+      await press(tester, LogicalKeyboardKey.digit3);
+      expect(container.read(homeSidebarProvider), HomeSidebarType.people);
+      await press(tester, LogicalKeyboardKey.digit4);
+      expect(container.read(homeSidebarProvider), HomeSidebarType.files);
+      await press(tester, LogicalKeyboardKey.digit1);
+      expect(container.read(homeSidebarProvider), HomeSidebarType.home);
+    });
+
+    testWidgets('Cmd works too', (tester) async {
+      final container = await _pump(tester, withTextField: false);
+
+      await press(
+        tester,
+        LogicalKeyboardKey.digit4,
+        modifier: LogicalKeyboardKey.metaLeft,
+      );
+
+      expect(container.read(homeSidebarProvider), HomeSidebarType.files);
+    });
+
+    testWidgets('does nothing when signed out', (tester) async {
+      final container = await _pump(
+        tester,
+        status: AuthStatus.unauthenticated,
+        withTextField: false,
+      );
+
+      await press(tester, LogicalKeyboardKey.digit2);
+
+      expect(container.read(homeSidebarProvider), HomeSidebarType.home);
+      expect(find.text('settings screen'), findsOneWidget);
+    });
+  });
 }

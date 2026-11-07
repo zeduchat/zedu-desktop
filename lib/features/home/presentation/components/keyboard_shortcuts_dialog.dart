@@ -17,6 +17,7 @@ class KeyboardShortcutsDialog extends StatelessWidget {
     'Anywhere': [
       _Shortcut([modifier, 'K'], 'Jump to a channel or conversation'),
       _Shortcut([modifier, '/'], 'Show keyboard shortcuts'),
+      _Shortcut([modifier, '1–4'], 'Go to Home, DMs, People or Files'),
     ],
     'Jumping to a conversation': const [
       _Shortcut(['Up', 'Down'], 'Move through the results'),

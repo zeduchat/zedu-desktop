@@ -2,8 +2,9 @@ import 'package:zedu/core/core.dart';
 import 'package:zedu/features/features.dart';
 
 /// Opens the [QuickSwitcherDialog] on Cmd+K (macOS) or Ctrl+K (Windows,
-/// Linux), and the [KeyboardShortcutsDialog] on Cmd+/ or Ctrl+/, from any
-/// screen once the user is signed in.
+/// Linux), the [KeyboardShortcutsDialog] on Cmd+/ or Ctrl+/, and the rail's
+/// Home, DMs, People and Files on Cmd/Ctrl+1 to 4, from any screen once the
+/// user is signed in.
 class QuickSwitcherShortcut extends ConsumerStatefulWidget {
   final Widget child;
 
@@ -68,6 +69,26 @@ class _QuickSwitcherShortcutState extends ConsumerState<QuickSwitcherShortcut> {
     }
   }
 
+  /// The rail sections Cmd/Ctrl+1 to 4 open, in rail order (Ziki #3434).
+  static const _sections = [
+    (LogicalKeyboardKey.digit1, HomeSidebarType.home),
+    (LogicalKeyboardKey.digit2, HomeSidebarType.dms),
+    (LogicalKeyboardKey.digit3, HomeSidebarType.people),
+    (LogicalKeyboardKey.digit4, HomeSidebarType.files),
+  ];
+
+  void _openSection(HomeSidebarType section) {
+    final signedIn =
+        ref.read(authNotifierProvider).status == AuthStatus.authenticated;
+    if (_open || !signedIn) return;
+
+    ref.read(homeSidebarProvider.notifier).setType(section);
+    final location = _router.routerDelegate.currentConfiguration.uri;
+    if (location.path != AppRouter.home) {
+      _router.go(AppRouter.home);
+    }
+  }
+
   void _openEntry(QuickSwitcherEntry entry) {
     final conversation = entry.conversation;
     if (conversation == null) {
@@ -98,6 +119,10 @@ class _QuickSwitcherShortcutState extends ConsumerState<QuickSwitcherShortcut> {
             _showShortcuts,
         const SingleActivator(LogicalKeyboardKey.slash, meta: true):
             _showShortcuts,
+        for (final (key, section) in _sections) ...{
+          SingleActivator(key, control: true): () => _openSection(section),
+          SingleActivator(key, meta: true): () => _openSection(section),
+        },
       },
       child: widget.child,
     );
