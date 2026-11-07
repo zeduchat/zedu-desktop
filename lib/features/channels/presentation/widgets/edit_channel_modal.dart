@@ -163,18 +163,18 @@ class _EditChannelModalState extends ConsumerState<EditChannelModal> {
                     ),
                   ),
                   child: isLoading
-                      ? const SizedBox(
+                      ? SizedBox(
                           width: 20,
                           height: 20,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            color: Colors.white,
+                            color: colors.onPrimary,
                           ),
                         )
                       : Text(
                           'Save changes',
                           style: textTheme.bodyMedium?.copyWith(
-                            color: Colors.white,
+                            color: colors.onPrimary,
                           ),
                         ),
                 ),

@@ -1571,10 +1571,10 @@ class DmMessageComposerState extends ConsumerState<DmMessageComposer> {
                       color: colors.primary,
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: const Text(
+                    child: Text(
                       'Drop files to attach',
                       style: TextStyle(
-                        color: Colors.white,
+                        color: colors.onPrimary,
                         fontWeight: FontWeight.bold,
                         fontSize: 16,
                       ),

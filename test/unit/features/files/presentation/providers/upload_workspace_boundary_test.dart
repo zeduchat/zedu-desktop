@@ -133,11 +133,9 @@ void main() {
       completeFirst();
       final outcome = await upload;
 
-      expect(
-        repository.destinations,
-        ['A'],
-        reason: 'Do not send remaining files to workspace B.',
-      );
+      expect(repository.destinations, [
+        'A',
+      ], reason: 'Do not send remaining files to workspace B.');
       expect(outcome.uploaded, 1);
       expect(outcome.skippedNames, ['second.txt']);
       expect(outcome.failedNames, isEmpty);

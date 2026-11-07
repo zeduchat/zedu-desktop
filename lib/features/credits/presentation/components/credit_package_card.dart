@@ -23,11 +23,11 @@ class CreditPackageCard extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: colors.background,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
+            color: colors.textPrimary.withValues(alpha: 0.08),
             blurRadius: 24,
             offset: const Offset(0, 10),
           ),
@@ -170,10 +170,10 @@ class CreditPackageCard extends StatelessWidget {
                               color: colors.primary,
                               shape: BoxShape.circle,
                             ),
-                            child: const Icon(
+                            child: Icon(
                               Icons.check,
                               size: 14,
-                              color: Colors.white,
+                              color: colors.onPrimary,
                             ),
                           ),
                           const SizedBox(width: 10),
@@ -203,19 +203,19 @@ class CreditPackageCard extends StatelessWidget {
                         onPressed: isLoading ? null : onPurchase,
                         style: FilledButton.styleFrom(
                           backgroundColor: colors.primary,
-                          foregroundColor: Colors.white,
+                          foregroundColor: colors.onPrimary,
                           padding: const EdgeInsets.symmetric(vertical: 12),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(8),
                           ),
                         ),
                         child: isLoading
-                            ? const SizedBox(
+                            ? SizedBox(
                                 width: 20,
                                 height: 20,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2,
-                                  color: Colors.white,
+                                  color: colors.background,
                                 ),
                               )
                             : FittedBox(

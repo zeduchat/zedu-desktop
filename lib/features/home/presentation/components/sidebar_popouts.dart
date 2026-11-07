@@ -256,7 +256,7 @@ class SidebarPopoutCard extends ConsumerWidget {
             borderRadius: BorderRadius.circular(12),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.22),
+                color: colors.textPrimary.withValues(alpha: 0.22),
                 offset: const Offset(0, 12),
                 blurRadius: 32,
               ),

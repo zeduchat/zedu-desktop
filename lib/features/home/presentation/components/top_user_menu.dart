@@ -126,11 +126,11 @@ class TopUserMenu extends ConsumerWidget {
                 color: colors.accent,
                 borderRadius: BorderRadius.circular(4),
               ),
-              child: const Center(
+              child: Center(
                 child: Text(
                   'ZU',
                   style: TextStyle(
-                    color: Colors.white,
+                    color: colors.onPrimary,
                     fontSize: 8,
                     fontWeight: FontWeight.bold,
                   ),

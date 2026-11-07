@@ -9,7 +9,7 @@ class MagicLinkSentView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: context.colors.onPrimary,
       appBar: PreferredSize(
         preferredSize: const Size.fromHeight(80),
         child: AuthHeaderStrip(
@@ -40,9 +40,9 @@ class MagicLinkSentView extends StatelessWidget {
                       color: Color(0xFF23B444),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.check_rounded,
-                      color: Colors.white,
+                      color: context.colors.onPrimary,
                       size: 92,
                     ),
                   ),

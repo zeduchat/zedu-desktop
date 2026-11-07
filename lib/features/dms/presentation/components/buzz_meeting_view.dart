@@ -41,7 +41,7 @@ class _BuzzMeetingViewState extends ConsumerState<BuzzMeetingView> {
               border: Border.all(color: colors.divider),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.1),
+                  color: colors.textPrimary.withValues(alpha: 0.1),
                   blurRadius: 16,
                   offset: const Offset(0, 4),
                 ),
@@ -97,17 +97,12 @@ class _BuzzMeetingViewState extends ConsumerState<BuzzMeetingView> {
                   child: Row(
                     children: [
                       Expanded(
-                        child: _buildVideoFeed(
-                          Colors.green.shade900,
-                          'You',
-                          null,
-                          80,
-                        ),
+                        child: _buildVideoFeed(colors.success, 'You', null, 80),
                       ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: _buildVideoFeed(
-                          Colors.grey.shade800,
+                          colors.textSecondary,
                           remoteName,
                           activeCall.state.remoteAvatarUrl,
                           80,
@@ -126,7 +121,7 @@ class _BuzzMeetingViewState extends ConsumerState<BuzzMeetingView> {
                         icon: _isMuted ? Icons.mic_off : Icons.mic,
                         tooltip: _isMuted ? 'Unmute' : 'Mute',
                         color: _isMuted
-                            ? Colors.red
+                            ? colors.error
                             : colors.primary.withValues(alpha: 0.2),
                         onTap: () => setState(() => _isMuted = !_isMuted),
                         small: true,
@@ -138,7 +133,7 @@ class _BuzzMeetingViewState extends ConsumerState<BuzzMeetingView> {
                             ? 'Turn camera on'
                             : 'Turn camera off',
                         color: _isVideoOff
-                            ? Colors.red
+                            ? colors.error
                             : colors.primary.withValues(alpha: 0.2),
                         onTap: () => setState(() => _isVideoOff = !_isVideoOff),
                         small: true,
@@ -148,7 +143,7 @@ class _BuzzMeetingViewState extends ConsumerState<BuzzMeetingView> {
                         icon: Icons.back_hand,
                         tooltip: _isHandRaised ? 'Lower hand' : 'Raise hand',
                         color: _isHandRaised
-                            ? Colors.amber
+                            ? colors.accent
                             : colors.primary.withValues(alpha: 0.2),
                         onTap: () =>
                             setState(() => _isHandRaised = !_isHandRaised),
@@ -158,7 +153,7 @@ class _BuzzMeetingViewState extends ConsumerState<BuzzMeetingView> {
                       _buildControlButton(
                         icon: Icons.call_end,
                         tooltip: 'Leave call',
-                        color: Colors.red,
+                        color: colors.error,
                         onTap: () {
                           ref.read(activeCallProvider.notifier).endCall();
                         },
@@ -254,7 +249,7 @@ class _BuzzMeetingViewState extends ConsumerState<BuzzMeetingView> {
                   icon: _isMuted ? Icons.mic_off : Icons.mic,
                   tooltip: _isMuted ? 'Unmute' : 'Mute',
                   color: _isMuted
-                      ? Colors.red
+                      ? colors.error
                       : colors.primary.withValues(alpha: 0.2),
                   onTap: () => setState(() => _isMuted = !_isMuted),
                   small: false,
@@ -276,7 +271,7 @@ class _BuzzMeetingViewState extends ConsumerState<BuzzMeetingView> {
                   icon: _isVideoOff ? Icons.videocam_off : Icons.videocam,
                   tooltip: _isVideoOff ? 'Turn camera on' : 'Turn camera off',
                   color: _isVideoOff
-                      ? Colors.red
+                      ? colors.error
                       : colors.primary.withValues(alpha: 0.2),
                   onTap: () => setState(() => _isVideoOff = !_isVideoOff),
                   small: false,
@@ -286,7 +281,7 @@ class _BuzzMeetingViewState extends ConsumerState<BuzzMeetingView> {
                   icon: Icons.back_hand,
                   tooltip: _isHandRaised ? 'Lower hand' : 'Raise hand',
                   color: _isHandRaised
-                      ? Colors.amber
+                      ? colors.accent
                       : colors.primary.withValues(alpha: 0.2),
                   onTap: () => setState(() => _isHandRaised = !_isHandRaised),
                   small: false,
@@ -295,7 +290,7 @@ class _BuzzMeetingViewState extends ConsumerState<BuzzMeetingView> {
                 _buildControlButton(
                   icon: Icons.call_end,
                   tooltip: 'Leave call',
-                  color: Colors.red,
+                  color: colors.error,
                   onTap: () {
                     ref.read(activeCallProvider.notifier).endCall();
                   },
@@ -332,7 +327,11 @@ class _BuzzMeetingViewState extends ConsumerState<BuzzMeetingView> {
                   ? NetworkImage(avatarUrl)
                   : null,
               child: avatarUrl == null || avatarUrl.isEmpty
-                  ? Icon(Icons.person, size: 24, color: Colors.white)
+                  ? Icon(
+                      Icons.person,
+                      size: 24,
+                      color: AppPalette.light.onPrimary,
+                    )
                   : null,
             ),
           ),
@@ -342,13 +341,13 @@ class _BuzzMeetingViewState extends ConsumerState<BuzzMeetingView> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.5),
+                color: AppPalette.light.textPrimary.withValues(alpha: 0.5),
                 borderRadius: BorderRadius.circular(4),
               ),
               child: Text(
                 name,
-                style: const TextStyle(
-                  color: Colors.white,
+                style: TextStyle(
+                  color: AppPalette.light.onPrimary,
                   fontSize: 10,
                   fontWeight: FontWeight.bold,
                 ),
@@ -378,7 +377,11 @@ class _BuzzMeetingViewState extends ConsumerState<BuzzMeetingView> {
             color: color,
             borderRadius: BorderRadius.circular(8),
           ),
-          child: Icon(icon, color: Colors.white, size: small ? 18 : 24),
+          child: Icon(
+            icon,
+            color: AppPalette.light.onPrimary,
+            size: small ? 18 : 24,
+          ),
         ),
       ),
     );

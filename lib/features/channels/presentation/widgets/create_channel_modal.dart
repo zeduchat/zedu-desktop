@@ -245,18 +245,18 @@ class _CreateChannelModalState extends ConsumerState<CreateChannelModal> {
                     ),
                   ),
                   child: isLoading
-                      ? const SizedBox(
+                      ? SizedBox(
                           width: 20,
                           height: 20,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            color: Colors.white,
+                            color: colors.onPrimary,
                           ),
                         )
                       : Text(
                           'Create',
                           style: textTheme.bodyMedium?.copyWith(
-                            color: Colors.white,
+                            color: colors.onPrimary,
                           ),
                         ),
                 ),

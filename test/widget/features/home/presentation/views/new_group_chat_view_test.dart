@@ -306,5 +306,4 @@ void main() {
       expect(find.text('alice@zedu.chat'), findsNothing);
     }, variant: _desktopPointer);
   });
-  });
 }

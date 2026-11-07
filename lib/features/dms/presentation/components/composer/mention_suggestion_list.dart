@@ -26,7 +26,7 @@ class MentionSuggestionList extends StatelessWidget {
         border: Border.all(color: colors.divider),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.12),
+            color: colors.textPrimary.withValues(alpha: 0.12),
             blurRadius: 12,
             offset: const Offset(0, -4),
           ),
@@ -82,8 +82,8 @@ class MentionSuggestionList extends StatelessWidget {
                             child: p.avatarUrl == null || p.avatarUrl!.isEmpty
                                 ? Text(
                                     initial,
-                                    style: const TextStyle(
-                                      color: Colors.white,
+                                    style: TextStyle(
+                                      color: colors.onPrimary,
                                       fontSize: 11,
                                       fontWeight: FontWeight.bold,
                                     ),

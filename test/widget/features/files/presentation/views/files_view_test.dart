@@ -57,6 +57,7 @@ class _FakeProfileNotifier extends UserProfileNotifier {
 
 /// Signed in as Ada (`u-1`), who owns the listed files. The share dialog reads
 /// the signed-in user to leave them out of its suggestions.
+
 class _FakePeopleRepository implements PeopleRepository {
   static const members = [
     OrgMember(id: 'u-2', name: 'Grace Hopper', email: 'grace@zedu.test'),
@@ -205,6 +206,15 @@ class _FakeFilesRepository extends Fake implements FilesRepository {
   }
 
   Result<void> deleteResult = const Success(null);
+
+  final deletedFolders = <String>[];
+  Result<void> deleteFolderResult = const Success(null);
+
+  @override
+  Future<Result<void>> deleteFolder(String id) async {
+    deletedFolders.add(id);
+    return deleteFolderResult;
+  }
 
   @override
   Future<Result<void>> deleteFile(

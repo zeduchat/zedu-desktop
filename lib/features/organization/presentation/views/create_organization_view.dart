@@ -64,8 +64,8 @@ class _CreateOrganizationViewState
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Row(
-            children: const [
-              Icon(Icons.check_circle_outline, color: Colors.white),
+            children: [
+              Icon(Icons.check_circle_outline, color: context.colors.onPrimary),
               SizedBox(width: 8),
               Text('Organization created!'),
             ],
@@ -271,7 +271,7 @@ class _CreateOrganizationViewState
                     onPressed: isLoading ? null : _submit,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: colors.primary,
-                      foregroundColor: Colors.white,
+                      foregroundColor: colors.onPrimary,
                       disabledBackgroundColor: colors.primary.withValues(
                         alpha: 0.5,
                       ),
@@ -282,13 +282,13 @@ class _CreateOrganizationViewState
                       elevation: 0,
                     ),
                     child: isLoading
-                        ? const SizedBox(
+                        ? SizedBox(
                             height: 20,
                             width: 20,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
                               valueColor: AlwaysStoppedAnimation<Color>(
-                                Colors.white,
+                                colors.onPrimary,
                               ),
                             ),
                           )

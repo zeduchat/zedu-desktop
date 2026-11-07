@@ -28,7 +28,7 @@ class PersonalProfilePanel extends ConsumerWidget {
         color: colors.background,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
+            color: colors.textPrimary.withValues(alpha: 0.1),
             blurRadius: 20,
             offset: const Offset(-4, 0),
           ),

@@ -146,7 +146,7 @@ class _AppSidebarRailState extends ConsumerState<AppSidebarRail> {
             onTap: () {
               showDialog<void>(
                 context: context,
-                barrierColor: Colors.black.withValues(alpha: 0.3),
+                barrierColor: colors.textPrimary.withValues(alpha: 0.3),
                 builder: (context) => const NotificationsDialog(),
               );
             },

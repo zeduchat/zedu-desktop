@@ -44,9 +44,6 @@ const String kDefaultConnectUrl =
 /// Default repository URL for the Zedu Desktop app.
 const String kDefaultRepoUrl = 'https://github.com/zeduchat/zedu-desktop';
 
-/// Inbox for in-app content reports, until the backend has a report endpoint.
-const String kReportEmail = 'support@emerj.net';
-
 class AppConfig {
   const AppConfig({
     required this.apiBaseUrl,

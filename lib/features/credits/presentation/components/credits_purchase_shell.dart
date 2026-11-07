@@ -55,7 +55,7 @@ class _CreditsTopBar extends StatelessWidget {
             'assets/pngs/zedu_logo.png',
             width: 82,
             height: 31,
-            color: Colors.white,
+            color: context.colors.onPrimary,
             colorBlendMode: BlendMode.srcIn,
           ),
           const SizedBox(width: 24),
@@ -71,11 +71,11 @@ class _CreditsTopBar extends StatelessWidget {
                 isDense: true,
                 hintText: 'Search messages...',
                 hintStyle: context.textTheme.bodySmall?.copyWith(
-                  color: Colors.white70,
+                  color: context.colors.textHint,
                 ),
-                prefixIcon: const Icon(
+                prefixIcon: Icon(
                   Icons.search,
-                  color: Colors.white,
+                  color: context.colors.onPrimary,
                   size: 18,
                 ),
                 filled: true,
@@ -86,7 +86,9 @@ class _CreditsTopBar extends StatelessWidget {
                 ),
                 contentPadding: const EdgeInsets.symmetric(vertical: 8),
               ),
-              style: context.textTheme.bodySmall?.copyWith(color: Colors.white),
+              style: context.textTheme.bodySmall?.copyWith(
+                color: context.colors.onPrimary,
+              ),
             ),
           ),
           const Spacer(flex: 2),

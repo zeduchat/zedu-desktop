@@ -31,7 +31,7 @@ class IncomingCallModal extends ConsumerWidget {
             border: Border.all(color: colors.divider),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.2),
+                color: colors.textPrimary.withValues(alpha: 0.2),
                 blurRadius: 16,
                 offset: const Offset(0, 4),
               ),
@@ -55,8 +55,8 @@ class IncomingCallModal extends ConsumerWidget {
                             activeCall.state.remoteAvatarUrl!.isEmpty
                         ? Text(
                             avatarInitial(activeCall.state.remoteUserName),
-                            style: const TextStyle(
-                              color: Colors.white,
+                            style: TextStyle(
+                              color: colors.onPrimary,
                               fontWeight: FontWeight.bold,
                             ),
                           )
@@ -97,7 +97,7 @@ class IncomingCallModal extends ConsumerWidget {
                     onPressed: () {
                       ref.read(activeCallProvider.notifier).declineCall();
                     },
-                    style: TextButton.styleFrom(foregroundColor: Colors.red),
+                    style: TextButton.styleFrom(foregroundColor: colors.error),
                     child: const Text('Decline'),
                   ),
                   const SizedBox(width: 8),
@@ -106,8 +106,8 @@ class IncomingCallModal extends ConsumerWidget {
                       ref.read(activeCallProvider.notifier).acceptCall();
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
-                      foregroundColor: Colors.white,
+                      backgroundColor: colors.success,
+                      foregroundColor: colors.onPrimary,
                     ),
                     icon: const Icon(Icons.call, size: 18),
                     label: const Text('Accept'),

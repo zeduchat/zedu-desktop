@@ -61,7 +61,7 @@ class _MagicLinkRequestViewState extends ConsumerState<MagicLinkRequestView> {
     final isLoading = ref.watch(magicLinkNotifierProvider).isLoading;
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: context.colors.onPrimary,
       appBar: PreferredSize(
         preferredSize: const Size.fromHeight(80),
         child: AuthHeaderStrip(

@@ -77,14 +77,14 @@ class AttachmentPreviewBar extends StatelessWidget {
                           child: Container(
                             width: 18,
                             height: 18,
-                            decoration: const BoxDecoration(
-                              color: Colors.red,
+                            decoration: BoxDecoration(
+                              color: colors.error,
                               shape: BoxShape.circle,
                             ),
-                            child: const Icon(
+                            child: Icon(
                               Icons.close,
                               size: 11,
-                              color: Colors.white,
+                              color: colors.onPrimary,
                             ),
                           ),
                         ),

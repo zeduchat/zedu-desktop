@@ -345,12 +345,12 @@ class _SetStatusDialogState extends ConsumerState<SetStatusDialog> {
                       ),
                     ),
                     child: _isSaving
-                        ? const SizedBox(
+                        ? SizedBox(
                             width: 18,
                             height: 18,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              color: Colors.white,
+                              color: colors.onPrimary,
                             ),
                           )
                         : const Text(
@@ -493,7 +493,7 @@ class PresenceDot extends StatelessWidget {
       decoration: BoxDecoration(
         color: online ? colors.presenceActive : colors.presenceAway,
         shape: BoxShape.circle,
-        border: Border.all(color: Colors.white, width: 1.5),
+        border: Border.all(color: colors.onPrimary, width: 1.5),
       ),
     );
   }
