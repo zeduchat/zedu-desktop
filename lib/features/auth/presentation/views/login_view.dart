@@ -211,12 +211,16 @@ class _LoginViewState extends ConsumerState<LoginView> {
                             children: [
                               Checkbox(
                                 value: _rememberMe,
+                                materialTapTargetSize:
+                                    MaterialTapTargetSize.shrinkWrap,
+                                visualDensity: VisualDensity.compact,
                                 onChanged: (value) {
                                   setState(() {
                                     _rememberMe = value ?? false;
                                   });
                                 },
                               ),
+                              const SizedBox(width: 8),
                               const Text('Remember me'),
                             ],
                           ),

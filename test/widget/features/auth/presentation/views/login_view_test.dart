@@ -395,6 +395,20 @@ void main() {
       );
     });
 
+    testWidgets('aligns the Remember me checkbox with the form fields', (
+      tester,
+    ) async {
+      await pumpDesktopLogin(tester, FakeAuthNotifier());
+
+      final checkboxRect = tester.getRect(find.byType(Checkbox));
+      final fieldRect = tester.getRect(find.byType(TextFormField).first);
+      final labelRect = tester.getRect(find.text('Remember me'));
+
+      expect(checkboxRect.left, moreOrLessEquals(fieldRect.left));
+      expect(checkboxRect.width, lessThan(40));
+      expect(labelRect.left - checkboxRect.right, moreOrLessEquals(8));
+    });
+
     for (final ticked in [false, true]) {
       testWidgets('passes Remember me = $ticked to login', (tester) async {
         final notifier = FakeAuthNotifier();
