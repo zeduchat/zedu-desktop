@@ -23,6 +23,19 @@ class _EmptyChannelRepository extends Mock implements ChannelRepository {
       ]);
 }
 
+class _LinksChannelRepository extends _EmptyChannelRepository {
+  @override
+  Future<Result<List<ChannelMessage>>> fetchChannelMessages(String id) async =>
+      Success([
+        ChannelMessage(
+          senderName: 'Ada',
+          text: 'Roadmap',
+          rawContent: '<a href="https://zedu.chat/roadmap">Roadmap</a>',
+          createdAt: DateTime.utc(2026, 11, 1, 9),
+        ),
+      ]);
+}
+
 /// Records leave calls and answers with [leaveResult].
 class _FakeNotificationService extends Fake
     implements ChannelNotificationService {
@@ -279,6 +292,21 @@ void main() {
         expect(find.text('Mentions'), findsOneWidget);
       },
     );
+
+    testWidgets('the channel menu opens links shared in that channel', (
+      tester,
+    ) async {
+      await pumpSidebarAndChat(tester, repository: _LinksChannelRepository());
+
+      await tester.tap(find.byKey(const ValueKey('channel-header-menu')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('View links'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('#general links'), findsOneWidget);
+      expect(find.text('https://zedu.chat/roadmap'), findsOneWidget);
+      expect(find.textContaining('Ada ·'), findsOneWidget);
+    });
 
     testWidgets('cancelling the dialog keeps the channel', (tester) async {
       final repository = _LeavingChannelRepository(const Success(null));

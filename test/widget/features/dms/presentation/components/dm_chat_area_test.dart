@@ -597,6 +597,22 @@ void main() {
       expect(opened, [Uri.parse('https://example.com/bold')]);
     });
 
+    testWidgets('the conversation menu opens its shared links view', (
+      tester,
+    ) async {
+      await pumpChat(tester, [
+        message('m1', '<a href="https://zedu.chat/dm-docs">DM docs</a>'),
+      ]);
+
+      await tester.tap(find.byTooltip('More options'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('View links'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Ada Lovelace links'), findsOneWidget);
+      expect(find.text('https://zedu.chat/dm-docs'), findsOneWidget);
+    });
+
     Finder bubbleDividers(String text) => find.descendant(
       of: find
           .ancestor(

@@ -28,6 +28,7 @@ void main() {
     expect(message.senderName, 'gold_salam');
     expect(message.avatarUrl, 'https://cdn.zedu.chat/default.png');
     expect(message.text, 'Hi & welcome\nLine two\na\nb');
+    expect(message.rawContent, contains('<p>Hi &amp; welcome</p>'));
   });
 
   group('ChannelMessage.fromJson decodes HTML entities', () {

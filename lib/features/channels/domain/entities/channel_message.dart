@@ -5,6 +5,7 @@ class ChannelMessage {
   final String senderName;
   final String? avatarUrl;
   final String text;
+  final String rawContent;
   final DateTime? createdAt;
   final String? status;
 
@@ -12,10 +13,11 @@ class ChannelMessage {
     this.id,
     required this.senderName,
     required this.text,
+    String? rawContent,
     this.avatarUrl,
     this.createdAt,
     this.status,
-  });
+  }) : rawContent = rawContent ?? text;
 
   factory ChannelMessage.fromJson(Map<String, dynamic> json) {
     String? nonEmpty(Object? value) {
@@ -23,6 +25,7 @@ class ChannelMessage {
       return text.isEmpty ? null : text;
     }
 
+    final rawContent = json['message']?.toString() ?? '';
     return ChannelMessage(
       id: json['id']?.toString(),
       senderName:
@@ -33,8 +36,9 @@ class ChannelMessage {
       avatarUrl:
           nonEmpty(json['avatar_url']) ?? nonEmpty(json['default_avatar_url']),
       // Messages sent from the web app arrive as HTML (`<p>hi</p>`).
+      rawContent: rawContent,
       text: _decodeHtmlEntities(
-        (json['message']?.toString() ?? '')
+        rawContent
             .replaceAll(
               RegExp(r'</(p|div|li)>\s*<(p|div|li|ul|ol)\b[^>]*>|<br\s*/?>'),
               '\n',

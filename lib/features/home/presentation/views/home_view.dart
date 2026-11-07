@@ -483,13 +483,27 @@ class _ChannelHeaderMenu extends ConsumerWidget {
       tooltip: 'Channel options',
       position: PopupMenuPosition.under,
       icon: Icon(Icons.more_vert, color: colors.textHint),
-      onSelected: (value) {
-        if (value == 'notifications') {
-          ChannelNotificationDialog.show(context, channel);
+      onSelected: (value) async {
+        switch (value) {
+          case 'links':
+            await _showLinks(context, ref);
+          case 'notifications':
+            await ChannelNotificationDialog.show(context, channel);
+          case 'leave':
+            await _confirmLeave(context, ref);
         }
-        if (value == 'leave') _confirmLeave(context, ref);
       },
       itemBuilder: (_) => [
+        PopupMenuItem(
+          value: 'links',
+          child: Row(
+            children: [
+              Icon(Icons.link, size: 18, color: colors.textPrimary),
+              const SizedBox(width: 12),
+              Text('View links', style: TextStyle(color: colors.textPrimary)),
+            ],
+          ),
+        ),
         PopupMenuItem(
           value: 'notifications',
           child: Row(
@@ -521,6 +535,43 @@ class _ChannelHeaderMenu extends ConsumerWidget {
           ),
         ),
       ],
+    );
+  }
+
+  Future<void> _showLinks(BuildContext context, WidgetRef ref) async {
+    List<ConversationLinkSource> pendingSources() => [
+      for (final message in ref.read(chatHistoryProvider(channel.id)).messages)
+        if (message['channel_id'] == channel.id ||
+            message['is_channel'] == true)
+          ConversationLinkSource(
+            content: message['content']?.toString() ?? '',
+            author: (message['sender_name'] ?? '').toString(),
+            sharedAt: DateTime.tryParse(
+              message['created_at']?.toString() ?? '',
+            ),
+          ),
+    ];
+
+    await showDialog<void>(
+      context: context,
+      builder: (context) => ConversationLinksDialog(
+        title: '#${channel.name} links',
+        messages: pendingSources(),
+        loadMessages: () async {
+          final messages = await ref.read(
+            channelHistoryProvider(channel.id).future,
+          );
+          return [
+            ...pendingSources(),
+            for (final message in messages)
+              ConversationLinkSource(
+                content: message.rawContent,
+                author: message.senderName,
+                sharedAt: message.createdAt,
+              ),
+          ];
+        },
+      ),
     );
   }
 

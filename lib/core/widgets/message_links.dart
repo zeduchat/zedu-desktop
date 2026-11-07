@@ -4,7 +4,12 @@ import 'package:zedu/core/core.dart';
 const _allowedLinkSchemes = {'http', 'https'};
 
 final _messageUrlPattern = RegExp(
-  r'''(?<![\w@/.])(?:https?://|www\.)[^\s<>"]+''',
+  r'''(?<![\w@/.:])(?:https?://|www\.)[^\s<>"]+''',
+  caseSensitive: false,
+);
+
+final _linkEntityPattern = RegExp(
+  r'&(amp|quot|apos|#39|#x27);',
   caseSensitive: false,
 );
 
@@ -54,6 +59,35 @@ String _trimMessageUrl(String url) {
     end--;
   }
   return url.substring(0, end);
+}
+
+String _decodeLinkEntities(String text) => text.replaceAllMapped(
+  _linkEntityPattern,
+  (match) => switch (match.group(1)!.toLowerCase()) {
+    'amp' => '&',
+    'quot' => '"',
+    _ => "'",
+  },
+);
+
+/// Finds safe web links in plain text, Markdown, or HTML message content.
+///
+/// Markdown destinations and HTML `href` values are found by the same scan as
+/// visible URLs. Entity decoding handles links such as `?a=1&amp;b=2`. The
+/// first occurrence wins when a message repeats a URL.
+List<Uri> extractMessageLinks(String content) {
+  final links = <Uri>[];
+  final seen = <String>{};
+  for (final match in _messageUrlPattern.allMatches(content)) {
+    final raw = _decodeLinkEntities(_trimMessageUrl(match.group(0)!));
+    final uri = messageLinkUri(raw);
+    if (uri == null) continue;
+    final key = uri
+        .replace(scheme: uri.scheme.toLowerCase(), host: uri.host.toLowerCase())
+        .toString();
+    if (seen.add(key)) links.add(uri);
+  }
+  return links;
 }
 
 /// Builds tappable text spans for the URLs in a message, and owns their gesture
