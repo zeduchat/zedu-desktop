@@ -20,6 +20,7 @@ class UserProfileState {
     this.organization,
     this.securitySessions = const [],
     this.teamMembers = const [],
+    this.teamMembersLoadFailed = false,
     this.rolesAndPermissions = const [],
     this.billing,
     this.isLoading = false,
@@ -34,6 +35,7 @@ class UserProfileState {
   final OrganizationProfile? organization;
   final List<SecuritySession> securitySessions;
   final List<TeamMember> teamMembers;
+  final bool teamMembersLoadFailed;
   final List<RolePermission> rolesAndPermissions;
   final BillingInfo? billing;
   final bool isLoading;
@@ -48,6 +50,7 @@ class UserProfileState {
     OrganizationProfile? organization,
     List<SecuritySession>? securitySessions,
     List<TeamMember>? teamMembers,
+    bool? teamMembersLoadFailed,
     List<RolePermission>? rolesAndPermissions,
     BillingInfo? billing,
     bool? isLoading,
@@ -70,6 +73,8 @@ class UserProfileState {
           : (organization ?? this.organization),
       securitySessions: securitySessions ?? this.securitySessions,
       teamMembers: teamMembers ?? this.teamMembers,
+      teamMembersLoadFailed:
+          teamMembersLoadFailed ?? this.teamMembersLoadFailed,
       rolesAndPermissions: rolesAndPermissions ?? this.rolesAndPermissions,
       billing: billing ?? this.billing,
       isLoading: isLoading ?? this.isLoading,

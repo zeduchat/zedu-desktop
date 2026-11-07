@@ -450,34 +450,31 @@ class UserProfileRemoteDataSourceImpl implements UserProfileRemoteDataSource {
     }
 
     if (orgId == null || orgId.length < 36) {
-      orgId = '019700db-4e22-7f90-a20e-f9116291ef24';
-    }
-
-    try {
-      final response = await _apiBaseService.get<Map<String, dynamic>>(
-        path: '/organisations/$orgId/users',
+      throw const ApiFailure(
+        message: 'Select a workspace to see its members.',
+        kind: ApiFailureKind.client,
       );
-      final data = response.data['data'] as List<dynamic>?;
-      if (data == null) return [];
-
-      return data.cast<Map<String, dynamic>>().map((user) {
-        // Map backend user to TeamMemberModel
-        return TeamMemberModel(
-          id: user['id'] as String? ?? '',
-          email: user['email'] as String? ?? '',
-          role: user['role'] as String? ?? 'User',
-          dateJoined: user['created_at'] as String? ?? '',
-          status: TeamMemberStatus.active, // Or parse from user['status']
-          name:
-              user['name'] as String? ??
-              user['username'] as String? ??
-              'Unknown',
-          avatarUrl: user['avatar_url'] as String?,
-        );
-      }).toList();
-    } catch (e) {
-      return [];
     }
+
+    final response = await _apiBaseService.get<Map<String, dynamic>>(
+      path: '/organisations/$orgId/users',
+    );
+    final data = response.data['data'] as List<dynamic>?;
+    if (data == null) return [];
+
+    return data.cast<Map<String, dynamic>>().map((user) {
+      // Map backend user to TeamMemberModel
+      return TeamMemberModel(
+        id: user['id'] as String? ?? '',
+        email: user['email'] as String? ?? '',
+        role: user['role'] as String? ?? 'User',
+        dateJoined: user['created_at'] as String? ?? '',
+        status: TeamMemberStatus.active, // Or parse from user['status']
+        name:
+            user['name'] as String? ?? user['username'] as String? ?? 'Unknown',
+        avatarUrl: user['avatar_url'] as String?,
+      );
+    }).toList();
   }
 
   @override

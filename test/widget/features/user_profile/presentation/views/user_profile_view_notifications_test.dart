@@ -97,6 +97,35 @@ void main() {
     },
   );
 
+  testWidgets('a failed member load offers a retry, not an empty team', (
+    tester,
+  ) async {
+    final notifier = await _pump(
+      tester,
+      const UserProfileState(
+        section: UserProfileSection.userManagement,
+        teamMembersLoadFailed: true,
+      ),
+    );
+
+    expect(find.text("We couldn't load your team members."), findsOneWidget);
+    expect(find.byType(UserManagementSection), findsNothing);
+
+    await tester.tap(find.text('Try again'));
+    await tester.pump();
+    expect(notifier.loads, 1);
+  });
+
+  testWidgets('an empty team that loaded shows the section', (tester) async {
+    await _pump(
+      tester,
+      const UserProfileState(section: UserProfileSection.userManagement),
+    );
+
+    expect(find.byType(UserManagementSection), findsOneWidget);
+    expect(find.text("We couldn't load your team members."), findsNothing);
+  });
+
   testWidgets('shows a spinner while the notifications are loading', (
     tester,
   ) async {
