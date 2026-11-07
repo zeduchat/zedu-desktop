@@ -21,6 +21,8 @@ void main() {
     testWidgets('hides the sidebar with one tap and shows it with the next', (
       tester,
     ) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
       final container = await pumpButton(tester);
 
       expect(container.read(sidebarVisibilityProvider), isTrue);
@@ -36,6 +38,18 @@ void main() {
       await tester.pump();
 
       expect(container.read(sidebarVisibilityProvider), isTrue);
+      debugDefaultTargetPlatformOverride = null;
+    });
+
+    // The binding is Cmd+\ on macOS and Ctrl+\ elsewhere (Ziki #3439).
+    testWidgets('names Ctrl+\\ on Windows and Linux', (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
+
+      await pumpButton(tester);
+
+      expect(find.byTooltip('Hide sidebar (Ctrl+\\)'), findsOneWidget);
+      debugDefaultTargetPlatformOverride = null;
     });
   });
 }
