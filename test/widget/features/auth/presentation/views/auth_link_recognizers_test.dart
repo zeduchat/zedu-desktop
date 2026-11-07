@@ -31,7 +31,6 @@ List<GestureRecognizer> _linkRecognizers(WidgetTester tester) {
 void main() {
   const views = <String, (Widget, int)>{
     'ForgotPasswordView': (ForgotPasswordView(), 1),
-    'LoginView': (LoginView(), 1),
     'MagicLinkRequestView': (MagicLinkRequestView(), 1),
     'SignUpView': (SignUpView(), 3),
   };

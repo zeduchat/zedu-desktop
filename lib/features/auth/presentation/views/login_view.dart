@@ -14,12 +14,18 @@ class _LoginViewState extends ConsumerState<LoginView> {
   final _passwordController = TextEditingController();
   bool _rememberMe = false;
 
-  late final _signUpLink = TapGestureRecognizer()
-    ..onTap = () => context.push(AppRouter.signup);
+  /// Keeps a link looking like inline text while it stays a button, so it can
+  /// be reached with Tab and opened with Enter or Space.
+  ButtonStyle _linkStyle(TextStyle? style) => TextButton.styleFrom(
+    padding: EdgeInsets.zero,
+    minimumSize: Size.zero,
+    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    foregroundColor: style?.color,
+    textStyle: style,
+  );
 
   @override
   void dispose() {
-    _signUpLink.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
@@ -91,26 +97,29 @@ class _LoginViewState extends ConsumerState<LoginView> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Image.asset('assets/pngs/zedu_logo.png', width: 83, height: 31),
-              Text.rich(
-                TextSpan(
-                  text: "Don't have an account? ",
-                  style: context.textTheme.bodyLarge?.copyWith(
-                    fontWeight: FontWeight.w400,
-                    color: context.colors.textPrimary,
-                    fontFamily: FontFamily.roboto,
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    "Don't have an account? ",
+                    style: context.textTheme.bodyLarge?.copyWith(
+                      fontWeight: FontWeight.w400,
+                      color: context.colors.textPrimary,
+                      fontFamily: FontFamily.roboto,
+                    ),
                   ),
-                  children: [
-                    TextSpan(
-                      text: 'Sign up',
-                      style: context.textTheme.bodyLarge?.copyWith(
+                  TextButton(
+                    onPressed: () => context.push(AppRouter.signup),
+                    style: _linkStyle(
+                      context.textTheme.bodyLarge?.copyWith(
                         fontWeight: FontWeight.w400,
                         color: context.colors.primary,
                         fontFamily: FontFamily.roboto,
                       ),
-                      recognizer: _signUpLink,
                     ),
-                  ],
-                ),
+                    child: const Text('Sign up'),
+                  ),
+                ],
               ),
             ],
           ),
@@ -224,16 +233,17 @@ class _LoginViewState extends ConsumerState<LoginView> {
                               const Text('Remember me'),
                             ],
                           ),
-                          GestureDetector(
-                            onTap: () => context.push(AppRouter.forgotPassword),
-                            child: Text(
-                              'Forgot Password?',
-                              style: context.textTheme.bodyMedium?.copyWith(
+                          TextButton(
+                            onPressed: () =>
+                                context.push(AppRouter.forgotPassword),
+                            style: _linkStyle(
+                              context.textTheme.bodyMedium?.copyWith(
                                 fontWeight: FontWeight.w400,
                                 color: context.colors.primary,
                                 fontFamily: FontFamily.roboto,
                               ),
                             ),
+                            child: const Text('Forgot Password?'),
                           ),
                         ],
                       ),
@@ -266,15 +276,16 @@ class _LoginViewState extends ConsumerState<LoginView> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     const Text("Don't have an account? "),
-                    GestureDetector(
-                      onTap: () => context.push(AppRouter.signup),
-                      child: Text(
-                        'Sign up',
-                        style: TextStyle(
-                          color: context.colors.primary,
+                    TextButton(
+                      onPressed: () => context.push(AppRouter.signup),
+                      style: _linkStyle(
+                        context.textTheme.bodyMedium?.copyWith(
                           fontWeight: FontWeight.bold,
+                          color: context.colors.primary,
+                          fontFamily: FontFamily.roboto,
                         ),
                       ),
+                      child: const Text('Sign up'),
                     ),
                   ],
                 ),

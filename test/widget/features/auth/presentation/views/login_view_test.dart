@@ -234,10 +234,8 @@ void main() {
       await tester.pumpWidget(buildLoginViewUnderTest());
       await tester.pump();
 
-      expect(
-        find.text("Don't have an account? Sign up", findRichText: true),
-        findsOneWidget,
-      );
+      expect(find.text("Don't have an account? "), findsNWidgets(2));
+      expect(find.widgetWithText(TextButton, 'Sign up'), findsNWidgets(2));
       expect(
         find.text('Already have an account? Sign up', findRichText: true),
         findsNothing,
@@ -517,6 +515,114 @@ void main() {
         ),
       );
       expect(passwordField.focusNode.hasFocus, isTrue);
+    });
+
+    group('keyboard access to the links', () {
+      Widget buildLoginViewWithRoutes() {
+        final router = GoRouter(
+          initialLocation: AppRouter.login,
+          routes: [
+            GoRoute(
+              path: AppRouter.login,
+              builder: (_, _) => const LoginView(),
+            ),
+            GoRoute(
+              path: AppRouter.forgotPassword,
+              builder: (_, _) => const Scaffold(
+                body: Center(child: Text('FORGOT-PASSWORD-STUB')),
+              ),
+            ),
+            GoRoute(
+              path: AppRouter.signup,
+              builder: (_, _) =>
+                  const Scaffold(body: Center(child: Text('SIGN-UP-STUB'))),
+            ),
+          ],
+        );
+        return ProviderScope(
+          overrides: [
+            authNotifierProvider.overrideWith(() => FakeAuthNotifier()),
+          ],
+          child: MaterialApp.router(routerConfig: router),
+        );
+      }
+
+      /// Presses Tab until the focused control sits inside [target].
+      Future<void> tabUntilFocused(
+        WidgetTester tester,
+        Finder target, {
+        int maxTabs = 12,
+      }) async {
+        for (var i = 0; i < maxTabs; i++) {
+          await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+          await tester.pump();
+          final focused = tester.binding.focusManager.primaryFocus?.context;
+          if (focused == null) continue;
+          final inside = find.descendant(
+            of: target,
+            matching: find.byElementPredicate(
+              (element) => identical(element, focused),
+            ),
+          );
+          if (inside.evaluate().isNotEmpty) return;
+        }
+        fail('Tab never reached $target');
+      }
+
+      Future<void> pumpWithRoutes(WidgetTester tester) async {
+        await tester.binding.setSurfaceSize(const Size(1440, 1024));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        await tester.pumpWidget(buildLoginViewWithRoutes());
+        await tester.pumpAndSettle();
+      }
+
+      testWidgets('Tab reaches Forgot Password? and Enter opens it', (
+        tester,
+      ) async {
+        await pumpWithRoutes(tester);
+
+        final forgotButton = find.widgetWithText(
+          TextButton,
+          'Forgot Password?',
+        );
+        expect(forgotButton, findsOneWidget);
+
+        await tester.tap(find.byType(TextFormField).at(0));
+        await tester.pump();
+        await tabUntilFocused(tester, forgotButton);
+        await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+        await tester.pumpAndSettle();
+
+        expect(find.text('FORGOT-PASSWORD-STUB'), findsOneWidget);
+      });
+
+      testWidgets('Tab reaches the sign-up link under the form', (
+        tester,
+      ) async {
+        await pumpWithRoutes(tester);
+
+        final signUpLinks = find.widgetWithText(TextButton, 'Sign up');
+        expect(signUpLinks, findsNWidgets(2));
+
+        await tester.tap(find.byType(TextFormField).at(0));
+        await tester.pump();
+        await tabUntilFocused(tester, signUpLinks.last);
+        await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+        await tester.pumpAndSettle();
+
+        expect(find.text('SIGN-UP-STUB'), findsOneWidget);
+      });
+
+      testWidgets('Tab reaches the sign-up link in the header', (tester) async {
+        await pumpWithRoutes(tester);
+
+        final signUpLinks = find.widgetWithText(TextButton, 'Sign up');
+        await tabUntilFocused(tester, signUpLinks.first);
+        await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+        await tester.pumpAndSettle();
+
+        expect(find.text('SIGN-UP-STUB'), findsOneWidget);
+      });
     });
   });
 }
