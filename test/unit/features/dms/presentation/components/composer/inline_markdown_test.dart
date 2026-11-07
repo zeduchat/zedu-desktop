@@ -107,6 +107,14 @@ void main() {
       expect(_isBold(code.single.$2), isFalse);
     });
 
+    test('a multi-line code span keeps its lines in one code run', () {
+      final code = _visible(
+        buildInlineMarkdownSpan('`if (a) {\n  b();\n}`', _base),
+      );
+      expect(code.single.$1, 'if (a) {\n  b();\n}');
+      expect(code.single.$2.fontFamily, 'monospace');
+    });
+
     test('bold-italic works next to other text, emoji and newlines', () {
       const text = '👋 ***héllo wörld 🎉***\nnext ***line***';
       final span = buildInlineMarkdownSpan(text, _base, keepMarkers: true);

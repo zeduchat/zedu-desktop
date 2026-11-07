@@ -76,5 +76,43 @@ void main() {
         'See this now',
       );
     });
+
+    group('code blocks (Ziki #2714)', () {
+      test('keeps the lines of a multi-line code block', () {
+        expect(
+          htmlMessageToMarkdown(
+            '<pre><code>line one\nline two\nline three</code></pre>',
+          ),
+          '`line one\nline two\nline three`',
+        );
+      });
+
+      test('keeps indentation and decodes entities in code', () {
+        expect(
+          htmlMessageToMarkdown(
+            '<pre><code>if (a &lt; b) {\n  return &quot;x&quot;;\n}</code></pre>',
+          ),
+          '`if (a < b) {\n  return "x";\n}`',
+        );
+      });
+
+      test('puts a code block between paragraphs on its own lines', () {
+        expect(
+          htmlMessageToMarkdown(
+            '<p>Try this:</p><pre><code>a = 1\nb = 2</code></pre><p>Then run it.</p>',
+          ),
+          'Try this:\n`a = 1\nb = 2`\nThen run it.',
+        );
+      });
+
+      test('still folds the layout whitespace of other markup', () {
+        expect(
+          htmlMessageToMarkdown(
+            '<p>one\n  two</p><pre><code>x\ny</code></pre><p>three\n four</p>',
+          ),
+          'one two\n`x\ny`\nthree four',
+        );
+      });
+    });
   });
 }
