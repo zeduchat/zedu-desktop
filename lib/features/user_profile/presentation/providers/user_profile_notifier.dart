@@ -720,6 +720,7 @@ class UserProfileNotifier extends Notifier<UserProfileState> {
       securitySessions: _valueOrNull(securityResult) ?? const [],
       organization: organization,
       teamMembers: loadedTeamMembers,
+      teamMembersLoadFailed: teamResult is Failure,
       rolesAndPermissions: _valueOrNull(rolesResult) ?? const [],
       billing: _valueOrNull(billingResult),
       isLoading: false,

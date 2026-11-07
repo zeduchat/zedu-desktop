@@ -137,13 +137,20 @@ class _ProfileContent extends StatelessWidget {
                       onDelete: notifier.deleteOrganization,
                       onLeave: notifier.leaveOrganization,
                     ),
-            UserProfileSection.userManagement => UserManagementSection(
-              members: state.teamMembers,
-              isSaving: state.isSaving,
-              onInvite: notifier.inviteMember,
-              onUpdate: notifier.updateMember,
-              onRemove: notifier.removeMember,
-            ),
+            UserProfileSection.userManagement =>
+              state.teamMembersLoadFailed && state.teamMembers.isEmpty
+                  ? _SectionLoadError(
+                      title: "We couldn't load your team members.",
+                      isLoading: state.isLoading,
+                      onRetry: notifier.load,
+                    )
+                  : UserManagementSection(
+                      members: state.teamMembers,
+                      isSaving: state.isSaving,
+                      onInvite: notifier.inviteMember,
+                      onUpdate: notifier.updateMember,
+                      onRemove: notifier.removeMember,
+                    ),
             UserProfileSection.rolesAndPermissions =>
               RolesAndPermissionsSection(roles: state.rolesAndPermissions),
             UserProfileSection.webhooks => const WebhooksSection(),
