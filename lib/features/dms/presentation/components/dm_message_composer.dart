@@ -368,6 +368,15 @@ class DmMessageComposerState extends ConsumerState<DmMessageComposer> {
 
     final key = event.logicalKey;
 
+    if (key == LogicalKeyboardKey.keyE &&
+        HardwareKeyboard.instance.isShiftPressed &&
+        (HardwareKeyboard.instance.isControlPressed ||
+            HardwareKeyboard.instance.isMetaPressed) &&
+        !HardwareKeyboard.instance.isAltPressed) {
+      _toggleEmojiPicker();
+      return KeyEventResult.handled;
+    }
+
     if (key == LogicalKeyboardKey.enter ||
         key == LogicalKeyboardKey.numpadEnter) {
       final hasModifier =
@@ -409,6 +418,10 @@ class DmMessageComposerState extends ConsumerState<DmMessageComposer> {
     }
 
     if (key == LogicalKeyboardKey.escape) {
+      if (_showEmojiPicker) {
+        _closeEmojiPicker();
+        return KeyEventResult.handled;
+      }
       if (_mentionSuggestions.isNotEmpty) {
         setState(() => _mentionSuggestions = []);
         return KeyEventResult.handled;
@@ -529,6 +542,11 @@ class DmMessageComposerState extends ConsumerState<DmMessageComposer> {
 
   void _toggleEmojiPicker() {
     setState(() => _showEmojiPicker = !_showEmojiPicker);
+  }
+
+  void _closeEmojiPicker() {
+    setState(() => _showEmojiPicker = false);
+    _focusNode.requestFocus();
   }
 
   void _insertEmoji(String emoji) {
@@ -1004,7 +1022,7 @@ class DmMessageComposerState extends ConsumerState<DmMessageComposer> {
               padding: const EdgeInsets.fromLTRB(24, 0, 24, 4),
               child: DmEmojiPicker(
                 onEmojiSelected: _insertEmoji,
-                onClose: () => setState(() => _showEmojiPicker = false),
+                onClose: _closeEmojiPicker,
               ),
             ),
           ),
@@ -1158,7 +1176,7 @@ class DmMessageComposerState extends ConsumerState<DmMessageComposer> {
                       const SizedBox(width: 2),
                       ToolbarButton(
                         icon: Icons.emoji_emotions_outlined,
-                        tooltip: 'Emoji',
+                        tooltip: 'Emoji (Ctrl/Cmd+Shift+E)',
                         onTap: _toggleEmojiPicker,
                         colors: colors,
                         isActive: _showEmojiPicker,

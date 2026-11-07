@@ -9,7 +9,7 @@ class _FakeAuthNotifier extends AuthNotifier {
 
 class _MockSecureStorageService extends Mock implements SecureStorageService {}
 
-Widget _composer() {
+Widget _composer({bool isChannel = false}) {
   final storage = _MockSecureStorageService();
   when(() => storage.readData(any())).thenAnswer((_) async => null);
   return ProviderScope(
@@ -21,7 +21,11 @@ Widget _composer() {
     ],
     child: buildTestMaterialApp(
       Scaffold(
-        body: DmMessageComposer(recipientName: 'Ada', channelId: 'channel-1'),
+        body: DmMessageComposer(
+          recipientName: 'Ada',
+          channelId: 'channel-1',
+          isChannel: isChannel,
+        ),
       ),
     ),
   );
@@ -31,18 +35,24 @@ void main() {
   TextEditingController controllerOf(WidgetTester tester) =>
       tester.widget<EditableText>(find.byType(EditableText)).controller;
 
-  Future<String> pickEmoji(WidgetTester tester, TextEditingValue value) async {
+  Future<void> showComposer(
+    WidgetTester tester, {
+    bool isChannel = false,
+  }) async {
     tester.view.physicalSize = const Size(1400, 1000);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
-
-    await tester.pumpWidget(_composer());
+    await tester.pumpWidget(_composer(isChannel: isChannel));
     await tester.pump();
+  }
+
+  Future<String> pickEmoji(WidgetTester tester, TextEditingValue value) async {
+    await showComposer(tester);
     controllerOf(tester).value = value;
     await tester.pump();
 
-    await tester.tap(find.byTooltip('Emoji'));
+    await tester.tap(find.byTooltip('Emoji (Ctrl/Cmd+Shift+E)'));
     await tester.pump();
     final picker = tester.widget<DmEmojiPicker>(find.byType(DmEmojiPicker));
     picker.onEmojiSelected('😀');
@@ -88,5 +98,56 @@ void main() {
     );
 
     expect(text, 'hello😀 world');
+  });
+
+  testWidgets('opens from the composer and selects with arrow keys and Enter', (
+    tester,
+  ) async {
+    await showComposer(tester, isChannel: true);
+    await tester.tap(find.byType(TextField));
+    await tester.pump();
+
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyE);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    await tester.pump();
+
+    expect(find.byType(DmEmojiPicker), findsOneWidget);
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pump();
+
+    expect(controllerOf(tester).text, '\u{1F603}');
+  });
+
+  testWidgets('Escape closes the picker and restores composer focus', (
+    tester,
+  ) async {
+    await showComposer(tester);
+    await tester.tap(find.byTooltip('Emoji (Ctrl/Cmd+Shift+E)'));
+    await tester.pump();
+    expect(find.byType(DmEmojiPicker), findsOneWidget);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pump();
+
+    expect(find.byType(DmEmojiPicker), findsNothing);
+    expect(
+      tester.widget<EditableText>(find.byType(EditableText)).focusNode.hasFocus,
+      isTrue,
+    );
+  });
+
+  testWidgets('mouse selection still inserts an emoji', (tester) async {
+    await showComposer(tester);
+    await tester.tap(find.byTooltip('Emoji (Ctrl/Cmd+Shift+E)'));
+    await tester.pump();
+
+    await tester.tap(find.text('\u{1F600}').first);
+    await tester.pump();
+
+    expect(controllerOf(tester).text, '\u{1F600}');
   });
 }
