@@ -38,6 +38,23 @@ void main() {
     ]);
   });
 
+  test('Name (A–Z) orders by name ignoring case, equal names newest first', () {
+    final files = [
+      WorkspaceFile(id: 'b', name: 'budget.xlsx', updatedAt: DateTime(2026)),
+      WorkspaceFile(id: 'Z', name: 'Zebra.png', updatedAt: DateTime(2026)),
+      WorkspaceFile(id: 'a-old', name: 'Agenda.pdf', updatedAt: DateTime(2025)),
+      WorkspaceFile(id: 'a-new', name: 'agenda.pdf', updatedAt: DateTime(2026)),
+    ];
+
+    expect(FilesSort.nameAz.apply(files).map((f) => f.id), [
+      'a-new',
+      'a-old',
+      'b',
+      'Z',
+    ]);
+    expect(FilesSort.nameAz.label, 'Name (A–Z)');
+  });
+
   test('a file takes its type from a MIME type or its name', () {
     expect(
       WorkspaceFile.fromJson({

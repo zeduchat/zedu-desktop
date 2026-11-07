@@ -110,6 +110,36 @@ void main() {
       expect(page.currentPage, 2);
     });
 
+    test('Name (A–Z) reads the page the user asked for (Ziki #3449)', () async {
+      repository.totalPages = 3;
+      filesNotifier().setSort(FilesSort.nameAz);
+      filesNotifier().setPage(2);
+      final page = await files.read(filesListProvider.future);
+
+      expect(repository.pages, [2]);
+      expect(page.currentPage, 2);
+    });
+
+    test('choosing Name (A–Z) keeps the filters, folder and tab', () {
+      filesNotifier()
+        ..openFolder(const FileFolder(id: 'f1', name: 'Reports'))
+        ..setCategory(FileCategory.documents)
+        ..setDateModified(DateModifiedFilter.last7Days)
+        ..setSearch('plan');
+      final before = files.read(filesProvider);
+
+      filesNotifier().setSort(FilesSort.nameAz);
+      final after = files.read(filesProvider);
+
+      expect(after.sort, FilesSort.nameAz);
+      expect(after.folderId, before.folderId);
+      expect(after.category, FileCategory.documents);
+      expect(after.dateModified, DateModifiedFilter.last7Days);
+      expect(after.search, 'plan');
+      expect(after.tab, before.tab);
+      expect(after.view, before.view);
+    });
+
     test('oldest first reads the server pages backwards', () async {
       repository.totalPages = 3;
       filesNotifier().setSort(FilesSort.oldestFirst);

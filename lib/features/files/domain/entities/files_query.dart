@@ -52,25 +52,41 @@ enum DateModifiedFilter {
 
 enum FilesSort {
   newestFirst('Newest to oldest'),
-  oldestFirst('Oldest to newest');
+  oldestFirst('Oldest to newest'),
+
+  /// Orders the loaded page by name (Ziki #3449). The server has no name
+  /// sort, so this sorts what is on the page, like the date sorts.
+  nameAz('Name (A–Z)');
 
   const FilesSort(this.label);
 
   final String label;
 
-  /// Sorts by date modified. Files with no date go last.
+  /// Sorts by date modified, files with no date last; or by name, ignoring
+  /// case, with equal names newest first.
   List<WorkspaceFile> apply(List<WorkspaceFile> files) {
     final sorted = [...files];
     sorted.sort((a, b) {
-      final aTime = a.modifiedAt, bTime = b.modifiedAt;
-      if (aTime == null && bTime == null) return 0;
-      if (aTime == null) return 1;
-      if (bTime == null) return -1;
-      return this == newestFirst
-          ? bTime.compareTo(aTime)
-          : aTime.compareTo(bTime);
+      if (this == nameAz) {
+        final byName = a.name.toLowerCase().compareTo(b.name.toLowerCase());
+        if (byName != 0) return byName;
+        return _byDate(a, b, newestFirst: true);
+      }
+      return _byDate(a, b, newestFirst: this == newestFirst);
     });
     return sorted;
+  }
+
+  static int _byDate(
+    WorkspaceFile a,
+    WorkspaceFile b, {
+    required bool newestFirst,
+  }) {
+    final aTime = a.modifiedAt, bTime = b.modifiedAt;
+    if (aTime == null && bTime == null) return 0;
+    if (aTime == null) return 1;
+    if (bTime == null) return -1;
+    return newestFirst ? bTime.compareTo(aTime) : aTime.compareTo(bTime);
   }
 }
 
@@ -83,7 +99,8 @@ class FilesQuery {
   final String search;
 
   /// The server always answers newest first; the list reads its pages
-  /// backwards when this is [FilesSort.oldestFirst].
+  /// backwards when this is [FilesSort.oldestFirst]. The other sorts read
+  /// pages in the server's order and sort each page.
   final FilesSort sort;
   final int page;
   final int limit;

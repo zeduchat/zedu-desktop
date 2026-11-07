@@ -398,6 +398,31 @@ void main() {
     expect(find.text('2 KB'), findsOneWidget);
   });
 
+  testWidgets('Name (A–Z) in the sort menu lists files by name (Ziki #3449)', (
+    tester,
+  ) async {
+    final repository = _FakeFilesRepository()
+      ..moreFiles = [
+        WorkspaceFile(id: 'f-2', name: 'agenda.pdf', updatedAt: DateTime(2026)),
+        WorkspaceFile(id: 'f-3', name: 'Zoo.txt', updatedAt: DateTime(2026, 2)),
+      ];
+    await _pump(tester, repository);
+    await tester.tap(find.text('Files').last);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Newest to oldest'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Name (A–Z)').last);
+    await tester.pumpAndSettle();
+
+    final top = {
+      for (final name in ['agenda.pdf', 'logo.png', 'Zoo.txt'])
+        name: tester.getTopLeft(find.text(name)).dy,
+    };
+    expect(top['agenda.pdf']!, lessThan(top['logo.png']!));
+    expect(top['logo.png']!, lessThan(top['Zoo.txt']!));
+  });
+
   testWidgets('a sidebar list loads that list', (tester) async {
     final repository = _FakeFilesRepository();
     await _pump(tester, repository);
