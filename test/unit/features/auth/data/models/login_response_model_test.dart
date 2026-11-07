@@ -123,6 +123,25 @@ void main() {
       },
     );
 
+    test(
+      'throws a readable error when the user is missing or not an object',
+      () {
+        for (final user in [null, 'user-123', 42]) {
+          final json = <String, dynamic>{
+            'user': user,
+            'access_token': 'jwt-token-abc',
+            'access_token_expires_in': 1778991491,
+            'notification_token': 'notif-token-xyz',
+          };
+
+          expect(
+            () => LoginResponseModel.fromJson(json),
+            throwsA(isA<FormatException>()),
+          );
+        }
+      },
+    );
+
     test('handles unparseable or empty access_token_expires_in gracefully', () {
       final json = <String, dynamic>{
         'user': validUserJson,

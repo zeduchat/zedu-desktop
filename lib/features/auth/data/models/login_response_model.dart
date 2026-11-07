@@ -43,8 +43,13 @@ class LoginResponseModel {
   }
 
   factory LoginResponseModel.fromJson(Map<String, dynamic> json) {
+    final rawUser = json["user"];
+    if (rawUser is! Map) {
+      throw const FormatException('Login response has no user object');
+    }
+
     return LoginResponseModel(
-      user: UserModel.fromJson(json["user"] as Map<String, dynamic>),
+      user: UserModel.fromJson(Map<String, dynamic>.from(rawUser)),
       accessToken: json["access_token"] as String? ?? "",
       accessTokenExpiresIn: _parseDate(json["access_token_expires_in"]),
       notificationToken: json["notification_token"] as String? ?? "",
