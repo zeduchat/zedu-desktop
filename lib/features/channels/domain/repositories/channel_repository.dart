@@ -23,6 +23,13 @@ abstract class ChannelRepository {
   Future<Result<void>> leaveChannel(String channelId);
   Future<Result<void>> joinChannel(String channelId);
 
+  /// Stars the channel for the current user, or unstars it if it is
+  /// starred. Succeeds with whether it is starred now.
+  Future<Result<bool>> toggleStarChannel({
+    required String orgId,
+    required String channelId,
+  });
+
   /// Starts exporting the channel's history (or returns the running export).
   Future<Result<ChannelExport>> startChannelExport(String channelId);
 

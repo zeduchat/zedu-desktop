@@ -355,4 +355,103 @@ void main() {
       ]);
     });
   });
+
+  group('ChannelNotifier.toggleStar (Ziki #2628)', () {
+    late MockChannelRepository repository;
+    late ProviderContainer container;
+
+    setUp(() {
+      repository = MockChannelRepository();
+      when(() => repository.fetchChannels(any())).thenAnswer(
+        (_) async =>
+            Success<List<Channel>>([_channel('general'), _channel('random')]),
+      );
+      container = ProviderContainer(
+        overrides: [
+          channelRepositoryProvider.overrideWithValue(repository),
+          workspaceProvider.overrideWith(FakeWorkspaceNotifier.new),
+          authNotifierProvider.overrideWith(FakeAuthNotifier.new),
+        ],
+      );
+      addTearDown(container.dispose);
+    });
+
+    bool starredOf(String name) => container
+        .read(channelProvider)
+        .requireValue
+        .firstWhere((c) => c.name == name)
+        .isStarred;
+
+    test('stores the star state the server answers with', () async {
+      when(
+        () => repository.toggleStarChannel(
+          orgId: 'org-1',
+          channelId: 'channel-general',
+        ),
+      ).thenAnswer((_) async => const Success(true));
+      await container.read(channelProvider.future);
+
+      final result = await container
+          .read(channelProvider.notifier)
+          .toggleStar('channel-general');
+
+      expect(result, isA<Success<bool>>());
+      expect(starredOf('general'), isTrue);
+      expect(starredOf('random'), isFalse);
+    });
+
+    test('a failure leaves the star as it was', () async {
+      when(
+        () => repository.toggleStarChannel(
+          orgId: any(named: 'orgId'),
+          channelId: any(named: 'channelId'),
+        ),
+      ).thenAnswer(
+        (_) async => const Failure<bool>(ApiFailure(message: 'Server error')),
+      );
+      await container.read(channelProvider.future);
+
+      final result = await container
+          .read(channelProvider.notifier)
+          .toggleStar('channel-general');
+
+      expect(result, isA<Failure<bool>>());
+      expect(starredOf('general'), isFalse);
+    });
+
+    test('a second toggle while one is running is refused', () async {
+      final gate = Completer<Result<bool>>();
+      when(
+        () => repository.toggleStarChannel(
+          orgId: any(named: 'orgId'),
+          channelId: any(named: 'channelId'),
+        ),
+      ).thenAnswer((_) => gate.future);
+      await container.read(channelProvider.future);
+      final notifier = container.read(channelProvider.notifier);
+
+      final first = notifier.toggleStar('channel-general');
+      final second = await notifier.toggleStar('channel-general');
+      gate.complete(const Success(true));
+      await first;
+
+      expect(second, isA<Failure<bool>>());
+      verify(
+        () => repository.toggleStarChannel(
+          orgId: 'org-1',
+          channelId: 'channel-general',
+        ),
+      ).called(1);
+      expect(starredOf('general'), isTrue);
+    });
+  });
+
+  test('Channel.fromJson reads is_starred', () {
+    final json = {'channels_id': 'c1', 'name': 'general', 'is_starred': true};
+    expect(Channel.fromJson(json).isStarred, isTrue);
+    expect(
+      Channel.fromJson({...json}..remove('is_starred')).isStarred,
+      isFalse,
+    );
+  });
 }
