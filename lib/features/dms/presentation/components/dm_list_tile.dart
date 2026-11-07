@@ -51,6 +51,12 @@ class DmListTile extends ConsumerWidget {
       });
     }
 
+    final currentUserId = ref.watch(authNotifierProvider).user?.id;
+    final isSelf =
+        currentUserId != null &&
+        currentUserId.isNotEmpty &&
+        conversation.participantId == currentUserId;
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
       child: Ink(
@@ -86,7 +92,12 @@ class DmListTile extends ConsumerWidget {
                 ),
               Padding(
                 padding: const EdgeInsets.all(12),
-                child: _buildContent(colors, hasUnread, draftEntry),
+                child: _buildContent(
+                  colors,
+                  hasUnread,
+                  draftEntry,
+                  isSelf: isSelf,
+                ),
               ),
             ],
           ),
@@ -98,8 +109,9 @@ class DmListTile extends ConsumerWidget {
   Widget _buildContent(
     AppPalette colors,
     bool hasUnread,
-    DraftEntry? draftEntry,
-  ) {
+    DraftEntry? draftEntry, {
+    bool isSelf = false,
+  }) {
     final emphasis = hasUnread ? FontWeight.w700 : FontWeight.w400;
 
     return Row(
@@ -126,15 +138,34 @@ class DmListTile extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                conversation.displayName,
-                style: TextStyle(
-                  color: colors.onPrimary,
-                  fontSize: 13,
-                  fontWeight: hasUnread ? FontWeight.w700 : FontWeight.w500,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+              Row(
+                children: [
+                  Flexible(
+                    child: Text(
+                      conversation.displayName,
+                      style: TextStyle(
+                        color: colors.onPrimary,
+                        fontSize: 13,
+                        fontWeight: hasUnread
+                            ? FontWeight.w700
+                            : FontWeight.w500,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  if (isSelf) ...[
+                    const SizedBox(width: 4),
+                    Text(
+                      '(you)',
+                      style: TextStyle(
+                        color: colors.onPrimary.withValues(alpha: 0.65),
+                        fontSize: 12,
+                        fontWeight: FontWeight.normal,
+                      ),
+                    ),
+                  ],
+                ],
               ),
               const SizedBox(height: 2),
               if (draftEntry != null)

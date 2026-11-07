@@ -145,14 +145,47 @@ class _DmSidebarListState extends ConsumerState<DmSidebarList> {
                         final actions = ref.watch(
                           dmConversationActionsProvider,
                         );
+                        final currentUserId = ref
+                            .watch(authNotifierProvider)
+                            .user
+                            ?.id;
+                        final allConversations = [...conversations];
+                        if (_debouncedQuery.isNotEmpty &&
+                            currentUserId != null &&
+                            currentUserId.isNotEmpty &&
+                            ('you'.contains(_debouncedQuery.toLowerCase()) ||
+                                '(you)'.contains(
+                                  _debouncedQuery.toLowerCase(),
+                                ))) {
+                          final cachedList =
+                              ref.watch(dmListProvider).value ?? [];
+                          for (final c in cachedList) {
+                            if (c.participantId == currentUserId &&
+                                !allConversations.any(
+                                  (x) => x.channelId == c.channelId,
+                                )) {
+                              allConversations.add(c);
+                            }
+                          }
+                        }
                         final visibleConversations =
-                            conversations
+                            allConversations
                                 .where(
                                   (conversation) => !actions.deletedIds
                                       .contains(conversation.channelId),
                                 )
                                 .toList()
                               ..sort((a, b) {
+                                final aSelf =
+                                    currentUserId != null &&
+                                    currentUserId.isNotEmpty &&
+                                    a.participantId == currentUserId;
+                                final bSelf =
+                                    currentUserId != null &&
+                                    currentUserId.isNotEmpty &&
+                                    b.participantId == currentUserId;
+                                if (aSelf != bSelf) return aSelf ? -1 : 1;
+
                                 final aPinned = actions.pinnedIds.contains(
                                   a.channelId,
                                 );
