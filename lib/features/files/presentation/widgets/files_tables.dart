@@ -143,19 +143,74 @@ Widget _nameCell(BuildContext context, Widget icon, String name) => Row(
   children: [
     icon,
     const SizedBox(width: 14),
-    Expanded(
-      child: Text(
-        name,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: context.textTheme.titleSmall?.copyWith(
-          color: context.colors.textPrimary,
-          fontWeight: FontWeight.w500,
-        ),
-      ),
-    ),
+    Expanded(child: _FileName(name)),
   ],
 );
+
+/// A file or folder name on one line. When it doesn't fit, the full name shows
+/// on hover and on keyboard focus. Screen readers already get the full name
+/// from the [Text], so the tooltip stays out of the semantics tree.
+class _FileName extends StatefulWidget {
+  const _FileName(this.name);
+
+  final String name;
+
+  @override
+  State<_FileName> createState() => _FileNameState();
+}
+
+class _FileNameState extends State<_FileName> {
+  final _tooltip = GlobalKey<TooltipState>();
+
+  bool _isTruncated(BoxConstraints constraints, TextStyle? style) {
+    final painter = TextPainter(
+      text: TextSpan(text: widget.name, style: style),
+      maxLines: 1,
+      textDirection: Directionality.of(context),
+      textScaler: MediaQuery.textScalerOf(context),
+    )..layout(maxWidth: constraints.maxWidth);
+    final truncated = painter.didExceedMaxLines;
+    painter.dispose();
+    return truncated;
+  }
+
+  void _onFocusChange(bool focused) {
+    if (focused) {
+      _tooltip.currentState?.ensureTooltipVisible();
+    } else {
+      Tooltip.dismissAllToolTips();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final style = context.textTheme.titleSmall?.copyWith(
+      color: context.colors.textPrimary,
+      fontWeight: FontWeight.w500,
+    );
+    final text = Text(
+      widget.name,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: style,
+    );
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (!_isTruncated(constraints, style)) return text;
+        return Focus(
+          onFocusChange: _onFocusChange,
+          child: Tooltip(
+            key: _tooltip,
+            message: widget.name,
+            excludeFromSemantics: true,
+            child: text,
+          ),
+        );
+      },
+    );
+  }
+}
 
 class FoldersTable extends StatelessWidget {
   const FoldersTable({
