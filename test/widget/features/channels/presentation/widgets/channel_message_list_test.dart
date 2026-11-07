@@ -253,4 +253,84 @@ void main() {
       expect(dividerY, lessThan(tester.getTopLeft(find.text('msg 1')).dy));
     });
   });
+
+  group('attachments', () {
+    const file = {
+      'file_name': 'plan.pdf',
+      'file_link': 'https://cdn.zedu.test/plan.pdf',
+      'file_type': 'pdf',
+    };
+    const image = {
+      'file_name': 'photo.png',
+      'file_link': 'https://cdn.zedu.test/photo.png',
+      'file_type': 'png',
+    };
+
+    testWidgets('a file-only message shows the file, not an empty text', (
+      tester,
+    ) async {
+      await pumpList(
+        tester,
+        const Success([
+          ChannelMessage(senderName: 'Ada', text: '', media: [file]),
+        ]),
+      );
+
+      expect(find.byType(MessageAttachmentList), findsOneWidget);
+      expect(find.text('plan.pdf'), findsOneWidget);
+      expect(find.byIcon(Icons.insert_drive_file_rounded), findsOneWidget);
+      expect(find.byType(SelectableText), findsNothing);
+    });
+
+    testWidgets('an image shows a preview', (tester) async {
+      await pumpList(
+        tester,
+        const Success([
+          ChannelMessage(senderName: 'Ada', text: '', media: [image]),
+        ]),
+      );
+
+      final preview = tester.widget<Image>(find.byType(Image));
+      expect(
+        (preview.image as NetworkImage).url,
+        'https://cdn.zedu.test/photo.png',
+      );
+    });
+
+    testWidgets('text and attachments show together', (tester) async {
+      await pumpList(
+        tester,
+        const Success([
+          ChannelMessage(
+            senderName: 'Ada',
+            text: 'see attached',
+            media: [file],
+          ),
+        ]),
+      );
+
+      expect(find.text('see attached', findRichText: true), findsOneWidget);
+      expect(find.text('plan.pdf'), findsOneWidget);
+    });
+
+    testWidgets('a message still sending shows its file', (tester) async {
+      fakeChatHistory.messages = [
+        {
+          'id': 'temp-file',
+          'content': '',
+          'channel_id': 'ch-1',
+          'status': 'sending',
+          'created_at': DateTime.now().toIso8601String(),
+          'media': [
+            {'file_name': 'draft.docx'},
+          ],
+        },
+      ];
+
+      await pumpList(tester, const Success(<ChannelMessage>[]));
+
+      expect(find.text('draft.docx'), findsOneWidget);
+      expect(find.text('Sending...'), findsOneWidget);
+    });
+  });
 }

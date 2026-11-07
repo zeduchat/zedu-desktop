@@ -8,6 +8,9 @@ class ChannelMessage {
   final DateTime? createdAt;
   final String? status;
 
+  /// Attached files, each with `file_name`, `file_link` and `file_type`.
+  final List<Map<String, dynamic>> media;
+
   const ChannelMessage({
     this.id,
     required this.senderName,
@@ -15,7 +18,15 @@ class ChannelMessage {
     this.avatarUrl,
     this.createdAt,
     this.status,
+    this.media = const [],
   });
+
+  /// The attachments in a message's `media` field; anything else is skipped.
+  static List<Map<String, dynamic>> mediaFrom(Object? value) => [
+    if (value is List)
+      for (final item in value)
+        if (item is Map) Map<String, dynamic>.from(item),
+  ];
 
   factory ChannelMessage.fromJson(Map<String, dynamic> json) {
     String? nonEmpty(Object? value) {
@@ -45,6 +56,7 @@ class ChannelMessage {
         json['created_at']?.toString() ?? '',
       )?.toLocal(),
       status: json['status']?.toString(),
+      media: mediaFrom(json['media']),
     );
   }
 

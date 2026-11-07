@@ -58,4 +58,49 @@ void main() {
       );
     });
   });
+
+  group('media', () {
+    test('reads the attachments of a thread', () {
+      final message = ChannelMessage.fromJson({
+        'full_name': 'Ada',
+        'message': '',
+        'media': [
+          {
+            'file_name': 'plan.pdf',
+            'file_link': 'https://cdn.zedu.test/plan.pdf',
+            'file_type': 'pdf',
+          },
+        ],
+      });
+
+      expect(message.media, [
+        {
+          'file_name': 'plan.pdf',
+          'file_link': 'https://cdn.zedu.test/plan.pdf',
+          'file_type': 'pdf',
+        },
+      ]);
+    });
+
+    test('has none when media is missing, null or malformed', () {
+      for (final media in [null, 'x', 3, <Object>[]]) {
+        expect(
+          ChannelMessage.fromJson({'full_name': 'Ada', 'media': media}).media,
+          isEmpty,
+        );
+      }
+      expect(
+        ChannelMessage.fromJson({
+          'full_name': 'Ada',
+          'media': [
+            'not a file',
+            {'file_name': 'a.png'},
+          ],
+        }).media,
+        [
+          {'file_name': 'a.png'},
+        ],
+      );
+    });
+  });
 }

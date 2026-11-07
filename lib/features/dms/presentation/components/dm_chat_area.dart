@@ -1136,7 +1136,7 @@ class _MessageBubble extends ConsumerWidget {
                   Padding(
                     padding: EdgeInsets.only(top: content.isNotEmpty ? 8 : 0),
                     child: content.isNotEmpty
-                        ? _AttachmentBubbleList(media: media, isMe: isMe)
+                        ? MessageAttachmentList(media: media, isMe: isMe)
                         // No text to hang the menu on, so it goes on the
                         // attachments (Delete only: there is nothing to edit).
                         : _OwnMessageMenu(
@@ -1144,7 +1144,7 @@ class _MessageBubble extends ConsumerWidget {
                             onEdit: null,
                             onDelete: () =>
                                 _confirmDelete(context, ref, messageId),
-                            child: _AttachmentBubbleList(
+                            child: MessageAttachmentList(
                               media: media,
                               isMe: isMe,
                             ),
@@ -1197,11 +1197,17 @@ class _MessageBubble extends ConsumerWidget {
   }
 }
 
-class _AttachmentBubbleList extends StatelessWidget {
+/// A message's attachments: an image preview that opens full screen, or a
+/// file chip that opens the file. Used by DMs and channels.
+class MessageAttachmentList extends StatelessWidget {
   final List<dynamic> media;
   final bool isMe;
 
-  const _AttachmentBubbleList({required this.media, required this.isMe});
+  const MessageAttachmentList({
+    super.key,
+    required this.media,
+    required this.isMe,
+  });
 
   void _launchUrl(String url) async {
     final uri = Uri.tryParse(url);
