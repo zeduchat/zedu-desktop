@@ -9,7 +9,8 @@ class _Shortcut {
 
 /// Lists the keyboard shortcuts the app supports, grouped by where they work.
 /// Keep this in step with the key handlers: `QuickSwitcherShortcut`,
-/// `QuickSwitcherDialog`, `DmMessageComposer` and `MessageComposer`.
+/// `QuickSwitcherDialog`, `DmMessageComposer`, `MessageComposer`, `DmChatArea`
+/// and `SearchPanel`.
 class KeyboardShortcutsDialog extends StatelessWidget {
   const KeyboardShortcutsDialog({super.key});
 
@@ -30,6 +31,8 @@ class KeyboardShortcutsDialog extends StatelessWidget {
       _Shortcut([modifier, 'I'], 'Italic'),
       const _Shortcut(['Up'], 'Edit your last message, when the box is empty'),
       const _Shortcut(['Esc'], 'Cancel editing'),
+      _Shortcut([modifier, 'F'], 'Search this conversation'),
+      const _Shortcut(['Esc'], 'Close the search panel'),
     ],
     'Channels and group chats': [
       _Shortcut([modifier, 'Enter'], 'Send'),

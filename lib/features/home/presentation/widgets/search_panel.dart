@@ -15,13 +15,14 @@ class SearchPanel extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<SearchPanel> createState() => _SearchPanelState();
+  ConsumerState<SearchPanel> createState() => SearchPanelState();
 }
 
-class _SearchPanelState extends ConsumerState<SearchPanel> {
+class SearchPanelState extends ConsumerState<SearchPanel> {
   static const _debounce = Duration(milliseconds: 300);
 
   final TextEditingController _searchController = TextEditingController();
+  final FocusNode _fieldFocus = FocusNode(debugLabel: 'SearchPanel field');
   Timer? _debounceTimer;
   List<ConversationSearchHit> _results = [];
   bool _isSearching = false;
@@ -35,7 +36,18 @@ class _SearchPanelState extends ConsumerState<SearchPanel> {
   void dispose() {
     _debounceTimer?.cancel();
     _searchController.dispose();
+    _fieldFocus.dispose();
     super.dispose();
+  }
+
+  /// Puts the cursor back in the search field with its text selected, for
+  /// Cmd/Ctrl+F while the panel is already open (Ziki #3441).
+  void focusField() {
+    _fieldFocus.requestFocus();
+    _searchController.selection = TextSelection(
+      baseOffset: 0,
+      extentOffset: _searchController.text.length,
+    );
   }
 
   void _onChanged(String value) {
@@ -86,73 +98,80 @@ class _SearchPanelState extends ConsumerState<SearchPanel> {
   Widget build(BuildContext context) {
     final colors = context.colors;
 
-    return Container(
-      width: 320,
-      decoration: BoxDecoration(
-        color: colors.background,
-        border: Border(left: BorderSide(color: colors.divider)),
-      ),
-      child: Column(
-        children: [
-          Container(
-            height: 60,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            decoration: BoxDecoration(
-              border: Border(bottom: BorderSide(color: colors.divider)),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    'Search',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: colors.textPrimary,
+    // Esc anywhere in the panel closes it, like the close button (#3441).
+    return CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.escape): widget.onClose,
+      },
+      child: Container(
+        width: 320,
+        decoration: BoxDecoration(
+          color: colors.background,
+          border: Border(left: BorderSide(color: colors.divider)),
+        ),
+        child: Column(
+          children: [
+            Container(
+              height: 60,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              decoration: BoxDecoration(
+                border: Border(bottom: BorderSide(color: colors.divider)),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Search',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: colors.textPrimary,
+                      ),
                     ),
                   ),
-                ),
-                IconButton(
-                  onPressed: widget.onClose,
-                  icon: Icon(Icons.close, color: colors.textHint),
-                  splashRadius: 20,
-                  tooltip: 'Close search',
-                ),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: TextField(
-              controller: _searchController,
-              autofocus: true,
-              decoration: InputDecoration(
-                hintText: 'Search messages...',
-                hintStyle: TextStyle(color: colors.textHint),
-                prefixIcon: Icon(Icons.search, color: colors.textHint),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(color: colors.divider),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(color: colors.divider),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(color: colors.primary),
-                ),
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 12,
-                ),
+                  IconButton(
+                    onPressed: widget.onClose,
+                    icon: Icon(Icons.close, color: colors.textHint),
+                    splashRadius: 20,
+                    tooltip: 'Close search',
+                  ),
+                ],
               ),
-              onChanged: _onChanged,
-              onSubmitted: _performSearch,
             ),
-          ),
-          Expanded(child: _buildResults(colors)),
-        ],
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: TextField(
+                controller: _searchController,
+                focusNode: _fieldFocus,
+                autofocus: true,
+                decoration: InputDecoration(
+                  hintText: 'Search messages...',
+                  hintStyle: TextStyle(color: colors.textHint),
+                  prefixIcon: Icon(Icons.search, color: colors.textHint),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(color: colors.divider),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(color: colors.divider),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(color: colors.primary),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 12,
+                  ),
+                ),
+                onChanged: _onChanged,
+                onSubmitted: _performSearch,
+              ),
+            ),
+            Expanded(child: _buildResults(colors)),
+          ],
+        ),
       ),
     );
   }
