@@ -673,8 +673,11 @@ class UserProfileNotifier extends Notifier<UserProfileState> {
 
     var loadedTeamMembers = _valueOrNull(teamResult) ?? const [];
 
-    // Load persisted mock members if they exist
-    if (orgId != null) {
+    // Load persisted mock members if they exist. Only in mock mode: a list
+    // cached by an earlier mock run must never replace the real members.
+    final usesMockData =
+        locator.isRegistered<AppConfig>() && locator<AppConfig>().usesMockData;
+    if (orgId != null && usesMockData) {
       final storage = locator<SecureStorageService>();
       final data = await storage.readData('mock_team_members_$orgId');
       if (data != null) {

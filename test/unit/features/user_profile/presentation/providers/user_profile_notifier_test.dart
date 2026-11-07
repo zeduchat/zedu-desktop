@@ -681,4 +681,118 @@ void main() {
       });
     });
   });
+
+  group('UserProfileNotifier.load team members', () {
+    const cachedMockMembers =
+        '[{"id":"member-1","email":"demo@zedu.app","role":"User",'
+        '"name":"Demo Member","date_joined":"2024-01-01","status":"active"}]';
+    const apiMember = TeamMember(
+      id: 'real-1',
+      email: 'real@zedu.app',
+      role: 'Administrator',
+      dateJoined: '2026-11-01',
+      status: TeamMemberStatus.active,
+      name: 'Real Member',
+    );
+
+    late MockUserProfileRepository repository;
+    late MockSecureStorageService storage;
+    late ProviderContainer container;
+
+    void registerConfig({required bool usesMockData}) {
+      if (locator.isRegistered<AppConfig>()) locator.unregister<AppConfig>();
+      locator.registerSingleton<AppConfig>(
+        AppConfig(apiBaseUrl: 'http://test/', usesMockData: usesMockData),
+      );
+    }
+
+    setUp(() {
+      repository = MockUserProfileRepository();
+      storage = MockSecureStorageService();
+      when(() => storage.readData(any())).thenAnswer((_) async => null);
+      when(
+        () => storage.readData('mock_team_members_org-1'),
+      ).thenAnswer((_) async => cachedMockMembers);
+      if (locator.isRegistered<SecureStorageService>()) {
+        locator.unregister<SecureStorageService>();
+      }
+      locator.registerSingleton<SecureStorageService>(storage);
+
+      when(
+        () => repository.getAccount(),
+      ).thenAnswer((_) async => Success(ProfileAccount.empty()));
+      when(
+        () => repository.getNotificationPreferences(orgId: any(named: 'orgId')),
+      ).thenAnswer((_) async => Success(NotificationPreferences.empty()));
+      when(
+        () => repository.getSecuritySessions(),
+      ).thenAnswer((_) async => const Success(<SecuritySession>[]));
+      when(
+        () => repository.getOrganization(orgId: any(named: 'orgId')),
+      ).thenAnswer(
+        (_) async => const Success(
+          OrganizationProfile(
+            id: '',
+            name: '',
+            natureOfBusiness: '',
+            country: '',
+          ),
+        ),
+      );
+      when(
+        () => repository.getTeamMembers(orgId: any(named: 'orgId')),
+      ).thenAnswer((_) async => const Success(<TeamMember>[apiMember]));
+      when(
+        () => repository.getRolesAndPermissions(),
+      ).thenAnswer((_) async => const Success(<RolePermission>[]));
+      when(
+        () => repository.getBillingInfo(),
+      ).thenAnswer((_) async => Success(BillingInfo.empty()));
+
+      container = ProviderContainer(
+        overrides: [
+          userProfileRepositoryProvider.overrideWithValue(repository),
+          workspaceProvider.overrideWith(_FakeWorkspaceNotifier.new),
+        ],
+      );
+      addTearDown(container.dispose);
+    });
+
+    tearDown(() {
+      locator.unregister<SecureStorageService>();
+      if (locator.isRegistered<AppConfig>()) locator.unregister<AppConfig>();
+    });
+
+    Future<UserProfileState> loaded() async {
+      final completer = Completer<UserProfileState>();
+      final subscription = container.listen<UserProfileState>(
+        userProfileNotifierProvider,
+        (_, next) {
+          if (!next.isLoading && !completer.isCompleted) {
+            completer.complete(next);
+          }
+        },
+        fireImmediately: true,
+      );
+      addTearDown(subscription.close);
+      return completer.future.timeout(const Duration(seconds: 5));
+    }
+
+    test('ignores a cached mock list outside mock mode', () async {
+      registerConfig(usesMockData: false);
+
+      final state = await loaded();
+
+      expect(state.teamMembers.map((m) => m.id), ['real-1']);
+      verifyNever(() => storage.readData('mock_team_members_org-1'));
+    });
+
+    test('still uses the cached mock list in mock mode', () async {
+      registerConfig(usesMockData: true);
+
+      final state = await loaded();
+
+      expect(state.teamMembers.map((m) => m.id), ['member-1']);
+    });
+  });
 }
