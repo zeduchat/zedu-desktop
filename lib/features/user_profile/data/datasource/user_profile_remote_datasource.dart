@@ -83,6 +83,7 @@ class UserProfileRemoteDataSourceImpl implements UserProfileRemoteDataSource {
       'full_name': account.name,
       'display_name': account.displayName,
       'username': account.username,
+      'email': account.email,
       'phone': account.phoneNumber,
       'title': account.title,
       'timezone': account.timezone,

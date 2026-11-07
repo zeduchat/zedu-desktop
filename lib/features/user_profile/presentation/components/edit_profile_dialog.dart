@@ -50,14 +50,6 @@ String normalizeProfileTimezone(String saved) {
   return value;
 }
 
-String _canonicalCountryName(String value) {
-  final trimmedValue = value.trim();
-  return kCountries.firstWhere(
-    (country) => country.toLowerCase() == trimmedValue.toLowerCase(),
-    orElse: () => trimmedValue,
-  );
-}
-
 /// Saves the edited profile and returns an error message, or null when the
 /// save succeeded.
 typedef EditProfileSave = Future<String?> Function(ProfileAccount account);
@@ -136,7 +128,6 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
   final formKey = GlobalKey<FormState>();
 
   late String selectedTimezone;
-  late String selectedCountry;
 
   bool _saving = false;
   String? _saveError;
@@ -235,7 +226,6 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
     );
 
     selectedTimezone = normalizeProfileTimezone(widget.account.timezone);
-    selectedCountry = widget.account.country;
     _photoUrl = widget.account.avatarUrl;
   }
 
@@ -267,7 +257,6 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
         title: titleCtrl.text.trim(),
         namePronunciation: pronunciationCtrl.text.trim(),
         timezone: selectedTimezone,
-        country: _canonicalCountryName(selectedCountry),
       ),
     );
     // Closed with Cancel while saving: nothing left to update or pop.
@@ -455,160 +444,6 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
                               onChanged: (v) => setState(
                                 () => selectedTimezone = v ?? selectedTimezone,
                               ),
-                            ),
-                            const SizedBox(height: 16),
-
-                            // Country dropdown (searchable)
-                            ProfileFieldLabel('Country'),
-                            const SizedBox(height: 6),
-                            Autocomplete<String>(
-                              initialValue: TextEditingValue(
-                                text: selectedCountry,
-                              ),
-                              optionsBuilder: (textEditingValue) {
-                                if (textEditingValue.text.isEmpty) {
-                                  return kCountries;
-                                }
-                                return kCountries.where(
-                                  (c) => c.toLowerCase().contains(
-                                    textEditingValue.text.toLowerCase(),
-                                  ),
-                                );
-                              },
-                              onSelected: (value) {
-                                setState(() => selectedCountry = value);
-                              },
-                              fieldViewBuilder:
-                                  (
-                                    context,
-                                    controller,
-                                    focusNode,
-                                    onFieldSubmitted,
-                                  ) {
-                                    return TextFormField(
-                                      controller: controller,
-                                      focusNode: focusNode,
-                                      onChanged: (value) => selectedCountry =
-                                          _canonicalCountryName(value),
-                                      validator: (value) {
-                                        final country = _canonicalCountryName(
-                                          value ?? '',
-                                        );
-                                        if (country.isEmpty ||
-                                            kCountries.contains(country)) {
-                                          return null;
-                                        }
-                                        return 'Select a country from the list';
-                                      },
-                                      decoration: InputDecoration(
-                                        hintText: 'Search or select a country',
-                                        hintStyle: context.textTheme.bodySmall
-                                            ?.copyWith(color: colors.textHint),
-                                        border: OutlineInputBorder(
-                                          borderRadius: BorderRadius.circular(
-                                            6,
-                                          ),
-                                          borderSide: BorderSide(
-                                            color: colors.divider,
-                                          ),
-                                        ),
-                                        enabledBorder: OutlineInputBorder(
-                                          borderRadius: BorderRadius.circular(
-                                            6,
-                                          ),
-                                          borderSide: BorderSide(
-                                            color: colors.divider,
-                                          ),
-                                        ),
-                                        contentPadding:
-                                            const EdgeInsets.symmetric(
-                                              horizontal: 12,
-                                              vertical: 14,
-                                            ),
-                                        suffixIcon: Icon(
-                                          Icons.keyboard_arrow_down,
-                                          color: colors.textHint,
-                                        ),
-                                      ),
-                                      style: context.textTheme.bodySmall,
-                                      onFieldSubmitted: (_) =>
-                                          onFieldSubmitted(),
-                                    );
-                                  },
-                              optionsViewBuilder: (context, onSelected, options) {
-                                return Align(
-                                  alignment: Alignment.topLeft,
-                                  child: Material(
-                                    elevation: 4,
-                                    borderRadius: BorderRadius.circular(8),
-                                    child: Container(
-                                      width: 360,
-                                      constraints: const BoxConstraints(
-                                        maxHeight: 240,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: colors.background,
-                                        borderRadius: BorderRadius.circular(8),
-                                        border: Border.all(
-                                          color: colors.divider,
-                                        ),
-                                      ),
-                                      child: ListView.builder(
-                                        padding: EdgeInsets.zero,
-                                        shrinkWrap: true,
-                                        itemCount: options.length,
-                                        itemBuilder: (context, index) {
-                                          final option = options.elementAt(
-                                            index,
-                                          );
-                                          // The row the arrow keys moved
-                                          // to, which Enter picks.
-                                          final highlighted =
-                                              AutocompleteHighlightedOption.of(
-                                                context,
-                                              ) ==
-                                              index;
-                                          if (highlighted) {
-                                            WidgetsBinding.instance
-                                                .addPostFrameCallback((_) {
-                                                  if (context.mounted) {
-                                                    Scrollable.ensureVisible(
-                                                      context,
-                                                      alignment: 0.5,
-                                                    );
-                                                  }
-                                                });
-                                          }
-                                          return Semantics(
-                                            selected: highlighted,
-                                            child: Material(
-                                              color: highlighted
-                                                  ? colors.primaryBg
-                                                  : Colors.transparent,
-                                              child: InkWell(
-                                                onTap: () => onSelected(option),
-                                                child: Padding(
-                                                  padding:
-                                                      const EdgeInsets.symmetric(
-                                                        horizontal: 12,
-                                                        vertical: 10,
-                                                      ),
-                                                  child: Text(
-                                                    option,
-                                                    style: context
-                                                        .textTheme
-                                                        .bodySmall,
-                                                  ),
-                                                ),
-                                              ),
-                                            ),
-                                          );
-                                        },
-                                      ),
-                                    ),
-                                  ),
-                                );
-                              },
                             ),
                             const SizedBox(height: 16),
                           ],

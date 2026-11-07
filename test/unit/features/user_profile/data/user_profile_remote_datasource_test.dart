@@ -98,6 +98,29 @@ void main() {
       });
       expect(saved.phoneNumber, '+2348012345678');
     });
+
+    test('sends the email to PATCH /profile as Zedu web does', () async {
+      const account = ProfileAccount(
+        name: 'Grace Hopper',
+        email: 'grace@example.com',
+        timezone: '',
+      );
+
+      await datasource.updateAccount(account);
+
+      final data =
+          verify(
+                () => mockApi.patch<Map<String, dynamic>>(
+                  path: '/profile',
+                  data: captureAny(named: 'data'),
+                ),
+              ).captured.single
+              as FormData;
+      expect(Map.fromEntries(data.fields), {
+        'full_name': 'Grace Hopper',
+        'email': 'grace@example.com',
+      });
+    });
   });
 
   group('UserProfileRemoteDataSourceImpl notification preferences', () {

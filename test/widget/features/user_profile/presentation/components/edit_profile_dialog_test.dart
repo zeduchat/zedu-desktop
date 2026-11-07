@@ -52,108 +52,33 @@ void main() {
     expect(saved, isFalse);
   });
 
-  testWidgets('rejects an unsupported manually entered country', (
-    tester,
-  ) async {
+  testWidgets('saves the edited email', (tester) async {
     ProfileAccount? saved;
     await openDialog(tester, (account) async {
       saved = account;
       return null;
     });
 
-    await tester.enterText(find.byType(TextFormField).last, 'ugggge');
+    final emailField = find.descendant(
+      of: find.widgetWithText(AppTextField, 'Email'),
+      matching: find.byType(TextFormField),
+    );
+    await tester.enterText(emailField, ' grace@example.com ');
     await tester.tap(find.text('Save changes'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Select a country from the list'), findsOneWidget);
-    expect(saved, isNull);
+    expect(saved?.email, 'grace@example.com');
   });
 
-  testWidgets('passes the selected country to the save callback', (
+  // The profile API has no country, so the dialog must not offer one it
+  // would silently drop.
+  testWidgets('does not offer a country field the API cannot save', (
     tester,
   ) async {
-    ProfileAccount? saved;
-    await openDialog(tester, (account) async {
-      saved = account;
-      return null;
-    });
+    await openDialog(tester, (_) async => null);
 
-    final countryField = find.byType(TextFormField).last;
-    await tester.tap(countryField);
-    await tester.enterText(countryField, 'Nige');
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Nigeria').last);
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Save changes'));
-    await tester.pumpAndSettle();
-
-    expect(saved?.country, 'Nigeria');
-  });
-
-  testWidgets(
-    'the arrow keys visibly move the highlighted country, and Enter picks it (Ziki #2781)',
-    (tester) async {
-      ProfileAccount? saved;
-      await openDialog(tester, (account) async {
-        saved = account;
-        return null;
-      });
-
-      final countryField = find.byType(TextFormField).last;
-      await tester.tap(countryField);
-      await tester.enterText(countryField, 'Nige');
-      await tester.pumpAndSettle();
-
-      Color? fillOf(String country) => tester
-          .widget<Material>(
-            find
-                .ancestor(
-                  of: find.text(country).last,
-                  matching: find.byType(Material),
-                )
-                .first,
-          )
-          .color;
-      void expectSelected(String country, bool selected) => expect(
-        tester.getSemantics(find.text(country).last),
-        isSemantics(isSelected: selected),
-      );
-
-      final highlight = AppPalette.light.primaryBg;
-      expect(fillOf('Niger'), highlight);
-      expectSelected('Niger', true);
-      expect(fillOf('Nigeria'), isNot(highlight));
-
-      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
-      await tester.pumpAndSettle();
-      expect(fillOf('Nigeria'), highlight);
-      expectSelected('Nigeria', true);
-      expect(fillOf('Niger'), isNot(highlight));
-      expectSelected('Niger', false);
-
-      await tester.testTextInput.receiveAction(TextInputAction.done);
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Save changes'));
-      await tester.pumpAndSettle();
-      expect(saved?.country, 'Nigeria');
-    },
-  );
-
-  testWidgets('accepts and normalizes a typed country without selecting it', (
-    tester,
-  ) async {
-    ProfileAccount? saved;
-    await openDialog(tester, (account) async {
-      saved = account;
-      return null;
-    });
-
-    await tester.enterText(find.byType(TextFormField).last, 'nigeria');
-    await tester.tap(find.text('Save changes'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Select a country from the list'), findsNothing);
-    expect(saved?.country, 'Nigeria');
+    expect(find.text('Country'), findsNothing);
+    expect(find.text('Search or select a country'), findsNothing);
   });
 
   group('saving', () {
