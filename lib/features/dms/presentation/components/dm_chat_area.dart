@@ -19,6 +19,52 @@ class _DmChatAreaState extends ConsumerState<DmChatArea> {
   bool _isDragging = false;
   final _composerKey = GlobalKey<DmMessageComposerState>();
 
+  /// The message whose thread is open beside the chat, if any.
+  Map<String, dynamic>? _threadMessage;
+
+  /// This widget is reused when another conversation is selected. A thread
+  /// belongs to one conversation, so it must not stay open over the next one,
+  /// where a reply would be posted to the wrong channel.
+  @override
+  void didUpdateWidget(DmChatArea oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.conversation.channelId != widget.conversation.channelId) {
+      _threadMessage = null;
+    }
+  }
+
+  /// The server knows a DM message's thread by its thread_id; messages that
+  /// only carry an id use that.
+  static String _threadIdOf(Map<String, dynamic> message) =>
+      (message['thread_id'] ?? message['id'] ?? '').toString();
+
+  Widget _buildThreadPanel(Map<String, dynamic> message) {
+    final history = ref.read(
+      chatHistoryProvider(widget.conversation.channelId),
+    );
+    final sentAt = DateTime.tryParse(
+      message['created_at']?.toString() ?? '',
+    )?.toLocal();
+    final threadId = _threadIdOf(message);
+    return ThreadPanel(
+      key: ValueKey('thread-$threadId'),
+      channelId: widget.conversation.channelId,
+      threadId: threadId,
+      parentMessage: htmlMessageToMarkdown(
+        message['content'] as String? ?? '',
+      ).trim(),
+      parentAuthor: history.isMyMessage(message)
+          ? history.currentUserName
+          : widget.conversation.displayName,
+      parentTimestamp: sentAt == null
+          ? ''
+          : '${sentAt.hour > 12 ? sentAt.hour - 12 : (sentAt.hour == 0 ? 12 : sentAt.hour)}'
+                ':${sentAt.minute.toString().padLeft(2, '0')} '
+                '${sentAt.hour >= 12 ? 'PM' : 'AM'}',
+      onClose: () => setState(() => _threadMessage = null),
+    );
+  }
+
   String get _recipientHandle {
     final parts = widget.conversation.displayName
         .trim()
@@ -332,127 +378,153 @@ class _DmChatAreaState extends ConsumerState<DmChatArea> {
         color: colors.onPrimary,
         child: Stack(
           children: [
-            Column(
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _DmChatHeader(
-                  conversation: widget.conversation,
-                  isOwnSpace: _isOwnSpace,
-                  isMuted: isMuted,
-                  isPinned: isPinned,
-                  onMenuAction: _handleMenuAction,
-                ),
                 Expanded(
-                  child: Consumer(
-                    builder: (context, ref, child) {
-                      final historyState = ref.watch(
-                        chatHistoryProvider(widget.conversation.channelId),
-                      );
-                      final isOwnSpace = _isOwnSpace;
-                      final messages = isOwnSpace
-                          ? historyState.messages
-                                .where(
-                                  (message) => !_isOwnSpaceSystemEvent(message),
-                                )
-                                .toList()
-                          : historyState.messages;
-
-                      return NotificationListener<ScrollNotification>(
-                        onNotification: (ScrollNotification scrollInfo) {
-                          if (!historyState.isLoading &&
-                              historyState.hasMore &&
-                              !historyState.loadFailed &&
-                              !historyState.loadMoreFailed &&
-                              scrollInfo.metrics.pixels >=
-                                  scrollInfo.metrics.maxScrollExtent * 0.8) {
-                            ref
-                                .read(
-                                  chatHistoryProvider(
-                                    widget.conversation.channelId,
-                                  ),
-                                )
-                                .loadMore();
-                          }
-                          return false;
-                        },
-                        child: CustomScrollView(
-                          reverse: true,
-                          slivers: [
-                            SliverPadding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 24,
-                                vertical: 16,
+                  child: Column(
+                    children: [
+                      _DmChatHeader(
+                        conversation: widget.conversation,
+                        isOwnSpace: _isOwnSpace,
+                        isMuted: isMuted,
+                        isPinned: isPinned,
+                        onMenuAction: _handleMenuAction,
+                      ),
+                      Expanded(
+                        child: Consumer(
+                          builder: (context, ref, child) {
+                            final historyState = ref.watch(
+                              chatHistoryProvider(
+                                widget.conversation.channelId,
                               ),
-                              sliver: SliverList(
-                                delegate: SliverChildBuilderDelegate((
-                                  context,
-                                  index,
-                                ) {
-                                  final msg = messages[index];
-                                  return _MessageBubble(
-                                    message: msg,
-                                    conversation: widget.conversation,
-                                    channelId: widget.conversation.channelId,
-                                    onEdit: (id, text) => _composerKey
-                                        .currentState
-                                        ?.enterEditMode(id, text),
-                                  );
-                                }, childCount: messages.length),
-                              ),
-                            ),
-                            if (historyState.isLoading)
-                              const SliverToBoxAdapter(
-                                child: Padding(
-                                  padding: EdgeInsets.symmetric(vertical: 16),
-                                  child: Center(
-                                    child: CircularProgressIndicator(),
-                                  ),
-                                ),
-                              ),
-                            if (!historyState.isLoading &&
-                                historyState.loadFailed)
-                              SliverToBoxAdapter(
-                                child: _HistoryLoadError(
-                                  message: "Couldn't load messages.",
-                                  onRetry: historyState.retryLoad,
-                                ),
-                              )
-                            else if (!historyState.isLoading &&
-                                historyState.loadMoreFailed)
-                              SliverToBoxAdapter(
-                                child: _HistoryLoadError(
-                                  message: "Couldn't load older messages.",
-                                  onRetry: historyState.loadMore,
-                                ),
-                              ),
-                            if (!historyState.hasMore)
-                              SliverToBoxAdapter(
-                                child: historyState.historyCleared
-                                    ? const _HistoryClearedNote()
-                                    : isOwnSpace
-                                    ? OwnSpaceIntro(
-                                        conversation: widget.conversation,
-                                        onEditProfile: _editOwnProfile,
+                            );
+                            final isOwnSpace = _isOwnSpace;
+                            final messages = isOwnSpace
+                                ? historyState.messages
+                                      .where(
+                                        (message) =>
+                                            !_isOwnSpaceSystemEvent(message),
                                       )
-                                    : DmProfileCard(
-                                        conversation: widget.conversation,
-                                        onViewProfile: () =>
-                                            _handleMenuAction('view_profile'),
+                                      .toList()
+                                : historyState.messages;
+
+                            return NotificationListener<ScrollNotification>(
+                              onNotification: (ScrollNotification scrollInfo) {
+                                if (!historyState.isLoading &&
+                                    historyState.hasMore &&
+                                    !historyState.loadFailed &&
+                                    !historyState.loadMoreFailed &&
+                                    scrollInfo.metrics.pixels >=
+                                        scrollInfo.metrics.maxScrollExtent *
+                                            0.8) {
+                                  ref
+                                      .read(
+                                        chatHistoryProvider(
+                                          widget.conversation.channelId,
+                                        ),
+                                      )
+                                      .loadMore();
+                                }
+                                return false;
+                              },
+                              child: CustomScrollView(
+                                reverse: true,
+                                slivers: [
+                                  SliverPadding(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 24,
+                                      vertical: 16,
+                                    ),
+                                    sliver: SliverList(
+                                      delegate: SliverChildBuilderDelegate((
+                                        context,
+                                        index,
+                                      ) {
+                                        final msg = messages[index];
+                                        return _MessageBubble(
+                                          message: msg,
+                                          conversation: widget.conversation,
+                                          channelId:
+                                              widget.conversation.channelId,
+                                          onEdit: (id, text) => _composerKey
+                                              .currentState
+                                              ?.enterEditMode(id, text),
+                                          onReply: _threadIdOf(msg).isEmpty
+                                              ? null
+                                              : () => setState(
+                                                  () => _threadMessage = msg,
+                                                ),
+                                        );
+                                      }, childCount: messages.length),
+                                    ),
+                                  ),
+                                  if (historyState.isLoading)
+                                    const SliverToBoxAdapter(
+                                      child: Padding(
+                                        padding: EdgeInsets.symmetric(
+                                          vertical: 16,
+                                        ),
+                                        child: Center(
+                                          child: CircularProgressIndicator(),
+                                        ),
                                       ),
+                                    ),
+                                  if (!historyState.isLoading &&
+                                      historyState.loadFailed)
+                                    SliverToBoxAdapter(
+                                      child: _HistoryLoadError(
+                                        message: "Couldn't load messages.",
+                                        onRetry: historyState.retryLoad,
+                                      ),
+                                    )
+                                  else if (!historyState.isLoading &&
+                                      historyState.loadMoreFailed)
+                                    SliverToBoxAdapter(
+                                      child: _HistoryLoadError(
+                                        message:
+                                            "Couldn't load older messages.",
+                                        onRetry: historyState.loadMore,
+                                      ),
+                                    ),
+                                  if (!historyState.hasMore)
+                                    SliverToBoxAdapter(
+                                      child: historyState.historyCleared
+                                          ? const _HistoryClearedNote()
+                                          : isOwnSpace
+                                          ? OwnSpaceIntro(
+                                              conversation: widget.conversation,
+                                              onEditProfile: _editOwnProfile,
+                                            )
+                                          : DmProfileCard(
+                                              conversation: widget.conversation,
+                                              onViewProfile: () =>
+                                                  _handleMenuAction(
+                                                    'view_profile',
+                                                  ),
+                                            ),
+                                    ),
+                                ],
                               ),
-                          ],
+                            );
+                          },
                         ),
-                      );
-                    },
+                      ),
+                      DmMessageComposer(
+                        key: _composerKey,
+                        recipientName: _recipientHandle,
+                        hintText: _isOwnSpace
+                            ? 'Write a note to yourself'
+                            : null,
+                        channelId: widget.conversation.channelId,
+                        draftKey: widget.conversation.conversationKey,
+                        participants: widget.conversation.participants,
+                      ),
+                    ],
                   ),
                 ),
-                DmMessageComposer(
-                  key: _composerKey,
-                  recipientName: _recipientHandle,
-                  hintText: _isOwnSpace ? 'Write a note to yourself' : null,
-                  channelId: widget.conversation.channelId,
-                  draftKey: widget.conversation.conversationKey,
-                  participants: widget.conversation.participants,
-                ),
+                if (_threadMessage case final message?)
+                  _buildThreadPanel(message),
               ],
             ),
 
@@ -907,11 +979,15 @@ class _MessageBubble extends ConsumerWidget {
   final String channelId;
   final void Function(String messageId, String content) onEdit;
 
+  /// Opens this message's thread; null hides the reply button.
+  final VoidCallback? onReply;
+
   const _MessageBubble({
     required this.message,
     required this.conversation,
     required this.channelId,
     required this.onEdit,
+    this.onReply,
   });
 
   TextSpan _parseRichText(
@@ -1097,6 +1173,22 @@ class _MessageBubble extends ConsumerWidget {
                         timeString,
                         style: TextStyle(color: colors.textHint, fontSize: 11),
                       ),
+                      if (onReply != null && status == null)
+                        IconButton(
+                          tooltip: 'Reply in thread',
+                          onPressed: onReply,
+                          icon: Icon(
+                            Icons.reply_outlined,
+                            size: 16,
+                            color: colors.textHint,
+                          ),
+                          visualDensity: VisualDensity.compact,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(
+                            minWidth: 28,
+                            minHeight: 28,
+                          ),
+                        ),
                     ],
                   ),
                 ),

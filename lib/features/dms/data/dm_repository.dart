@@ -137,6 +137,34 @@ class DmRepository {
         : threadId;
   }
 
+  /// Replies posted in a message's thread, oldest first, as the web's
+  /// threads sidebar loads them.
+  Future<List<Map<String, dynamic>>> getThreadReplies({
+    required String channelId,
+    required String threadId,
+  }) async {
+    final response = await _apiClient.get<Map<String, dynamic>>(
+      path: '/dms/thread/$threadId/channels/$channelId',
+      queryParameters: {'page': 1, 'limit': 30},
+    );
+    final data = response.data['data'];
+    return (data is List ? data : const <dynamic>[])
+        .whereType<Map<String, dynamic>>()
+        .toList();
+  }
+
+  /// Posts [content] as a reply in the thread started by a DM message.
+  Future<void> replyToThread({
+    required String channelId,
+    required String threadId,
+    required String content,
+  }) async {
+    await _apiClient.post<Map<String, dynamic>>(
+      path: '/dms/messages/$channelId',
+      data: {'content': content, 'thread_id': threadId},
+    );
+  }
+
   String _newUuidV7() {
     final random = Random.secure();
     final bytes = List<int>.generate(16, (_) => random.nextInt(256));

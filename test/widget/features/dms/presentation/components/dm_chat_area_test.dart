@@ -246,6 +246,12 @@ void main() {
       when(
         () => repository.getMessages(any(), page: any(named: 'page')),
       ).thenAnswer((_) async => messages);
+      when(
+        () => repository.getThreadReplies(
+          channelId: any(named: 'channelId'),
+          threadId: any(named: 'threadId'),
+        ),
+      ).thenAnswer((_) async => const []);
       final storage = MockSecureStorageService();
       when(() => storage.readData(any())).thenAnswer((_) async => null);
 
@@ -483,6 +489,92 @@ void main() {
       await searchFor(tester, 'tom & jerry');
 
       expect(searchResult('Tom & Jerry <3'), findsOneWidget);
+    });
+
+    testWidgets('Reply in thread opens that message thread beside the chat', (
+      tester,
+    ) async {
+      await pumpChat(tester, [
+        {...message('m1', '<p>Can you review this?</p>'), 'thread_id': 't-1'},
+      ]);
+
+      await tester.tap(find.byTooltip('Reply in thread'));
+      await tester.pumpAndSettle();
+
+      final panel = tester.widget<ThreadPanel>(find.byType(ThreadPanel));
+      expect(panel.channelId, 'ch-1');
+      expect(panel.threadId, 't-1');
+      expect(panel.parentMessage, 'Can you review this?');
+
+      await tester.tap(find.byTooltip('Close thread'));
+      await tester.pumpAndSettle();
+      expect(find.byType(ThreadPanel), findsNothing);
+    });
+
+    testWidgets('switching conversation closes the open thread', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(1200, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final repository = MockDmRepository();
+      when(
+        () => repository.getMessages(any(), page: any(named: 'page')),
+      ).thenAnswer(
+        (_) async => [
+          {...message('m1', '<p>Can you review this?</p>'), 'thread_id': 't-1'},
+        ],
+      );
+      when(
+        () => repository.getThreadReplies(
+          channelId: any(named: 'channelId'),
+          threadId: any(named: 'threadId'),
+        ),
+      ).thenAnswer((_) async => const []);
+      final storage = MockSecureStorageService();
+      when(() => storage.readData(any())).thenAnswer((_) async => null);
+      final channel = ValueNotifier('ch-1');
+      addTearDown(channel.dispose);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            dmRepositoryProvider.overrideWithValue(repository),
+            authNotifierProvider.overrideWith(FakeSignedInAuthNotifier.new),
+            dmDraftStoreProvider.overrideWith(
+              (ref) => DmDraftStore(storage, userId: 'user-1', orgId: 'org-1'),
+            ),
+          ],
+          child: buildTestMaterialApp(
+            Scaffold(
+              body: ValueListenableBuilder<String>(
+                valueListenable: channel,
+                builder: (context, channelId, _) => DmChatArea(
+                  conversation: DmConversation(
+                    channelId: channelId,
+                    username: 'Ada Lovelace',
+                    participantId: 'u-2',
+                    previewMessage: '',
+                    unreadCount: 0,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byTooltip('Reply in thread'));
+      await tester.pumpAndSettle();
+      expect(find.byType(ThreadPanel), findsOneWidget);
+
+      channel.value = 'ch-2';
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ThreadPanel), findsNothing);
     });
 
     testWidgets('opens the message menu on long press', (tester) async {
