@@ -1093,6 +1093,12 @@ class _MessageBubble extends ConsumerWidget {
                         ),
                       ),
                       const SizedBox(width: 8),
+                      if (status == null && messageId.isNotEmpty)
+                        SaveLaterButton(
+                          channelId: channelId,
+                          threadId:
+                              message['thread_id']?.toString() ?? messageId,
+                        ),
                       Text(
                         timeString,
                         style: TextStyle(color: colors.textHint, fontSize: 11),

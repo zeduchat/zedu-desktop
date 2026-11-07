@@ -157,8 +157,12 @@ class _ChannelMessageListState extends ConsumerState<ChannelMessageList> {
       itemCount: messages.length,
       itemBuilder: (context, index) {
         final message = messages[index];
+        final canSave = message.status == null && message.id != null;
         final tile = ChannelMessageTile(
           message: message,
+          saveAction: canSave
+              ? SaveLaterButton(channelId: channelId, threadId: message.id!)
+              : null,
           onRetry: message.id != null
               ? () => ref
                     .read(chatHistoryProvider(channelId))
@@ -230,11 +234,16 @@ class _UnreadDivider extends StatelessWidget {
 }
 
 class ChannelMessageTile extends StatelessWidget {
-  const ChannelMessageTile({super.key, required this.message, this.onRetry});
+  const ChannelMessageTile({
+    super.key,
+    required this.message,
+    this.onRetry,
+    this.saveAction,
+  });
 
   final ChannelMessage message;
   final VoidCallback? onRetry;
-
+  final Widget? saveAction;
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
@@ -283,6 +292,7 @@ class ChannelMessageTile extends StatelessWidget {
                     ],
                   ),
                 ),
+                ?saveAction,
                 const SizedBox(height: 4),
                 ReportMessageMenu(
                   senderName: message.senderName,
