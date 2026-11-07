@@ -14,6 +14,7 @@ double stepAppZoom(double current, int direction) {
 
 class AppZoomNotifier extends Notifier<double> {
   static const storageKey = 'app_zoom_level';
+  static const _tag = 'AppZoomNotifier';
 
   @override
   double build() {
@@ -21,8 +22,16 @@ class AppZoomNotifier extends Notifier<double> {
     return 1.0;
   }
 
+  /// A locked or unavailable keychain leaves the zoom at 100% instead of an
+  /// unhandled error at startup (Ziki #3484).
   Future<void> _restore() async {
-    final raw = await locator<SecureStorageService>().readData(storageKey);
+    final String? raw;
+    try {
+      raw = await locator<SecureStorageService>().readData(storageKey);
+    } catch (error) {
+      AppLogger.w('Could not read the saved zoom level - $error', tag: _tag);
+      return;
+    }
     final saved = double.tryParse(raw ?? '');
     if (saved != null && appZoomLevels.contains(saved)) state = saved;
   }
@@ -33,12 +42,18 @@ class AppZoomNotifier extends Notifier<double> {
 
   Future<void> reset() => _set(1.0);
 
+  /// Applies [zoom] at once. If it can't be saved, it still holds for this
+  /// session and the shortcut doesn't throw (Ziki #3484).
   Future<void> _set(double zoom) async {
     state = zoom;
-    await locator<SecureStorageService>().writeData(
-      storageKey,
-      zoom.toString(),
-    );
+    try {
+      await locator<SecureStorageService>().writeData(
+        storageKey,
+        zoom.toString(),
+      );
+    } catch (error) {
+      AppLogger.w('Could not save the zoom level - $error', tag: _tag);
+    }
   }
 }
 

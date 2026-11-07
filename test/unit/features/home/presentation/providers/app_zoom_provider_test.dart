@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:zedu/core/core.dart';
 import 'package:zedu/features/features.dart';
 
@@ -89,5 +91,57 @@ void main() {
       expect(container.read(appZoomProvider), 1.0);
       expect(saved[AppZoomNotifier.storageKey], '1.0');
     });
+  });
+
+  group('AppZoomNotifier when secure storage fails (Ziki #3484)', () {
+    late MockSecureStorageService storage;
+
+    setUp(() {
+      storage = MockSecureStorageService();
+      when(
+        () => storage.readData(any()),
+      ).thenThrow(Exception('keychain unavailable'));
+      when(
+        () => storage.writeData(any(), any()),
+      ).thenThrow(Exception('keychain unavailable'));
+      locator.registerSingleton<SecureStorageService>(storage);
+    });
+
+    tearDown(() async {
+      await locator.reset();
+    });
+
+    test('a failed read on start leaves 100% with no uncaught error', () async {
+      final errors = <Object>[];
+      await runZonedGuarded(() async {
+        final container = ProviderContainer();
+        addTearDown(container.dispose);
+
+        expect(container.read(appZoomProvider), 1.0);
+        await Future<void>.delayed(Duration.zero);
+        expect(container.read(appZoomProvider), 1.0);
+      }, (error, _) => errors.add(error));
+
+      expect(errors, isEmpty);
+    });
+
+    test(
+      'zoom shortcuts still apply for the session when saving fails',
+      () async {
+        final container = ProviderContainer();
+        addTearDown(container.dispose);
+        final notifier = container.read(appZoomProvider.notifier);
+
+        await expectLater(notifier.zoomIn(), completes);
+        expect(container.read(appZoomProvider), 1.1);
+
+        await expectLater(notifier.zoomOut(), completes);
+        await expectLater(notifier.zoomOut(), completes);
+        expect(container.read(appZoomProvider), 0.9);
+
+        await expectLater(notifier.reset(), completes);
+        expect(container.read(appZoomProvider), 1.0);
+      },
+    );
   });
 }
