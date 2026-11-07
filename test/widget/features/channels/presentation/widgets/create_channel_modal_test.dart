@@ -24,6 +24,15 @@ class _FakeChannelNotifier extends ChannelNotifier {
   }
 }
 
+/// A workspace that is already loaded, as it is when the dialog opens in the
+/// app; the active chat starts over whenever the workspace changes.
+class _FakeWorkspaceNotifier extends WorkspaceNotifier {
+  @override
+  WorkspaceState build() => const WorkspaceState(
+    selectedWorkspace: Workspace(id: 'org-1', name: 'Workspace', avatar: ''),
+  );
+}
+
 void main() {
   group('CreateChannelModal', () {
     late _FakeChannelNotifier notifier;
@@ -37,7 +46,10 @@ void main() {
       notifier = _FakeChannelNotifier();
       await tester.pumpWidget(
         ProviderScope(
-          overrides: [channelProvider.overrideWith(() => notifier)],
+          overrides: [
+            channelProvider.overrideWith(() => notifier),
+            workspaceProvider.overrideWith(_FakeWorkspaceNotifier.new),
+          ],
           child: buildTestMaterialApp(
             Builder(
               builder: (context) => Scaffold(
@@ -128,6 +140,32 @@ void main() {
       await submit(tester);
 
       expect(find.text('Create a channel'), findsNothing);
+      await drainToastTimer(tester);
+    });
+
+    testWidgets('opens the new channel once it is created (#3048)', (
+      tester,
+    ) async {
+      await openModal(tester);
+      notifier.result = Success<Channel>(
+        Channel(
+          id: 'c-new',
+          name: 'launch',
+          description: '',
+          organisationId: 'org-1',
+          ownerId: 'user-1',
+        ),
+      );
+
+      await submit(tester);
+
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(Scaffold)),
+      );
+      final active = container.read(activeChatProvider);
+      expect(active.type, ActiveChatType.channel);
+      expect(active.id, 'launch');
+      expect(active.channelId, 'c-new');
       await drainToastTimer(tester);
     });
 
