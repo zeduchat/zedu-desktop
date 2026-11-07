@@ -1040,6 +1040,12 @@ class _MessageBubble extends ConsumerWidget {
 
     final senderInitial = avatarInitial(senderName);
 
+    final isEdited =
+        message['is_edited'] == true ||
+        message['isEdited'] == true ||
+        message['edited_at'] != null ||
+        message['edited'] == true;
+
     final List<dynamic> media = (message['media'] as List<dynamic>?) ?? [];
 
     return Padding(
@@ -1095,6 +1101,17 @@ class _MessageBubble extends ConsumerWidget {
                         timeString,
                         style: TextStyle(color: colors.textHint, fontSize: 11),
                       ),
+                      if (isEdited) ...[
+                        const SizedBox(width: 4),
+                        Text(
+                          '(edited)',
+                          style: TextStyle(
+                            color: colors.textHint,
+                            fontSize: 11,
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),

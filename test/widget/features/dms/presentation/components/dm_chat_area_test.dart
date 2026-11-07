@@ -641,5 +641,23 @@ void main() {
       expect(find.text('hello\n---', findRichText: true), findsOneWidget);
       expect(find.byType(IntrinsicWidth), findsNothing);
     });
+
+    testWidgets('shows (edited) badge next to timestamp on edited message', (
+      tester,
+    ) async {
+      await pumpChat(tester, [
+        {...message('m1', '<p>edited text</p>'), 'is_edited': true},
+      ]);
+
+      expect(find.text('(edited)'), findsOneWidget);
+    });
+
+    testWidgets('does not show (edited) badge on unedited message', (
+      tester,
+    ) async {
+      await pumpChat(tester, [message('m1', '<p>original text</p>')]);
+
+      expect(find.text('(edited)'), findsNothing);
+    });
   });
 }

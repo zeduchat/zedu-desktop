@@ -5,6 +5,7 @@ class MessageBubble extends StatefulWidget {
   final String text;
   final String timestamp;
   final bool isSystem;
+  final bool isEdited;
 
   const MessageBubble({
     super.key,
@@ -12,6 +13,7 @@ class MessageBubble extends StatefulWidget {
     required this.text,
     required this.timestamp,
     this.isSystem = false,
+    this.isEdited = false,
   });
 
   @override
@@ -121,6 +123,17 @@ class _MessageBubbleState extends State<MessageBubble> {
                         widget.timestamp,
                         style: TextStyle(fontSize: 11, color: colors.textHint),
                       ),
+                      if (widget.isEdited) ...[
+                        const SizedBox(width: 4),
+                        Text(
+                          '(edited)',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontStyle: FontStyle.italic,
+                            color: colors.textHint,
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                   const SizedBox(height: 4),

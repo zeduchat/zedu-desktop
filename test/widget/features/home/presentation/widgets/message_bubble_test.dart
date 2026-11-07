@@ -78,6 +78,40 @@ void main() {
 
       expect(find.text('?'), findsOneWidget);
     });
+
+    testWidgets('renders (edited) indicator when isEdited is true', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _wrap(
+          const MessageBubble(
+            author: 'Alice',
+            text: 'Updated message',
+            timestamp: '10:00 AM',
+            isEdited: true,
+          ),
+        ),
+      );
+
+      expect(find.text('(edited)'), findsOneWidget);
+    });
+
+    testWidgets(
+      'does not render (edited) indicator when isEdited is false or omitted',
+      (tester) async {
+        await tester.pumpWidget(
+          _wrap(
+            const MessageBubble(
+              author: 'Alice',
+              text: 'Original message',
+              timestamp: '10:00 AM',
+            ),
+          ),
+        );
+
+        expect(find.text('(edited)'), findsNothing);
+      },
+    );
   });
 
   group('MessageBubble reaction menu (#166)', () {

@@ -762,6 +762,8 @@ class ChatHistoryNotifier extends ChangeNotifier {
       if (m['id'] == messageId) {
         final updated = Map<String, dynamic>.from(m);
         updated['content'] = newContent;
+        updated['is_edited'] = true;
+        updated['isEdited'] = true;
         return updated;
       }
       return m;
@@ -791,6 +793,8 @@ class ChatHistoryNotifier extends ChangeNotifier {
         if (m['id'] == messageId && m['content'] == newContent) {
           final reverted = Map<String, dynamic>.from(m);
           reverted['content'] = baselineContent;
+          reverted['is_edited'] = original['is_edited'];
+          reverted['isEdited'] = original['isEdited'];
           return reverted;
         }
         return m;
