@@ -7,6 +7,16 @@ export 'package:flutter_svg/flutter_svg.dart';
 export 'package:google_fonts/google_fonts.dart';
 export 'package:dio/dio.dart';
 export 'package:flutter_dotenv/flutter_dotenv.dart';
+export 'package:flutter_inappwebview/flutter_inappwebview.dart'
+    show
+        InAppWebView,
+        InAppWebViewController,
+        InAppWebViewSettings,
+        NavigationActionPolicy,
+        PermissionResponse,
+        PermissionResponseAction,
+        URLRequest,
+        WebUri;
 export 'package:go_router/go_router.dart';
 export 'package:get_it/get_it.dart';
 export 'package:url_launcher/url_launcher.dart';

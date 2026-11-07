@@ -9,6 +9,10 @@ class HomeView extends ConsumerStatefulWidget {
 }
 
 class _HomeViewState extends ConsumerState<HomeView> {
+  /// Office stays loaded once opened, so going back to it is instant and
+  /// keeps the person where they were in the building.
+  bool _officeOpened = false;
+
   @override
   void initState() {
     super.initState();
@@ -31,6 +35,9 @@ class _HomeViewState extends ConsumerState<HomeView> {
     });
     final colors = context.colors;
     final showProfile = ref.watch(personalProfilePanelProvider);
+    final sidebarType = ref.watch(homeSidebarProvider);
+    final showOffice = sidebarType == HomeSidebarType.office;
+    if (showOffice) _officeOpened = true;
 
     return Scaffold(
       backgroundColor: colors.background,
@@ -40,18 +47,46 @@ class _HomeViewState extends ConsumerState<HomeView> {
           Expanded(
             child: Row(
               children: [
-                AppSidebarRail(activeType: ref.watch(homeSidebarProvider)),
-                ResizableSidebar(child: const _MainSidebarSwitcher()),
+                AppSidebarRail(activeType: sidebarType),
                 Expanded(
                   child: Stack(
                     children: [
-                      const Positioned.fill(child: _ChatAreaSwitcher()),
-                      if (showProfile)
-                        const Positioned(
-                          right: 0,
-                          top: 0,
-                          bottom: 0,
-                          child: PersonalProfilePanel(),
+                      Offstage(
+                        offstage: showOffice,
+                        child: Row(
+                          children: [
+                            ResizableSidebar(
+                              child: const _MainSidebarSwitcher(),
+                            ),
+                            Expanded(
+                              child: Stack(
+                                children: [
+                                  const Positioned.fill(
+                                    child: _ChatAreaSwitcher(),
+                                  ),
+                                  if (showProfile)
+                                    const Positioned(
+                                      right: 0,
+                                      top: 0,
+                                      bottom: 0,
+                                      child: PersonalProfilePanel(),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (_officeOpened)
+                        Offstage(
+                          offstage: !showOffice,
+                          child: OfficeView(
+                            // A new workspace signs Office in afresh.
+                            key: ValueKey(ref.watch(creditsOrgIdProvider)),
+                            onExit: () => ref
+                                .read(homeSidebarProvider.notifier)
+                                .setType(HomeSidebarType.home),
+                          ),
                         ),
                     ],
                   ),

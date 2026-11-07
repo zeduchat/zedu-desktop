@@ -67,40 +67,66 @@ class _AppSidebarRailState extends ConsumerState<AppSidebarRail> {
       ),
       child: Column(
         children: [
-          const SizedBox(height: 10),
-          _RailNavItem(
-            icon: Icons.home_filled,
-            label: 'Home',
-            isActive: activeType == HomeSidebarType.home,
-            onTap: () => select(HomeSidebarType.home),
+          // The nav items scroll in a short window instead of overflowing
+          // into the bottom icons.
+          Expanded(
+            child: SingleChildScrollView(
+              child: Column(
+                children: [
+                  const SizedBox(height: 10),
+                  _RailNavItem(
+                    icon: Icons.home_filled,
+                    label: 'Home',
+                    isActive: activeType == HomeSidebarType.home,
+                    onTap: () => select(HomeSidebarType.home),
+                  ),
+                  _RailNavItem(
+                    icon: Icons.chat_bubble_outline,
+                    label: 'DMs',
+                    popoutType: HomeSidebarType.dms,
+                    positionKey: dmsTargetKey,
+                    isActive: activeType == HomeSidebarType.dms,
+                    onTap: () => select(HomeSidebarType.dms),
+                  ),
+                  _RailNavItem(
+                    icon: Icons.people_outline,
+                    label: 'People',
+                    popoutType: HomeSidebarType.people,
+                    positionKey: peopleTargetKey,
+                    isActive: activeType == HomeSidebarType.people,
+                    onTap: () => select(HomeSidebarType.people),
+                  ),
+                  _RailNavItem(
+                    icon: Icons.folder_open_outlined,
+                    label: 'Files',
+                    isActive: activeType == HomeSidebarType.files,
+                    onTap: () => select(HomeSidebarType.files),
+                  ),
+                  _BuzzRailItem(
+                    isActive: activeType == HomeSidebarType.buzz,
+                    onTap: () => select(HomeSidebarType.buzz),
+                  ),
+                  _RailNavItem(
+                    icon: Icons.apartment_outlined,
+                    label: 'Office',
+                    isActive: activeType == HomeSidebarType.office,
+                    onTap: () {
+                      if (OfficeView.isSupported) {
+                        select(HomeSidebarType.office);
+                        return;
+                      }
+                      // No embedded WebView here; the browser signs in to Office
+                      // the web way.
+                      launchUrl(
+                        Uri.parse(kOfficeUrl),
+                        mode: LaunchMode.externalApplication,
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
           ),
-          _RailNavItem(
-            icon: Icons.chat_bubble_outline,
-            label: 'DMs',
-            popoutType: HomeSidebarType.dms,
-            positionKey: dmsTargetKey,
-            isActive: activeType == HomeSidebarType.dms,
-            onTap: () => select(HomeSidebarType.dms),
-          ),
-          _RailNavItem(
-            icon: Icons.people_outline,
-            label: 'People',
-            popoutType: HomeSidebarType.people,
-            positionKey: peopleTargetKey,
-            isActive: activeType == HomeSidebarType.people,
-            onTap: () => select(HomeSidebarType.people),
-          ),
-          _RailNavItem(
-            icon: Icons.folder_open_outlined,
-            label: 'Files',
-            isActive: activeType == HomeSidebarType.files,
-            onTap: () => select(HomeSidebarType.files),
-          ),
-          _BuzzRailItem(
-            isActive: activeType == HomeSidebarType.buzz,
-            onTap: () => select(HomeSidebarType.buzz),
-          ),
-          const Spacer(),
           _RailBottomIcon(
             icon: Icons.notifications_none_outlined,
             // No unread-count source yet; show the dot once there is one.

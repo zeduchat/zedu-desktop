@@ -7,6 +7,7 @@ list(APPEND FLUTTER_PLUGIN_LIST
   app_links
   audioplayers_windows
   desktop_drop
+  flutter_inappwebview_windows
   flutter_secure_storage_windows
   hotkey_manager_windows
   iris_method_channel
