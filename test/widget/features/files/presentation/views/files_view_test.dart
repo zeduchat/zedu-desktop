@@ -410,6 +410,66 @@ void main() {
     expect(find.text('Deleted files'), findsNWidgets(2));
   });
 
+  group('Reset filters (Ziki #3445)', () {
+    Finder resetButton() => find.byKey(const Key('files-reset-filters'));
+
+    testWidgets('is hidden until a filter is set', (tester) async {
+      await _pump(tester, _FakeFilesRepository());
+
+      expect(resetButton(), findsNothing);
+
+      await tester.tap(find.text('File Type'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Images').last);
+      await tester.pumpAndSettle();
+
+      expect(resetButton(), findsOneWidget);
+    });
+
+    testWidgets('clears search, type and date and reloads the list', (
+      tester,
+    ) async {
+      final repository = _FakeFilesRepository();
+      await _pump(tester, repository);
+      await tester.tap(find.text('Files').last);
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byType(TextField).first, 'logo');
+      await tester.pump(const Duration(milliseconds: 450));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('File Type'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Images').last);
+      await tester.pumpAndSettle();
+      // The first match is the toolbar dropdown; the table also has a
+      // Date Modified column.
+      await tester.tap(find.text('Date Modified').first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Today').last);
+      await tester.pumpAndSettle();
+      expect(repository.queries.last.search, 'logo');
+      expect(repository.queries.last.category, FileCategory.images);
+      expect(repository.queries.last.dateModified, DateModifiedFilter.today);
+
+      await tester.tap(resetButton());
+      await tester.pumpAndSettle();
+
+      final query = repository.queries.last;
+      expect(query.search, '');
+      expect(query.category, isNull);
+      expect(query.dateModified, isNull);
+      expect(
+        tester.widget<TextField>(find.byType(TextField).first).controller!.text,
+        '',
+      );
+      expect(find.text('File Type'), findsOneWidget);
+      expect(find.text('Today'), findsNothing);
+      expect(resetButton(), findsNothing);
+      // Still on the Files tab.
+      expect(find.text('logo.png'), findsOneWidget);
+    });
+  });
+
   testWidgets('opening a folder shows its files and a way back', (
     tester,
   ) async {

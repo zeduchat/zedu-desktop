@@ -3,7 +3,8 @@ import 'dart:async';
 import 'package:zedu/core/core.dart';
 import 'package:zedu/features/features.dart';
 
-/// Search, File Type, Date Modified and Sort above the Files lists.
+/// Search, File Type, Date Modified, Reset filters and Sort above the Files
+/// lists.
 class FilesToolbar extends ConsumerWidget {
   const FilesToolbar({super.key});
 
@@ -38,6 +39,17 @@ class FilesToolbar extends ConsumerWidget {
                 labelOf: (d) => d.label,
                 onChanged: notifier.setDateModified,
               ),
+              // Only while a filter is set (Ziki #3445).
+              if (state.hasFilters)
+                SizedBox(
+                  height: 40,
+                  child: TextButton.icon(
+                    key: const Key('files-reset-filters'),
+                    onPressed: notifier.resetFilters,
+                    icon: const Icon(Icons.filter_alt_off_outlined, size: 18),
+                    label: const Text('Reset filters'),
+                  ),
+                ),
             ],
           ),
         ),

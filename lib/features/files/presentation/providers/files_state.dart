@@ -34,6 +34,10 @@ class FilesState {
 
   String? get folderId => folderPath.isEmpty ? null : folderPath.last.id;
 
+  /// Whether a name search, file type or date-modified filter is set.
+  bool get hasFilters =>
+      category != null || dateModified != null || search.trim().isNotEmpty;
+
   FilesQuery get query => FilesQuery(
     view: view,
     folderId: folderId,
