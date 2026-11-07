@@ -98,6 +98,10 @@ class _QuickSwitcherShortcutState extends ConsumerState<QuickSwitcherShortcut> {
             _showShortcuts,
         const SingleActivator(LogicalKeyboardKey.slash, meta: true):
             _showShortcuts,
+        // On layouts where / needs Shift (Shift+7 on German keyboards), the
+        // key bindings above never match, so match the character as well.
+        const CharacterActivator('/', control: true): _showShortcuts,
+        const CharacterActivator('/', meta: true): _showShortcuts,
       },
       child: widget.child,
     );
