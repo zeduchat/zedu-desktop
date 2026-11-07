@@ -20,6 +20,18 @@ class _ChannelDirectoryViewState extends ConsumerState<ChannelDirectoryView> {
     super.dispose();
   }
 
+  /// Opens the same create-channel dialog the sidebar's "Add channel" action
+  /// uses (home_view.dart `_AddChannelButton`), so the directory offers a way
+  /// to create the channel a search could not find. On success
+  /// `ChannelNotifier.createChannel` inserts the new channel into the state
+  /// this view watches, so the list updates without an extra reload.
+  void _openCreateChannel() {
+    showDialog<void>(
+      context: context,
+      builder: (_) => const CreateChannelModal(),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final channelState = ref.watch(channelProvider);
@@ -38,12 +50,24 @@ class _ChannelDirectoryViewState extends ConsumerState<ChannelDirectoryView> {
       children: [
         Padding(
           padding: const EdgeInsets.all(24.0),
-          child: Text(
-            'Channel Directory',
-            style: textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.bold,
-              color: colors.textPrimary,
-            ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Channel Directory',
+                  style: textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: colors.textPrimary,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              OutlinedButton.icon(
+                onPressed: _openCreateChannel,
+                icon: const Icon(Icons.add, size: 18),
+                label: const Text('New channel'),
+              ),
+            ],
           ),
         ),
         Padding(
@@ -121,11 +145,22 @@ class _ChannelDirectoryViewState extends ConsumerState<ChannelDirectoryView> {
                 )
               : filteredChannels.isEmpty
               ? Center(
-                  child: Text(
-                    'No channels found.',
-                    style: textTheme.bodyMedium?.copyWith(
-                      color: colors.textSecondary,
-                    ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'No channels found.',
+                        style: textTheme.bodyMedium?.copyWith(
+                          color: colors.textSecondary,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      OutlinedButton.icon(
+                        onPressed: _openCreateChannel,
+                        icon: const Icon(Icons.add, size: 18),
+                        label: const Text('Create a channel'),
+                      ),
+                    ],
                   ),
                 )
               : ListView.builder(
