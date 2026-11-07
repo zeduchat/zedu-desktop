@@ -49,8 +49,9 @@ void main() {
     Result<List<ChannelMessage>> r, {
     FakeChatHistoryNotifier? chatNotifier,
   }) {
-    when(() => repository.fetchChannelMessages('ch-1'))
-        .thenAnswer((_) async => r);
+    when(
+      () => repository.fetchChannelMessages('ch-1'),
+    ).thenAnswer((_) async => r);
     return tester
         .pumpWidget(
           ProviderScope(

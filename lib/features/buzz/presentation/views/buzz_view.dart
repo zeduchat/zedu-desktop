@@ -56,12 +56,13 @@ class _BuzzViewState extends ConsumerState<BuzzView> {
   Future<void> _join() async {
     final code = buzzMeetingCode(_codeController.text);
     if (code.isEmpty) return;
-    final link = ref.read(buzzMeetingsProvider.notifier).linkFor(code);
-    if (link == null) {
-      _toast('Sign in again to join a meeting.');
-      return;
+    final result = ref.read(buzzMeetingsProvider.notifier).joinLink(code);
+    switch (result) {
+      case Success<Uri>(:final value):
+        await _open(value);
+      case Failure<Uri>(:final error):
+        _toast(error.message);
     }
-    await _open(link);
   }
 
   @override

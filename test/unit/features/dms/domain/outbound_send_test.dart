@@ -96,10 +96,7 @@ void main() {
       expect(record.attempts, 2);
       expect(record.firstAttemptAt, attemptedAt);
       expect(record.content, 'hi');
-      expect(
-        record.lastAttemptAt,
-        attemptedAt.add(const Duration(seconds: 3)),
-      );
+      expect(record.lastAttemptAt, attemptedAt.add(const Duration(seconds: 3)));
     });
   });
 
@@ -136,11 +133,7 @@ void main() {
   group('isDeliveredCopyOf', () {
     test('matches the same sender, text and a nearby time', () {
       expect(
-        isDeliveredCopyOf(
-          serverMessage(),
-          send: send(),
-          senderId: 'user-1',
-        ),
+        isDeliveredCopyOf(serverMessage(), send: send(), senderId: 'user-1'),
         isTrue,
       );
     });
@@ -209,7 +202,9 @@ void main() {
     test('does not match a message from far in the future', () {
       expect(
         isDeliveredCopyOf(
-          serverMessage(createdAt: attemptedAt.add(const Duration(minutes: 10))),
+          serverMessage(
+            createdAt: attemptedAt.add(const Duration(minutes: 10)),
+          ),
           send: send(),
           senderId: 'user-1',
         ),
@@ -284,14 +279,8 @@ void main() {
 
   group('newClientSendId', () {
     test('is prefixed, unique and stable for a fixed random source', () {
-      final first = newClientSendId(
-        now: attemptedAt,
-        random: Random(7),
-      );
-      final second = newClientSendId(
-        now: attemptedAt,
-        random: Random(7),
-      );
+      final first = newClientSendId(now: attemptedAt, random: Random(7));
+      final second = newClientSendId(now: attemptedAt, random: Random(7));
       final later = newClientSendId(
         now: attemptedAt.add(const Duration(seconds: 1)),
         random: Random(7),

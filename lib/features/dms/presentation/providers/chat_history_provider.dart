@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io' show File;
 
 import 'package:zedu/core/core.dart';
 import 'package:zedu/features/features.dart';
@@ -295,11 +294,7 @@ class ChatHistoryNotifier extends ChangeNotifier {
       final repository = ref.read(dmRepositoryProvider);
       final page = await repository.getMessages(channelId, page: 1);
       if (_isDisposed) return null;
-      return findDeliveredCopy(
-        page,
-        send: send,
-        senderId: _currentUserId,
-      );
+      return findDeliveredCopy(page, send: send, senderId: _currentUserId);
     } catch (_) {
       return null;
     }
@@ -575,11 +570,7 @@ class ChatHistoryNotifier extends ChangeNotifier {
 
     final now = DateTime.now();
     _outboundSends[messageId] = record == null
-        ? OutboundSend.starting(
-            clientId: messageId,
-            content: content,
-            at: now,
-          )
+        ? OutboundSend.starting(clientId: messageId, content: content, at: now)
         : record.withAnotherAttempt(now);
 
     failedMsg['status'] = 'sending';
@@ -806,3 +797,24 @@ final chatHistoryProvider = ChangeNotifierProvider.autoDispose
     .family<ChatHistoryNotifier, String>(
       (ref, channelId) => ChatHistoryNotifier(channelId, ref),
     );
+
+// Polling payloads contain nested maps and arrays. Map identity must not turn
+// an unchanged server response into a chat refresh.
+bool _sameJsonValue(Object? left, Object? right) {
+  if (identical(left, right)) return true;
+  if (left is Map && right is Map) {
+    return left.length == right.length &&
+        left.keys.every(
+          (key) =>
+              right.containsKey(key) && _sameJsonValue(left[key], right[key]),
+        );
+  }
+  if (left is List && right is List) {
+    if (left.length != right.length) return false;
+    for (var index = 0; index < left.length; index++) {
+      if (!_sameJsonValue(left[index], right[index])) return false;
+    }
+    return true;
+  }
+  return left == right;
+}

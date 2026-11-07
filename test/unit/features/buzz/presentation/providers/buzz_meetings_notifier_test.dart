@@ -23,11 +23,13 @@ class _FakeRepository implements BuzzMeetingsRepository {
 ProviderContainer _container(
   _FakeRepository repository, {
   String slug = 'acme',
+  bool signedIn = true,
 }) {
   final container = ProviderContainer(
     overrides: [
       buzzMeetingsRepositoryProvider.overrideWithValue(repository),
       buzzOrgSlugProvider.overrideWithValue(slug),
+      buzzSignedInProvider.overrideWithValue(signedIn),
       buzzConfigProvider.overrideWithValue(
         const AppConfig(
           apiBaseUrl: 'https://api.zedu.chat/api/v1/',
@@ -114,6 +116,88 @@ void main() {
     expect(
       container.read(buzzMeetingsProvider.notifier).linkFor('abc'),
       isNull,
+    );
+  });
+
+  group('joinLink', () {
+    test('signed in with a workspace builds the meeting link', () {
+      final container = _container(_FakeRepository(const Success('abc')));
+
+      final result = container
+          .read(buzzMeetingsProvider.notifier)
+          .joinLink('abc-defg-hij');
+
+      expect(
+        (result as Success<Uri>).value.toString(),
+        'https://zedu.chat/acme/buzz/abc-defg-hij',
+      );
+    });
+
+    test('signed in without a workspace slug says the workspace is missing, '
+        'not to sign in', () {
+      final container = _container(
+        _FakeRepository(const Success('abc')),
+        slug: '',
+      );
+
+      final result = container
+          .read(buzzMeetingsProvider.notifier)
+          .joinLink('abc-defg-hij');
+
+      final message = (result as Failure<Uri>).error.message;
+      expect(message, BuzzMeetingsNotifier.workspaceMissingJoinMessage);
+      expect(message, isNot(BuzzMeetingsNotifier.signInToJoinMessage));
+    });
+
+    test('signed out asks to sign in again', () {
+      final container = _container(
+        _FakeRepository(const Success('abc')),
+        slug: '',
+        signedIn: false,
+      );
+
+      final result = container
+          .read(buzzMeetingsProvider.notifier)
+          .joinLink('abc-defg-hij');
+
+      expect(
+        (result as Failure<Uri>).error.message,
+        'Sign in again to join a meeting.',
+      );
+    });
+  });
+
+  test('starting a meeting signed in without a workspace slug says the '
+      'workspace is missing', () async {
+    final container = _container(
+      _FakeRepository(const Success('abc')),
+      slug: '',
+    );
+
+    final result = await container
+        .read(buzzMeetingsProvider.notifier)
+        .create(startNow: true);
+
+    expect(
+      (result as Failure<Uri>).error.message,
+      BuzzMeetingsNotifier.workspaceMissingStartMessage,
+    );
+  });
+
+  test('starting a meeting signed out asks to sign in again', () async {
+    final container = _container(
+      _FakeRepository(const Success('abc')),
+      slug: '',
+      signedIn: false,
+    );
+
+    final result = await container
+        .read(buzzMeetingsProvider.notifier)
+        .create(startNow: true);
+
+    expect(
+      (result as Failure<Uri>).error.message,
+      'Sign in again to start a meeting.',
     );
   });
 }

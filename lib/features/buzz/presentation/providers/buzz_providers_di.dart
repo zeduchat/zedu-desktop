@@ -12,6 +12,13 @@ final buzzOrgSlugProvider = Provider<String>(
       '',
 );
 
+/// Whether someone is signed in, so Buzz can tell a missing session apart
+/// from a workspace whose slug has not been loaded.
+final buzzSignedInProvider = Provider<bool>((ref) {
+  final auth = ref.watch(authNotifierProvider);
+  return auth.status == AuthStatus.authenticated && auth.user != null;
+});
+
 final buzzMeetingsRemoteDataSourceProvider =
     Provider<BuzzMeetingsRemoteDataSource>(
       (ref) => BuzzMeetingsRemoteDataSourceImpl(
