@@ -12,6 +12,7 @@ void main() {
             body: BillingSection(
               billing: BillingInfo.empty(),
               onInvite: ({required email, required role}) async {},
+              onComparePlans: () {},
             ),
           ),
         ),
@@ -36,6 +37,7 @@ void main() {
                 paymentHistory: const [],
               ),
               onInvite: ({required email, required role}) async {},
+              onComparePlans: () {},
             ),
           ),
         ),
@@ -75,6 +77,7 @@ void main() {
                 paymentHistory: records,
               ),
               onInvite: ({required email, required role}) async {},
+              onComparePlans: () {},
             ),
           ),
         ),
@@ -99,6 +102,7 @@ void main() {
             body: BillingSection(
               billing: BillingInfo.empty(),
               onInvite: ({required email, required role}) async {},
+              onComparePlans: () {},
             ),
           ),
         ),
@@ -110,5 +114,54 @@ void main() {
       find.textContaining('Your payment and transaction history'),
       findsOneWidget,
     );
+  });
+
+  testWidgets('Compare Plans opens the plan comparison flow', (tester) async {
+    var comparePlansOpened = false;
+
+    await tester.pumpWidget(
+      ProviderScope(
+        child: buildTestMaterialApp(
+          Scaffold(
+            body: BillingSection(
+              billing: BillingInfo.empty(),
+              onInvite: ({required email, required role}) async {},
+              onComparePlans: () => comparePlansOpened = true,
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Compare Plans'));
+
+    expect(comparePlansOpened, isTrue);
+  });
+
+  testWidgets('billing actions remain visible at a narrow width', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(540, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        child: buildTestMaterialApp(
+          Scaffold(
+            body: BillingSection(
+              billing: BillingInfo.empty(),
+              onInvite: ({required email, required role}) async {},
+              onComparePlans: () {},
+            ),
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('Invite People'), findsOneWidget);
+    expect(find.text('Compare Plans'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 }

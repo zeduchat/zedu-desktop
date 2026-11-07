@@ -6,11 +6,13 @@ class BillingSection extends ConsumerStatefulWidget {
     super.key,
     required this.billing,
     required this.onInvite,
+    required this.onComparePlans,
   });
 
   final BillingInfo billing;
   final Future<void> Function({required String email, required String role})
   onInvite;
+  final VoidCallback onComparePlans;
 
   @override
   ConsumerState<BillingSection> createState() => _BillingSectionState();
@@ -46,52 +48,89 @@ class _BillingSectionState extends ConsumerState<BillingSection> {
             color: colors.primaryBg,
             borderRadius: BorderRadius.circular(8),
           ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Expanded(
-                child: Column(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final planSummary = Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    widget.billing.plan,
+                    style: context.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: colors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    widget.billing.description,
+                    style: context.textTheme.bodySmall?.copyWith(
+                      color: colors.textSecondary.withValues(alpha: 0.6),
+                      height: 1.4,
+                    ),
+                  ),
+                ],
+              );
+              final actions = Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                alignment: WrapAlignment.end,
+                children: [
+                  OutlinedButton(
+                    onPressed: () =>
+                        showInviteMemberDialog(context, widget.onInvite),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: colors.primary,
+                      side: BorderSide(color: colors.borderOutline),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 12,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                    ),
+                    child: const Text(
+                      'Invite People',
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                  FilledButton(
+                    onPressed: widget.onComparePlans,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: colors.primary,
+                      foregroundColor: colors.onPrimary,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 12,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                    ),
+                    child: const Text(
+                      'Compare Plans',
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ],
+              );
+
+              if (constraints.maxWidth < 680) {
+                return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      widget.billing.plan,
-                      style: context.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: colors.textPrimary,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      widget.billing.description,
-                      style: context.textTheme.bodySmall?.copyWith(
-                        color: colors.textSecondary.withValues(alpha: 0.6),
-                        height: 1.4,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 24),
-              OutlinedButton(
-                onPressed: () =>
-                    showInviteMemberDialog(context, widget.onInvite),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: colors.primary,
-                  side: BorderSide(color: colors.borderOutline),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 24,
-                    vertical: 12,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                ),
-                child: const Text(
-                  'Invite People',
-                  style: TextStyle(fontWeight: FontWeight.w600),
-                ),
-              ),
-            ],
+                  children: [planSummary, const SizedBox(height: 20), actions],
+                );
+              }
+
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Expanded(child: planSummary),
+                  const SizedBox(width: 24),
+                  actions,
+                ],
+              );
+            },
           ),
         ),
         const SizedBox(height: 48),
