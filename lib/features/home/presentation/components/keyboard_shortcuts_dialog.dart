@@ -9,7 +9,8 @@ class _Shortcut {
 
 /// Lists the keyboard shortcuts the app supports, grouped by where they work.
 /// Keep this in step with the key handlers: `QuickSwitcherShortcut`,
-/// `QuickSwitcherDialog`, `DmMessageComposer` and `MessageComposer`.
+/// `QuickSwitcherDialog`, `DmMessageComposer` (DMs, channels and group chats)
+/// and the sidebar binding in `HomeView`.
 class KeyboardShortcutsDialog extends StatelessWidget {
   const KeyboardShortcutsDialog({super.key});
 
@@ -17,22 +18,21 @@ class KeyboardShortcutsDialog extends StatelessWidget {
     'Anywhere': [
       _Shortcut([modifier, 'K'], 'Jump to a channel or conversation'),
       _Shortcut([modifier, '/'], 'Show keyboard shortcuts'),
+      _Shortcut([modifier, '\\'], 'Show or hide the sidebar'),
     ],
     'Jumping to a conversation': const [
       _Shortcut(['Up', 'Down'], 'Move through the results'),
       _Shortcut(['Enter'], 'Open the highlighted result'),
       _Shortcut(['Esc'], 'Close'),
     ],
-    'Direct messages': [
+    // Channels and group chats use the same composer as DMs (Ziki #3439).
+    'Messages': [
       const _Shortcut(['Enter'], 'Send'),
       const _Shortcut(['Shift', 'Enter'], 'New line'),
       _Shortcut([modifier, 'B'], 'Bold'),
       _Shortcut([modifier, 'I'], 'Italic'),
       const _Shortcut(['Up'], 'Edit your last message, when the box is empty'),
       const _Shortcut(['Esc'], 'Cancel editing'),
-    ],
-    'Channels and group chats': [
-      _Shortcut([modifier, 'Enter'], 'Send'),
     ],
   };
 
