@@ -52,32 +52,43 @@ class _AuthDeepLinkListenerState extends ConsumerState<AuthDeepLinkListener> {
     if (token == null || token == _lastProcessedToken) return;
     _lastProcessedToken = token;
 
-    AppLogger.i('Processing magic link deep link', tag: _tag);
-    await ref.read(authNotifierProvider.notifier).verifyMagicLink(token: token);
+    try {
+      AppLogger.i('Processing magic link deep link', tag: _tag);
+      await ref
+          .read(authNotifierProvider.notifier)
+          .verifyMagicLink(token: token);
 
-    if (!mounted) return;
+      if (!mounted) return;
 
-    // This listener is mounted from `App`'s builder, above the Navigator, so
-    // its own context has neither an Overlay nor the router in it.
-    final navigator = AppRouter.navigatorKey.currentState;
-    if (navigator == null) return;
+      // This listener is mounted from `App`'s builder, above the Navigator, so
+      // its own context has neither an Overlay nor the router in it.
+      final navigator = AppRouter.navigatorKey.currentState;
+      if (navigator == null) return;
 
-    final authState = ref.read(authNotifierProvider);
-    if (authState.status == AuthStatus.authenticated) {
-      AppToastService.showAtRoot(
-        navigator,
-        type: AppToastType.success,
-        message: 'Logged in successfully!',
-      );
-      navigator.context.go(AppRouter.home);
-      return;
-    }
+      final authState = ref.read(authNotifierProvider);
+      if (authState.status == AuthStatus.authenticated) {
+        AppToastService.showAtRoot(
+          navigator,
+          type: AppToastType.success,
+          message: 'Logged in successfully!',
+        );
+        navigator.context.go(AppRouter.home);
+        return;
+      }
 
-    if (authState.error != null) {
-      AppToastService.showAtRoot(
-        navigator,
-        type: AppToastType.error,
-        message: authState.error!,
+      if (authState.error != null) {
+        AppToastService.showAtRoot(
+          navigator,
+          type: AppToastType.error,
+          message: authState.error!,
+        );
+      }
+    } catch (error, stackTrace) {
+      AppLogger.w(
+        'Failed to process magic link deep link: $error',
+        tag: _tag,
+        error: error,
+        stackTrace: stackTrace,
       );
     }
   }

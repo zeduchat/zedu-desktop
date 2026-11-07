@@ -154,5 +154,34 @@ void main() {
       await tester.pump(const Duration(seconds: 5));
       await tester.pumpAndSettle();
     });
+
+    testWidgets('does not crash when verification throws', (tester) async {
+      when(() => mockAppLinks.getInitialLink()).thenAnswer(
+        (_) async => Uri.parse('zedu://auth/magick-link/verify?token=t-err'),
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authNotifierProvider.overrideWith(
+              () => FakeDeepLinkAuthNotifier(
+                onVerify: (_) => throw StateError('boom'),
+              ),
+            ),
+          ],
+          child: MaterialApp(
+            home: AuthDeepLinkListener(
+              appLinks: mockAppLinks,
+              child: const SizedBox.shrink(),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      // Reaching here means the exception was handled instead of escaping.
+      expect(tester.takeException(), isNull);
+    });
   });
 }
