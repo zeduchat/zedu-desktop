@@ -343,6 +343,28 @@ class AuthNotifier extends Notifier<AuthState> {
     state = const AuthState(status: AuthStatus.unauthenticated);
   }
 
+  /// Saves the token from a successful sign-in. If the keychain write fails
+  /// (locked keychain, missing entitlement, broken keyring) the sign-in still
+  /// completes: the token is kept in memory for this run, as when Remember me
+  /// is off, instead of the error escaping and leaving the sign-in spinner
+  /// running forever (Ziki #3485).
+  Future<void> _saveSessionToken(String token, {bool persist = true}) async {
+    try {
+      await _storage.saveAccessToken(token, persist: persist);
+    } catch (error) {
+      AppLogger.w(
+        'Could not save the session token; keeping it for this run only '
+        '- $error',
+        tag: _tag,
+      );
+      try {
+        // Sets the in-memory token before touching the keychain, so the
+        // session works even if this keychain call fails as well.
+        await _storage.saveAccessToken(token, persist: false);
+      } catch (_) {}
+    }
+  }
+
   /// With [rememberMe] false the session lasts until the app closes.
   Future<void> login({
     required String email,
@@ -355,16 +377,12 @@ class AuthNotifier extends Notifier<AuthState> {
     final result = await _repository.login(email: email, password: password);
     switch (result) {
       case Success<AuthSession>():
-        AppLogger.i('Login succeeded — token persisted', tag: _tag);
-        await _storage.saveAccessToken(result.value.accessToken);
+        AppLogger.i('Login succeeded — saving token', tag: _tag);
+        await _saveSessionToken(result.value.accessToken, persist: rememberMe);
         state = AuthState(
           status: AuthStatus.authenticated,
           user: result.value.user,
           isLoading: false,
-        );
-        await _storage.saveAccessToken(
-          result.value.accessToken,
-          persist: rememberMe,
         );
         _bumpSession();
         _adoptSessionUser(result.value.user);
@@ -385,10 +403,10 @@ class AuthNotifier extends Notifier<AuthState> {
     switch (result) {
       case Success<AuthSession>():
         AppLogger.i(
-          'Magic link verification succeeded — token persisted',
+          'Magic link verification succeeded — saving token',
           tag: _tag,
         );
-        await _storage.saveAccessToken(result.value.accessToken);
+        await _saveSessionToken(result.value.accessToken);
         _bumpSession();
         _adoptSessionUser(result.value.user);
       case Failure<AuthSession>():
@@ -764,7 +782,7 @@ class AuthNotifier extends Notifier<AuthState> {
                 : 'Google Sign-In succeeded · token kept for this run only',
             tag: _tag,
           );
-          await _storage.saveAccessToken(
+          await _saveSessionToken(
             result.value.accessToken,
             persist: rememberMe,
           );
