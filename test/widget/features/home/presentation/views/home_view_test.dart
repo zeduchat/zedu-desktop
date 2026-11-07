@@ -3,13 +3,22 @@ import 'package:zedu/features/features.dart';
 
 import '../../../../../helpers/helpers.dart';
 
-Channel _channel(String name) => Channel(
+Channel _channel(String name, {int membersCount = 0}) => Channel(
   id: 'channel-$name',
   name: name,
   description: '',
   organisationId: 'org-1',
   ownerId: 'user-1',
+  membersCount: membersCount,
 );
+
+class _CountedChannelNotifier extends ChannelNotifier {
+  @override
+  Future<List<Channel>> build() async => [
+    _channel('general', membersCount: 12),
+    _channel('random', membersCount: 3),
+  ];
+}
 
 class _EmptyChannelRepository extends Mock implements ChannelRepository {
   @override
@@ -143,6 +152,32 @@ void main() {
       );
       await tester.pumpAndSettle();
     }
+
+    testWidgets('the header shows how many people are in the channel (#3062)', (
+      tester,
+    ) async {
+      await pumpSidebarAndChat(tester, channels: _CountedChannelNotifier.new);
+
+      final count = find.byKey(const ValueKey('channel-member-count'));
+      expect(
+        find.descendant(of: count, matching: find.text('12')),
+        findsOneWidget,
+      );
+      expect(find.byTooltip('12 members'), findsOneWidget);
+
+      await tester.tap(find.text('random'));
+      await tester.pumpAndSettle();
+      expect(
+        find.descendant(of: count, matching: find.text('3')),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('no member count shows until it is known', (tester) async {
+      await pumpSidebarAndChat(tester);
+
+      expect(find.byKey(const ValueKey('channel-member-count')), findsNothing);
+    });
 
     testWidgets('shows #general until another channel is picked', (
       tester,

@@ -421,12 +421,34 @@ class HomeChatArea extends ConsumerWidget {
             ),
           ),
           _HeaderAction(icon: Icons.headphones_outlined, label: 'Start Buzz'),
-          const SizedBox(width: 12),
-          CircleAvatar(
-            radius: 14,
-            backgroundColor: colors.accent,
-            child: Icon(Icons.person, size: 18, color: colors.onPrimary),
-          ),
+          // How many people are in the channel, not a stand-in person icon
+          // (Ziki #3062). Hidden until the count is known.
+          if (channel != null && channel.membersCount > 0) ...[
+            const SizedBox(width: 12),
+            Tooltip(
+              message: channel.membersCount.countLabel('member'),
+              child: Row(
+                key: const ValueKey('channel-member-count'),
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.people_outline,
+                    size: 18,
+                    color: colors.textSecondary,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    '${channel.membersCount}',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: colors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           const SizedBox(width: 8),
           if (channel == null)
             Icon(Icons.more_vert, color: colors.textHint)
