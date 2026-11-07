@@ -28,6 +28,7 @@ const _session = CreditCheckoutSession(
 const _email = 'tester@example.com';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
   late MockCreditsRepository repository;
   late ProviderContainer container;
   late CreditsNotifier notifier;
