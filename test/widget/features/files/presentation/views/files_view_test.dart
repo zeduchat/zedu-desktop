@@ -55,30 +55,6 @@ class _FakeProfileNotifier extends UserProfileNotifier {
   Future<void> load() async {}
 }
 
-/// Signed in as Ada (`u-1`), who owns the listed files. The share dialog reads
-/// the signed-in user to leave them out of its suggestions.
-class _FakeAuthNotifier extends AuthNotifier {
-  @override
-  AuthState build() => AuthState(
-    status: AuthStatus.authenticated,
-    user: User(
-      id: 'u-1',
-      firstName: 'Ada',
-      lastName: 'Lovelace',
-      email: 'ada@zedu.test',
-      phone: '',
-      username: 'ada',
-      isVerified: true,
-      isOnboarded: true,
-      createdAt: DateTime(2026, 1, 1),
-      currentOrg: 'org-1',
-      currentOrganisationSlug: 'org-1',
-      avatarUrl: '',
-      defaultAvatarUrl: '',
-    ),
-  );
-}
-
 class _FakePeopleRepository implements PeopleRepository {
   static const members = [
     OrgMember(id: 'u-2', name: 'Grace Hopper', email: 'grace@zedu.test'),
@@ -120,6 +96,7 @@ class _FakeFilesRepository implements FilesRepository {
   final queries = <FilesQuery>[];
   final folderRequests = <(FilesScope, String?)>[];
   final createdFolders = <(String, String, String?)>[];
+  final deletedFolders = <String>[];
   final downloads = <(String, String)>[];
   final deletes = <(String, bool)>[];
   final renames = <(String, String)>[];
@@ -334,6 +311,12 @@ class _FakeFilesRepository implements FilesRepository {
     }
     if (createFailure case final error?) return Failure(error);
     createdFolders.add((name, orgId, parentId));
+    return const Success(null);
+  }
+
+  @override
+  Future<Result<void>> deleteFolder(String id) async {
+    deletedFolders.add(id);
     return const Success(null);
   }
 }

@@ -136,10 +136,11 @@ String _plainText(
       ..writeln('${message.sender} · ${transcriptTimestamp(message.sentAt)}')
       ..writeln();
     final body = _plainTextBody(message.content);
-    if (body.isNotEmpty)
+    if (body.isNotEmpty) {
       out
         ..writeln(body)
         ..writeln();
+    }
     for (final attachment in message.attachments) {
       out.writeln('[Attachment] ${attachment.name}');
     }
@@ -170,10 +171,11 @@ String _markdown(
       ..writeln('## ${message.sender} · ${transcriptTimestamp(message.sentAt)}')
       ..writeln();
     final body = message.content.trim();
-    if (body.isNotEmpty)
+    if (body.isNotEmpty) {
       out
         ..writeln(body)
         ..writeln();
+    }
     for (final attachment in message.attachments) {
       final link = attachment.link.trim();
       out.writeln(

@@ -6,12 +6,16 @@ import 'package:zedu/features/features.dart';
 import '../../../../../helpers/helpers.dart';
 
 class _DeferredUploads implements FilesRepository {
+  @override
+  dynamic noSuchMethod(Invocation invocation) =>
+      throw UnimplementedError('unexpected ${invocation.memberName}');
+
   String workspace = 'A';
   final destinations = <String>[];
   final first = Completer<Result<WorkspaceFile>>();
 
   @override
-  Future<Result<WorkspaceFile>> uploadFile(XFile file) {
+  Future<Result<WorkspaceFile>> uploadFile(XFile file, {String? parentId}) {
     destinations.add(workspace);
     if (destinations.length == 1) return first.future;
     return Future.value(Success(WorkspaceFile(id: file.name, name: file.name)));
@@ -77,11 +81,9 @@ void main() {
       completeFirst();
       final outcome = await upload;
 
-      expect(
-        repository.destinations,
-        ['A'],
-        reason: 'Do not send remaining files to workspace B.',
-      );
+      expect(repository.destinations, [
+        'A',
+      ], reason: 'Do not send remaining files to workspace B.');
       expect(outcome.uploaded, 1);
       expect(outcome.skippedNames, ['second.txt']);
       expect(outcome.failedNames, isEmpty);

@@ -1,7 +1,5 @@
 import 'package:zedu/core/core.dart';
 import 'package:zedu/features/features.dart';
-import 'package:flutter_test/flutter_test.dart';
-import 'package:mocktail/mocktail.dart';
 import '../../../../../helpers/helpers.dart';
 
 class MockAuthRepository extends Mock implements AuthRepository {}

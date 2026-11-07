@@ -1,6 +1,3 @@
-import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:flutter_test/flutter_test.dart';
 import 'package:zedu/features/features.dart';
 
 import '../../../../../helpers/helpers.dart';
@@ -31,7 +28,7 @@ void main() {
         find.text(
           'Type these markdown shortcuts directly in your message box:',
         ),
-        findOneWidget,
+        findsOneWidget,
       );
 
       // Verify all 9 style names

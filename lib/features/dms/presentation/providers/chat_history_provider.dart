@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io' show File;
 
 import 'package:zedu/core/core.dart';
 import 'package:zedu/features/features.dart';
@@ -275,6 +274,27 @@ class ChatHistoryNotifier extends ChangeNotifier {
     return changed;
   }
 
+  /// Whether [a] and [b] hold the same JSON structure, so a poll that fetched
+  /// identical fields does not count as a change.
+  bool _sameJsonValue(Object? a, Object? b) {
+    if (identical(a, b) || a == b) return true;
+    if (a is List && b is List) {
+      return a.length == b.length &&
+          Iterable<int>.generate(
+            a.length,
+          ).every((index) => _sameJsonValue(a[index], b[index]));
+    }
+    if (a is Map && b is Map) {
+      return a.length == b.length &&
+          a.entries.every(
+            (entry) =>
+                b.containsKey(entry.key) &&
+                _sameJsonValue(entry.value, b[entry.key]),
+          );
+    }
+    return false;
+  }
+
   /// Whether [messageId] is being sent right now.
   bool isSending(String messageId) => _sendsInFlight.contains(messageId);
 
@@ -295,11 +315,7 @@ class ChatHistoryNotifier extends ChangeNotifier {
       final repository = ref.read(dmRepositoryProvider);
       final page = await repository.getMessages(channelId, page: 1);
       if (_isDisposed) return null;
-      return findDeliveredCopy(
-        page,
-        send: send,
-        senderId: _currentUserId,
-      );
+      return findDeliveredCopy(page, send: send, senderId: _currentUserId);
     } catch (_) {
       return null;
     }
@@ -575,11 +591,7 @@ class ChatHistoryNotifier extends ChangeNotifier {
 
     final now = DateTime.now();
     _outboundSends[messageId] = record == null
-        ? OutboundSend.starting(
-            clientId: messageId,
-            content: content,
-            at: now,
-          )
+        ? OutboundSend.starting(clientId: messageId, content: content, at: now)
         : record.withAnotherAttempt(now);
 
     failedMsg['status'] = 'sending';

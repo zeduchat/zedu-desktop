@@ -174,27 +174,23 @@ void main() {
       expect(requestedPath, '/api/v1/auth/me');
     });
 
-    test(
-      'fallback client times out when a server never responds',
-      () async {
-        server.listen((request) {});
-        final api = ApiBaseService(
-          config: AppConfig(apiBaseUrl: baseUrl, usesMockData: false),
-        );
+    test('fallback client times out when a server never responds', () async {
+      server.listen((request) {});
+      final api = ApiBaseService(
+        config: AppConfig(apiBaseUrl: baseUrl, usesMockData: false),
+      );
 
-        await expectLater(
-          api.get<Map<String, dynamic>>(path: 'auth/me'),
-          throwsA(
-            isA<ApiFailure>().having(
-              (failure) => failure.kind,
-              'kind',
-              ApiFailureKind.timeout,
-            ),
+      await expectLater(
+        api.get<Map<String, dynamic>>(path: 'auth/me'),
+        throwsA(
+          isA<ApiFailure>().having(
+            (failure) => failure.kind,
+            'kind',
+            ApiFailureKind.timeout,
           ),
-        );
-      },
-      timeout: const Timeout(Duration(seconds: 45)),
-    );
+        ),
+      );
+    }, timeout: const Timeout(Duration(seconds: 45)));
 
     test('an injected client preserves its shorter timeout', () async {
       server.listen((request) {});
