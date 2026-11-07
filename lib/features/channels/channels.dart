@@ -1,3 +1,5 @@
+export 'data/repositories/channel_administration_repository.dart';
+export 'presentation/views/channel_management_section.dart';
 export 'data/datasources/channel_draft_store.dart';
 export 'data/datasources/channel_remote_datasource.dart';
 export 'data/datasources/channel_notification_service.dart';

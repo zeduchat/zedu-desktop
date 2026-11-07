@@ -10,6 +10,8 @@ enum UserProfileSection {
   rolesAndPermissions,
   webhooks,
   billing,
+  channelManagement,
+  desktop,
 }
 
 class UserProfileState {

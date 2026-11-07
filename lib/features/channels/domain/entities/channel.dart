@@ -8,6 +8,8 @@ class Channel {
   final bool archived;
   final int unreadCount;
   final int membersCount;
+  final bool hasAccess;
+
   final String? topic;
 
   Channel({
@@ -76,6 +78,7 @@ class Channel {
       archived: archived ?? this.archived,
       unreadCount: unreadCount ?? this.unreadCount,
       membersCount: membersCount ?? this.membersCount,
+      hasAccess: hasAccess ?? this.hasAccess,
       topic: topic ?? this.topic,
     );
   }
