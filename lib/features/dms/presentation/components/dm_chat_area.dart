@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:zedu/core/core.dart';
 import 'package:zedu/features/features.dart';
 
@@ -14,6 +16,19 @@ class _DmChatAreaState extends ConsumerState<DmChatArea> {
   bool _isDragging = false;
   bool _searchOpen = false;
   final _composerKey = GlobalKey<DmMessageComposerState>();
+  final _scrollController = ScrollController();
+  final _jumpTargetKey = GlobalKey();
+  // Rows are about this tall, so a jump scrolls roughly to the message first.
+  static const _estimatedRowHeight = 88.0;
+  String? _highlightedId;
+  Timer? _highlightTimer;
+
+  @override
+  void dispose() {
+    _highlightTimer?.cancel();
+    _scrollController.dispose();
+    super.dispose();
+  }
 
   String get _recipientHandle {
     final parts = widget.conversation.displayName
@@ -291,6 +306,59 @@ class _DmChatAreaState extends ConsumerState<DmChatArea> {
     ).showSnackBar(SnackBar(content: Text(message)));
   }
 
+  List<Map<String, dynamic>> _visibleMessages(List<Map<String, dynamic>> all) {
+    if (!_isOwnSpace) return all;
+    return all.where((message) => !_isOwnSpaceSystemEvent(message)).toList();
+  }
+
+  /// Opens a search hit: loads back to its message, scrolls to it and
+  /// highlights it for a moment.
+  Future<void> _jumpToSearchHit(ConversationSearchHit hit) async {
+    final history = ref.read(
+      chatHistoryProvider(widget.conversation.channelId),
+    );
+    final loaded = await history.loadUntilMessage(hit.messageId);
+    if (!mounted) return;
+
+    final index = _visibleMessages(
+      history.messages,
+    ).indexWhere((message) => message['id']?.toString() == hit.messageId);
+    if (!loaded || index < 0) {
+      _showActionNotice("Couldn't find that message in this conversation.");
+      return;
+    }
+
+    setState(() => _highlightedId = hit.messageId);
+    _highlightTimer?.cancel();
+    _highlightTimer = Timer(const Duration(seconds: 2), () {
+      if (mounted) setState(() => _highlightedId = null);
+    });
+    _scrollToMessage(index, attempt: 0);
+  }
+
+  void _scrollToMessage(int index, {required int attempt}) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scrollController.hasClients) return;
+      final target = _jumpTargetKey.currentContext;
+      if (target != null) {
+        Scrollable.ensureVisible(
+          target,
+          alignment: 0.5,
+          duration: const Duration(milliseconds: 250),
+        );
+        return;
+      }
+      if (attempt >= 5) return;
+      final position = _scrollController.position;
+      _scrollController.jumpTo(
+        (index * _estimatedRowHeight)
+            .clamp(0.0, position.maxScrollExtent)
+            .toDouble(),
+      );
+      _scrollToMessage(index, attempt: attempt + 1);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
@@ -342,14 +410,9 @@ class _DmChatAreaState extends ConsumerState<DmChatArea> {
                               ),
                             );
                             final isOwnSpace = _isOwnSpace;
-                            final messages = isOwnSpace
-                                ? historyState.messages
-                                      .where(
-                                        (message) =>
-                                            !_isOwnSpaceSystemEvent(message),
-                                      )
-                                      .toList()
-                                : historyState.messages;
+                            final messages = _visibleMessages(
+                              historyState.messages,
+                            );
 
                             return NotificationListener<ScrollNotification>(
                               onNotification: (ScrollNotification scrollInfo) {
@@ -371,6 +434,7 @@ class _DmChatAreaState extends ConsumerState<DmChatArea> {
                                 return false;
                               },
                               child: CustomScrollView(
+                                controller: _scrollController,
                                 reverse: true,
                                 slivers: [
                                   SliverPadding(
@@ -384,14 +448,25 @@ class _DmChatAreaState extends ConsumerState<DmChatArea> {
                                         index,
                                       ) {
                                         final msg = messages[index];
-                                        return _MessageBubble(
-                                          message: msg,
-                                          conversation: widget.conversation,
-                                          channelId:
-                                              widget.conversation.channelId,
-                                          onEdit: (id, text) => _composerKey
-                                              .currentState
-                                              ?.enterEditMode(id, text),
+                                        final isTarget =
+                                            _highlightedId != null &&
+                                            msg['id']?.toString() ==
+                                                _highlightedId;
+                                        return Container(
+                                          key: isTarget ? _jumpTargetKey : null,
+                                          color: isTarget
+                                              ? context.colors.primary
+                                                    .withValues(alpha: 0.12)
+                                              : null,
+                                          child: _MessageBubble(
+                                            message: msg,
+                                            conversation: widget.conversation,
+                                            channelId:
+                                                widget.conversation.channelId,
+                                            onEdit: (id, text) => _composerKey
+                                                .currentState
+                                                ?.enterEditMode(id, text),
+                                          ),
                                         );
                                       }, childCount: messages.length),
                                     ),
@@ -465,6 +540,7 @@ class _DmChatAreaState extends ConsumerState<DmChatArea> {
                     key: ValueKey(widget.conversation.channelId),
                     channelId: widget.conversation.channelId,
                     onClose: () => setState(() => _searchOpen = false),
+                    onResultSelected: _jumpToSearchHit,
                   ),
               ],
             ),

@@ -7,11 +7,13 @@ import 'package:zedu/features/features.dart';
 class SearchPanel extends ConsumerStatefulWidget {
   final String channelId;
   final VoidCallback onClose;
+  final ValueChanged<ConversationSearchHit>? onResultSelected;
 
   const SearchPanel({
     super.key,
     required this.channelId,
     required this.onClose,
+    this.onResultSelected,
   });
 
   @override
@@ -196,29 +198,37 @@ class _SearchPanelState extends ConsumerState<SearchPanel> {
       itemBuilder: (context, index) {
         final hit = _results[index];
         final sentAt = hit.sentAtLabel;
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              sentAt == null ? hit.userName : '${hit.userName} · $sentAt',
-              style: TextStyle(fontSize: 12, color: colors.textHint),
-            ),
-            const SizedBox(height: 4),
-            Text.rich(
-              highlightMatches(
-                hit.text,
-                _searchedQuery,
-                base: TextStyle(color: colors.textPrimary),
-                match: TextStyle(
-                  color: colors.textPrimary,
-                  fontWeight: FontWeight.bold,
-                  backgroundColor: colors.primary.withValues(alpha: 0.18),
+        return InkWell(
+          onTap: widget.onResultSelected == null
+              ? null
+              : () => widget.onResultSelected!(hit),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  sentAt == null ? hit.userName : '${hit.userName} · $sentAt',
+                  style: TextStyle(fontSize: 12, color: colors.textHint),
                 ),
-              ),
-              maxLines: 4,
-              overflow: TextOverflow.ellipsis,
+                const SizedBox(height: 4),
+                Text.rich(
+                  highlightMatches(
+                    hit.text,
+                    _searchedQuery,
+                    base: TextStyle(color: colors.textPrimary),
+                    match: TextStyle(
+                      color: colors.textPrimary,
+                      fontWeight: FontWeight.bold,
+                      backgroundColor: colors.primary.withValues(alpha: 0.18),
+                    ),
+                  ),
+                  maxLines: 4,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
             ),
-          ],
+          ),
         );
       },
     );

@@ -449,6 +449,26 @@ class ChatHistoryNotifier extends ChangeNotifier {
     }
   }
 
+  /// Loads older pages until the message [messageId] is loaded, so a search
+  /// hit far back in the history can be shown. Returns whether it is loaded.
+  /// Stops at the end of the history, when a page fails, after [maxPages]
+  /// pages, or once this notifier is disposed.
+  Future<bool> loadUntilMessage(String messageId, {int maxPages = 50}) async {
+    bool isLoaded() => messages.any((m) => m['id']?.toString() == messageId);
+
+    for (var i = 0; i < maxPages && !isLoaded() && hasMore; i++) {
+      while (isLoading) {
+        if (_isDisposed) return false;
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+      }
+      if (_isDisposed || !hasMore) break;
+      final before = page;
+      await loadMore();
+      if (_isDisposed || page == before) return false;
+    }
+    return !_isDisposed && isLoaded();
+  }
+
   // What each message was sent with, so a retry sends it the same way.
   final Map<
     String,
