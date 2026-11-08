@@ -88,6 +88,23 @@ void main() {
       name: 'quarterly_results.xlsx',
       fileType: 'xlsx',
     );
+    String? copied;
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (call) async {
+        if (call.method == 'Clipboard.setData') {
+          copied = (call.arguments as Map)['text'] as String?;
+        }
+        return null;
+      },
+    );
+    addTearDown(
+      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        null,
+      ),
+    );
+
     await showFile(tester, file);
     await tester.pumpAndSettle();
 
@@ -98,9 +115,12 @@ void main() {
     await tester.tap(copyBtn);
     await tester.pumpAndSettle();
 
-    final data = await Clipboard.getData(Clipboard.kTextPlain);
-    expect(data?.text, 'quarterly_results.xlsx');
+    expect(copied, 'quarterly_results.xlsx');
     expect(find.text('File name copied'), findsOneWidget);
+
+    // Let the toast's auto-dismiss timer fire so no timers are left pending.
+    await tester.pump(const Duration(seconds: 5));
+    await tester.pumpAndSettle();
   });
 }
 

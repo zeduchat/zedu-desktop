@@ -17,11 +17,21 @@ class _DmChatAreaState extends ConsumerState<DmChatArea> {
   bool _searchOpen = false;
   final _composerKey = GlobalKey<DmMessageComposerState>();
   final _scrollController = ScrollController();
+  final _messageKeys = <String, GlobalKey>{};
   final _jumpTargetKey = GlobalKey();
   // Rows are about this tall, so a jump scrolls roughly to the message first.
   static const _estimatedRowHeight = 88.0;
   String? _highlightedId;
   Timer? _highlightTimer;
+  final _searchPanelKey = GlobalKey<SearchPanelState>();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _consumePendingJump();
+    });
+  }
 
   @override
   void dispose() {
@@ -29,7 +39,28 @@ class _DmChatAreaState extends ConsumerState<DmChatArea> {
     _scrollController.dispose();
     super.dispose();
   }
-  final _searchPanelKey = GlobalKey<SearchPanelState>();
+
+  /// Jumps to the message a chat deep link pointed at, once this chat area
+  /// is the one showing that conversation.
+  void _consumePendingJump() {
+    final pending = ref.read(pendingMessageJumpProvider);
+    if (pending == null || pending.messageId.isEmpty) return;
+    if (pending.channelId != widget.conversation.channelId) return;
+    ref.read(pendingMessageJumpProvider.notifier).state = null;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _jumpToMessage(pending.messageId);
+    });
+  }
+
+  Future<void> _copyMessageLink(String messageId) async {
+    final link = ChatDeepLinkParser.buildUri(
+      widget.conversation.channelId,
+      messageId: messageId,
+    );
+    await Clipboard.setData(ClipboardData(text: link.toString()));
+    if (!mounted) return;
+    _showActionNotice('Link copied');
+  }
 
   String get _recipientHandle {
     final parts = widget.conversation.displayName
@@ -314,6 +345,70 @@ class _DmChatAreaState extends ConsumerState<DmChatArea> {
     );
   }
 
+  /// Scrolls the list so [messageId] is visible, loading older pages first
+  /// when the message is not in the loaded history yet.
+  Future<void> _jumpToMessage(String messageId) async {
+    final history = ref.read(
+      chatHistoryProvider(widget.conversation.channelId),
+    );
+    final isLoaded = history.messages.any(
+      (message) => message['id']?.toString() == messageId,
+    );
+    if (!isLoaded) {
+      await history.loadAll();
+      final stillMissing = !history.messages.any(
+        (message) => message['id']?.toString() == messageId,
+      );
+      if (stillMissing) {
+        if (mounted) {
+          _showActionNotice("Couldn't find that message in this conversation.");
+        }
+        return;
+      }
+      // Let the rebuilt list register the message's key before scrolling.
+      await WidgetsBinding.instance.endOfFrame;
+      if (!mounted) return;
+    }
+    if (!_scrollController.hasClients) return;
+    final messages = _visibleMessages(history.messages);
+    final targetIndex = messages.indexWhere(
+      (message) => message['id']?.toString() == messageId,
+    );
+    if (targetIndex == -1) return;
+    final position = _scrollController.position;
+    final maxExtent = position.maxScrollExtent;
+    if (messages.length > 1 && maxExtent > 0) {
+      // Jump close to the target first, so the lazy list builds it and
+      // registers its key, then narrow in with viewport-sized steps.
+      final estimate = maxExtent * (targetIndex / (messages.length - 1));
+      _scrollController.jumpTo(estimate.clamp(0.0, maxExtent));
+    }
+    var key = _messageKeys[messageId];
+    var guard = 0;
+    var direction = 1;
+    while (key?.currentContext == null && guard < 120) {
+      final position = _scrollController.position;
+      final bottom = position.maxScrollExtent;
+      if (direction == 1 && position.pixels >= bottom - 1) direction = -1;
+      final step = position.viewportDimension * 0.8 * direction;
+      final next = (position.pixels + step).clamp(0.0, bottom);
+      if ((next - position.pixels).abs() < 1) break;
+      _scrollController.jumpTo(next);
+      await WidgetsBinding.instance.endOfFrame;
+      guard++;
+      key = _messageKeys[messageId];
+    }
+    final targetContext = key?.currentContext;
+    if (targetContext != null && targetContext.mounted) {
+      await Scrollable.ensureVisible(
+        targetContext,
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeInOut,
+        alignment: 0.3,
+      );
+    }
+  }
+
   Future<void> _showSavedItems() async {
     await showDialog<void>(
       context: context,
@@ -382,6 +477,11 @@ class _DmChatAreaState extends ConsumerState<DmChatArea> {
 
   @override
   Widget build(BuildContext context) {
+    // Registered during build so Riverpod manages the listener's lifetime;
+    // a deep link may land while this chat area is already on screen.
+    ref.listen(pendingMessageJumpProvider, (previous, next) {
+      if (next != null) _consumePendingJump();
+    });
     final colors = context.colors;
     final isMuted = ref.watch(
       notificationSettingsProvider.select(
@@ -479,6 +579,9 @@ class _DmChatAreaState extends ConsumerState<DmChatArea> {
                                           index,
                                         ) {
                                           final msg = messages[index];
+                                          final messageId =
+                                              msg['id']?.toString() ??
+                                              'message-$index';
                                           final isTarget =
                                               _highlightedId != null &&
                                               msg['id']?.toString() ==
@@ -491,15 +594,26 @@ class _DmChatAreaState extends ConsumerState<DmChatArea> {
                                                 ? context.colors.primary
                                                       .withValues(alpha: 0.12)
                                                 : null,
-                                            child: _MessageBubble(
-                                              message: msg,
-                                              conversation:
-                                                  widget.conversation,
-                                              channelId:
-                                                  widget.conversation.channelId,
-                                              onEdit: (id, text) => _composerKey
-                                                  .currentState
-                                                  ?.enterEditMode(id, text),
+                                            child: KeyedSubtree(
+                                              key: _messageKeys.putIfAbsent(
+                                                messageId,
+                                                GlobalKey.new,
+                                              ),
+                                              child: _MessageBubble(
+                                                message: msg,
+                                                conversation:
+                                                    widget.conversation,
+                                                channelId: widget
+                                                    .conversation
+                                                    .channelId,
+                                                onEdit: (id, text) =>
+                                                    _composerKey.currentState
+                                                        ?.enterEditMode(
+                                                          id,
+                                                          text,
+                                                        ),
+                                                onCopyLink: _copyMessageLink,
+                                              ),
                                             ),
                                           );
                                         }, childCount: messages.length),
@@ -1050,12 +1164,14 @@ class _MessageBubble extends ConsumerWidget {
   final DmConversation conversation;
   final String channelId;
   final void Function(String messageId, String content) onEdit;
+  final void Function(String messageId) onCopyLink;
 
   const _MessageBubble({
     required this.message,
     required this.conversation,
     required this.channelId,
     required this.onEdit,
+    required this.onCopyLink,
   });
 
   TextSpan _parseRichText(
@@ -1322,6 +1438,7 @@ class _MessageBubble extends ConsumerWidget {
                     isSaved: isSaved,
                     onPin: () => _pin(context, ref, messageId),
                     onToggleSave: toggleSaved,
+                    onCopyLink: () => onCopyLink(messageId),
                     onEdit: isMe && status == null
                         ? () => onEdit(messageId, content)
                         : null,
@@ -1361,6 +1478,7 @@ class _MessageBubble extends ConsumerWidget {
                             isSaved: isSaved,
                             onPin: () => _pin(context, ref, messageId),
                             onToggleSave: toggleSaved,
+                            onCopyLink: () => onCopyLink(messageId),
                             onEdit: null,
                             onDelete: isMe && status == null
                                 ? () => _confirmDelete(context, ref, messageId)
@@ -1582,8 +1700,9 @@ class MessageAttachmentList extends StatelessWidget {
 }
 
 /// Shows a "more" button on hover, and a right-click or long-press menu, for
-/// a message: Pin and Save on every message, and Edit and Delete on your own.
-/// The long press is for touch input, where there is no hover or right click.
+/// a message: Pin, Copy link and Save on every message, and Edit and Delete
+/// on your own. The long press is for touch input, where there is no hover or
+/// right click.
 ///
 /// Your own messages keep a fixed gutter for the button so the bubble never
 /// moves; incoming messages only grow one while hovered so the conversation
@@ -1595,6 +1714,7 @@ class _MessageMenu extends StatefulWidget {
     required this.isSaved,
     required this.onPin,
     required this.onToggleSave,
+    required this.onCopyLink,
     required this.onEdit,
     required this.onDelete,
     required this.child,
@@ -1605,6 +1725,7 @@ class _MessageMenu extends StatefulWidget {
   final bool isSaved;
   final VoidCallback onPin;
   final VoidCallback onToggleSave;
+  final VoidCallback onCopyLink;
 
   /// Null on other people's messages, which can't be edited or deleted.
   final VoidCallback? onEdit;
@@ -1629,12 +1750,14 @@ class _MessageMenuState extends State<_MessageMenu> {
       icon: const Icon(Icons.more_horiz, size: 18),
       onSelected: (value) => switch (value) {
         'pin' => widget.onPin(),
+        'copy_link' => widget.onCopyLink(),
         'edit' => widget.onEdit?.call(),
         'save' => widget.onToggleSave(),
         _ => widget.onDelete?.call(),
       },
       itemBuilder: (_) => [
         const PopupMenuItem(value: 'pin', child: Text('Pin message')),
+        const PopupMenuItem(value: 'copy_link', child: Text('Copy link')),
         if (widget.onEdit != null)
           const PopupMenuItem(value: 'edit', child: Text('Edit message')),
         PopupMenuItem(
