@@ -188,6 +188,15 @@ void main() {
       expect(find.byIcon(Icons.close), findsOneWidget);
     });
 
+    testWidgets('clear button has a tooltip', (tester) async {
+      await _pumpDialog(tester);
+
+      await tester.enterText(find.byType(TextField), 'Deep work');
+      await tester.pump();
+
+      expect(find.byTooltip('Clear status'), findsOneWidget);
+    });
+
     testWidgets('editing the status text clears the selection', (tester) async {
       await _pumpDialog(tester);
 

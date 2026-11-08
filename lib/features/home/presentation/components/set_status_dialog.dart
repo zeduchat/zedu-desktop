@@ -232,6 +232,7 @@ class _SetStatusDialogState extends ConsumerState<SetStatusDialog> {
                       // Clear button
                       if (_textCtrl.text.isNotEmpty || _selectedEmoji != null)
                         IconButton(
+                          tooltip: 'Clear status',
                           icon: Icon(
                             Icons.close,
                             size: 16,
