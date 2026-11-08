@@ -54,6 +54,9 @@ String htmlMessageToMarkdown(String content) {
   final lists = <int?>[];
   // True right after a list marker, so the item's paragraph stays on its line.
   var afterMarker = false;
+  // How many `<pre>` blocks are open: their text keeps its line breaks and
+  // indentation, so a multi-line code block isn't folded onto one line.
+  var preDepth = 0;
 
   bool atLineStart() => out.isEmpty || out.toString().endsWith('\n');
 
@@ -62,6 +65,10 @@ String htmlMessageToMarkdown(String content) {
   }
 
   void writeText(String text) {
+    if (preDepth > 0) {
+      out.write(_decodeEntities(text));
+      return;
+    }
     // Whitespace that only lays out the markup (`</li>\n  <li>`) is not text.
     if (text.trim().isEmpty && (text.contains('\n') || atLineStart())) return;
     if (text.trim().isEmpty && afterMarker) return;
@@ -105,6 +112,9 @@ String htmlMessageToMarkdown(String content) {
       out.write('${'  ' * (depth - 1)}$bullet ');
       afterMarker = true;
     } else if (_blockTags.contains(tag)) {
+      if (tag == 'pre') {
+        preDepth = closing ? (preDepth > 0 ? preDepth - 1 : 0) : preDepth + 1;
+      }
       if (closing) {
         out.write('\n');
         afterMarker = false;
