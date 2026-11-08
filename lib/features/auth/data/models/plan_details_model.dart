@@ -87,13 +87,15 @@ class PlanDetailsModel {
       transcriptAvailable: json['transcript_available'] as bool? ?? false,
       advancedControls: json['advanced_controls'] as bool? ?? false,
       advancedControlsUser: json['advanced_controls_user'] as bool? ?? false,
-      createdAt: DateTime.parse(
-        json['created_at'] as String? ?? '0001-01-01T00:00:00Z',
-      ),
+      createdAt: _parseDate(json['created_at']),
       credits: (json['credits'] as num?)?.toInt() ?? 0,
-      updatedAt: DateTime.parse(
-        json['updated_at'] as String? ?? '0001-01-01T00:00:00Z',
-      ),
+      updatedAt: _parseDate(json['updated_at']),
     );
+  }
+
+  /// A missing or unreadable date must not stop the organisation from loading.
+  static DateTime _parseDate(Object? value) {
+    final parsed = value is String ? DateTime.tryParse(value) : null;
+    return parsed ?? DateTime.utc(1);
   }
 }
