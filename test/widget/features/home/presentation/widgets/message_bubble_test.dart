@@ -131,4 +131,111 @@ void main() {
       expect((menuItem.dy - buttonCenter.dy).abs(), lessThan(350));
     });
   });
+
+  group('MessageBubble reaction menu mounted check (#9088)', () {
+    testWidgets(
+      'hovering shows add-reaction button and selecting emoji adds reaction when mounted',
+      (tester) async {
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: AppTheme.light,
+            home: const Scaffold(
+              body: MessageBubble(
+                author: 'Alice',
+                text: 'Reaction test',
+                timestamp: '10:00 AM',
+              ),
+            ),
+          ),
+        );
+
+        // Initially, add reaction button is not visible because not hovering
+        expect(find.byIcon(Icons.add_reaction_outlined), findsNothing);
+
+        // Hover over the MessageBubble to trigger _isHovering = true
+        final gesture = await tester.createGesture(
+          kind: PointerDeviceKind.mouse,
+        );
+        await gesture.addPointer(location: Offset.zero);
+        addTearDown(gesture.removePointer);
+        await gesture.moveTo(tester.getCenter(find.byType(MessageBubble)));
+        await tester.pump();
+
+        expect(find.byIcon(Icons.add_reaction_outlined), findsOneWidget);
+
+        // Tap add reaction button to open menu
+        await tester.tap(find.byIcon(Icons.add_reaction_outlined));
+        await tester.pumpAndSettle();
+
+        // Menu is displayed with emojis
+        expect(find.text('👍'), findsOneWidget);
+
+        // Tap the 👍 emoji
+        await tester.tap(find.text('👍'));
+        await tester.pumpAndSettle();
+
+        // Reaction is added to the bubble (emoji key and count)
+        expect(find.text('👍'), findsOneWidget);
+        expect(find.text('1'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'selecting an emoji does not throw if MessageBubble is disposed while menu is open',
+      (tester) async {
+        final key = GlobalKey();
+
+        Widget buildHarness({required bool showBubble}) {
+          return MaterialApp(
+            theme: AppTheme.light,
+            home: Scaffold(
+              body: showBubble
+                  ? MessageBubble(
+                      key: key,
+                      author: 'Alice',
+                      text: 'Disposal test',
+                      timestamp: '10:00 AM',
+                    )
+                  : const SizedBox.shrink(),
+            ),
+          );
+        }
+
+        await tester.pumpWidget(buildHarness(showBubble: true));
+
+        // Hover to reveal add reaction button
+        final gesture = await tester.createGesture(
+          kind: PointerDeviceKind.mouse,
+        );
+        await gesture.addPointer(location: Offset.zero);
+        addTearDown(gesture.removePointer);
+        await gesture.moveTo(tester.getCenter(find.byType(MessageBubble)));
+        await tester.pump();
+
+        expect(find.byIcon(Icons.add_reaction_outlined), findsOneWidget);
+
+        // Tap to open popup menu
+        await tester.tap(find.byIcon(Icons.add_reaction_outlined));
+        await tester.pumpAndSettle();
+
+        expect(find.text('❤️'), findsOneWidget);
+
+        // Unmount the MessageBubble while popup menu remains open on Navigator
+        await tester.pumpWidget(buildHarness(showBubble: false));
+        await tester.pump();
+
+        // MessageBubble is unmounted
+        expect(find.byType(MessageBubble), findsNothing);
+        // PopupMenuItem is still active in the Navigator overlay
+        expect(find.text('❤️'), findsOneWidget);
+
+        // Tap the emoji item on the open popup menu
+        await tester.tap(find.text('❤️'));
+        await tester.pumpAndSettle();
+
+        // Ensure no unhandled exception (e.g. setState called after dispose) was thrown
+        expect(tester.takeException(), isNull);
+      },
+    );
+  });
 }

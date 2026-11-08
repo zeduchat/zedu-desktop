@@ -69,7 +69,8 @@ class _MessageBubbleState extends State<MessageBubble> {
         PopupMenuItem(value: '👎', child: Text('👎')),
       ],
     );
-    if (emoji != null && mounted) {
+    if (!mounted) return;
+    if (emoji != null) {
       _addReaction(emoji);
     }
   }
