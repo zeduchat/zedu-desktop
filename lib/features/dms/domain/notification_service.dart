@@ -61,6 +61,7 @@ class NotificationService {
   final GoRouter? _router;
   final Future<void> Function()? _bringToFront;
   final Future<bool> Function()? _isFocused;
+  final Future<void> Function(LocalNotification notification)? _show;
   final Map<String, DateTime> _lastNotificationTimes = {};
 
   NotificationService(
@@ -68,6 +69,7 @@ class NotificationService {
     this._router,
     this._bringToFront,
     this._isFocused,
+    this._show,
   ]);
 
   static Future<void> _defaultBringToFront() async {
@@ -106,7 +108,12 @@ class NotificationService {
     final authState = _ref.read(authNotifierProvider);
     final currentUserId = authState.user?.id ?? '';
 
-    final senderId = (message['user_id'] ?? message['userId']).toString();
+    final senderId = (message['user_id'] ?? message['userId'])
+        ?.toString()
+        .trim();
+    // Without a sender there is nobody to name, mute or throttle, and such
+    // entries are system rows the chat never shows as someone's message.
+    if (senderId == null || senderId.isEmpty) return;
 
     // Never notify about our own messages (unless forced for testing).
     if (!forceShow && (senderId == currentUserId || senderId == 'me')) return;
@@ -162,7 +169,7 @@ class NotificationService {
     );
 
     try {
-      await notification.show();
+      await (_show?.call(notification) ?? notification.show());
     } catch (_) {}
   }
 
