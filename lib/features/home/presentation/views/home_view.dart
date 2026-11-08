@@ -545,7 +545,7 @@ class HomeChatArea extends ConsumerWidget {
               ],
             ),
           ),
-          _HeaderAction(icon: Icons.headphones_outlined, label: 'Start Buzz'),
+          const _StartBuzzButton(),
           const SizedBox(width: 12),
           // The same count the channel directory shows, so the two agree.
           if (channel != null)
@@ -793,31 +793,98 @@ class _ChannelHeaderMenu extends ConsumerWidget {
   }
 }
 
+/// Starts a Buzz meeting from the channel header and opens it in the browser,
+/// as Start now on the Buzz page does (Ziki #3054).
+class _StartBuzzButton extends ConsumerWidget {
+  const _StartBuzzButton();
+
+  static const openErrorMessage = "Couldn't open the meeting in your browser.";
+
+  Future<void> _start(BuildContext context, WidgetRef ref) async {
+    final result = await ref
+        .read(buzzMeetingsProvider.notifier)
+        .create(startNow: true);
+    if (!context.mounted) return;
+    switch (result) {
+      case Success<Uri>(:final value):
+        final opened = await canLaunchUrl(value) && await launchUrl(value);
+        if (!opened && context.mounted) {
+          AppToastService.show(
+            context,
+            type: AppToastType.error,
+            message: openErrorMessage,
+          );
+        }
+      case Failure<Uri>(:final error):
+        AppToastService.show(
+          context,
+          type: AppToastType.error,
+          message: error.message,
+        );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isStarting =
+        ref.watch(buzzMeetingsProvider) != BuzzMeetingAction.none;
+
+    return _HeaderAction(
+      key: const ValueKey('channel_header_start_buzz'),
+      icon: Icons.headphones_outlined,
+      label: isStarting ? 'Starting…' : 'Start Buzz',
+      onTap: isStarting ? null : () => _start(context, ref),
+    );
+  }
+}
+
 class _HeaderAction extends StatelessWidget {
   final IconData icon;
   final String label;
 
-  const _HeaderAction({required this.icon, required this.label});
+  /// Null while the action can't run: the control is shown disabled.
+  final VoidCallback? onTap;
+
+  const _HeaderAction({
+    super.key,
+    required this.icon,
+    required this.label,
+    this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
+    final enabled = onTap != null;
+    final foreground = enabled ? colors.textPrimary : colors.textHint;
+    final borderRadius = BorderRadius.circular(8);
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        border: Border.all(color: colors.divider),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, size: 18, color: colors.textPrimary),
-          const SizedBox(width: 8),
-          Text(
-            label,
-            style: TextStyle(color: colors.textPrimary, fontSize: 13),
+    return Semantics(
+      button: true,
+      enabled: enabled,
+      child: Material(
+        type: MaterialType.transparency,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: borderRadius,
+          mouseCursor: enabled
+              ? SystemMouseCursors.click
+              : SystemMouseCursors.basic,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              border: Border.all(color: colors.divider),
+              borderRadius: borderRadius,
+            ),
+            child: Row(
+              children: [
+                Icon(icon, size: 18, color: foreground),
+                const SizedBox(width: 8),
+                Text(label, style: TextStyle(color: foreground, fontSize: 13)),
+              ],
+            ),
           ),
-        ],
+        ),
       ),
     );
   }
