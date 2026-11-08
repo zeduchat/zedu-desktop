@@ -399,34 +399,4 @@ void main() {
       expect(find.text('Edit your profile'), findsNothing);
     });
   });
-
-  testWidgets('photo buttons are disabled and say they are coming soon', (
-    tester,
-  ) async {
-    await openDialog(tester, (_) async => null);
-
-    for (final label in ['Upload photo', 'Remove photo']) {
-      final button = find.ancestor(
-        of: find.text(label),
-        matching: find.byWidgetPredicate((w) => w is TextButton),
-      );
-      expect(button, findsOneWidget, reason: label);
-      expect(
-        tester.widget<TextButton>(button).onPressed,
-        isNull,
-        reason: '$label should be disabled',
-      );
-      expect(
-        find.ancestor(of: button, matching: find.byType(Tooltip)),
-        findsOneWidget,
-        reason: label,
-      );
-    }
-    expect(find.byTooltip('Coming soon'), findsNWidgets(2));
-
-    // Tapping a disabled button keeps the dialog open and does nothing.
-    await tester.tap(find.text('Upload photo'), warnIfMissed: false);
-    await tester.pumpAndSettle();
-    expect(find.byType(Dialog), findsOneWidget);
-  });
 }

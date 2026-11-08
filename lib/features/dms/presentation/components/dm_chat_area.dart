@@ -29,6 +29,7 @@ class _DmChatAreaState extends ConsumerState<DmChatArea> {
     _scrollController.dispose();
     super.dispose();
   }
+
   final _searchPanelKey = GlobalKey<SearchPanelState>();
 
   String get _recipientHandle {
@@ -80,11 +81,23 @@ class _DmChatAreaState extends ConsumerState<DmChatArea> {
       return;
     }
 
-    await showEditProfileDialog(context, account, (updated) async {
-      await notifier.updateAccount(updated);
-      // updateAccount clears the error when it starts and sets it on failure.
-      return ref.read(userProfileNotifierProvider).error;
-    });
+    await showEditProfileDialog(
+      context,
+      account,
+      (updated) async {
+        await notifier.updateAccount(updated);
+        // updateAccount clears the error when it starts and sets it on failure.
+        return ref.read(userProfileNotifierProvider).error;
+      },
+      onUploadPhoto: (path) async {
+        await ref.read(userProfileNotifierProvider.notifier).uploadAvatar(path);
+        return ref.read(userProfileNotifierProvider).error;
+      },
+      onRemovePhoto: () async {
+        await ref.read(userProfileNotifierProvider.notifier).removeAvatar();
+        return ref.read(userProfileNotifierProvider).error;
+      },
+    );
   }
 
   Future<void> _handleMenuAction(String action) async {
@@ -493,8 +506,7 @@ class _DmChatAreaState extends ConsumerState<DmChatArea> {
                                                 : null,
                                             child: _MessageBubble(
                                               message: msg,
-                                              conversation:
-                                                  widget.conversation,
+                                              conversation: widget.conversation,
                                               channelId:
                                                   widget.conversation.channelId,
                                               onEdit: (id, text) => _composerKey
