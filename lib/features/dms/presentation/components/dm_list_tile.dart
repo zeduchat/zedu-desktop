@@ -8,26 +8,6 @@ class DmListTile extends ConsumerWidget {
 
   const DmListTile({super.key, required this.conversation});
 
-  String _formatTime(DateTime dt) {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final messageDay = DateTime(dt.year, dt.month, dt.day);
-
-    if (messageDay == today) {
-      final hour = dt.hour > 12 ? dt.hour - 12 : (dt.hour == 0 ? 12 : dt.hour);
-      final minute = dt.minute.toString().padLeft(2, '0');
-      final period = dt.hour >= 12 ? 'PM' : 'AM';
-      return '$hour:$minute $period';
-    }
-
-    final yesterday = today.subtract(const Duration(days: 1));
-    if (messageDay == yesterday) {
-      return 'Yesterday';
-    }
-
-    return '${dt.day}/${dt.month}/${dt.year}';
-  }
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final colors = context.colors;
@@ -88,7 +68,7 @@ class DmListTile extends ConsumerWidget {
                 ),
               Padding(
                 padding: const EdgeInsets.all(12),
-                child: _buildContent(colors, hasUnread, draftEntry),
+                child: _buildContent(context, colors, hasUnread, draftEntry),
               ),
             ],
           ),
@@ -98,6 +78,7 @@ class DmListTile extends ConsumerWidget {
   }
 
   Widget _buildContent(
+    BuildContext context,
     AppPalette colors,
     bool hasUnread,
     DraftEntry? draftEntry,
@@ -199,7 +180,7 @@ class DmListTile extends ConsumerWidget {
           children: [
             if (conversation.hasActivity)
               Text(
-                _formatTime(conversation.lastActivityAt),
+                dmListTimeLabel(context, conversation.lastActivityAt),
                 style: TextStyle(
                   color: hasUnread
                       ? colors.onPrimary
@@ -233,4 +214,36 @@ class DmListTile extends ConsumerWidget {
       ],
     );
   }
+}
+
+const _months = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+];
+
+/// The time label of a DM row: today's time in the system's 12- or 24-hour
+/// format, "Yesterday", or the date with the month spelled out (and the year
+/// only when it isn't this year).
+String dmListTimeLabel(BuildContext context, DateTime time, {DateTime? now}) {
+  final today = now ?? DateTime.now();
+  final day = DateTime(time.year, time.month, time.day);
+  if (day == DateTime(today.year, today.month, today.day)) {
+    return TimeOfDay.fromDateTime(time).format(context);
+  }
+  // By calendar date, so a day shortened by a DST change still counts.
+  if (day == DateTime(today.year, today.month, today.day - 1)) {
+    return 'Yesterday';
+  }
+  final date = '${_months[time.month - 1]} ${time.day}';
+  return time.year == today.year ? date : '$date, ${time.year}';
 }

@@ -218,21 +218,21 @@ void main() {
               message: 'Hello',
               userId: 'user-1',
               username: 'Ada',
-              createdAt: DateTime(2026, 3, 5, 9, 30),
+              createdAt: DateTime(2025, 3, 5, 9, 30),
             ),
           ],
         ),
       );
 
-      expect(find.text('5/3/2026'), findsOneWidget);
+      expect(find.text('Mar 5, 2025'), findsOneWidget);
     });
 
     testWidgets('shows the last read date when there are no messages', (
       tester,
     ) async {
-      await pumpTile(tester, conversation(lastReadAt: DateTime(2026, 4, 2)));
+      await pumpTile(tester, conversation(lastReadAt: DateTime(2025, 4, 2)));
 
-      expect(find.text('2/4/2026'), findsOneWidget);
+      expect(find.text('Apr 2, 2025'), findsOneWidget);
     });
   });
 
@@ -340,6 +340,96 @@ void main() {
 
     test('rows with a channel keep the channel as their key', () {
       expect(buildConversation().conversationKey, 'channel-1');
+    });
+  });
+
+  group('dmListTimeLabel', () {
+    // Labels need a BuildContext for the time format.
+    Future<String> label(
+      WidgetTester tester,
+      DateTime time, {
+      required DateTime now,
+      bool use24Hour = false,
+    }) async {
+      late String result;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: MediaQuery(
+            data: MediaQueryData(alwaysUse24HourFormat: use24Hour),
+            child: Builder(
+              builder: (context) {
+                result = dmListTimeLabel(context, time, now: now);
+                return const SizedBox();
+              },
+            ),
+          ),
+        ),
+      );
+      return result;
+    }
+
+    final now = DateTime(2026, 11, 5, 18);
+
+    testWidgets("today's time follows the 12- or 24-hour setting", (
+      tester,
+    ) async {
+      final time = DateTime(2026, 11, 5, 15, 7);
+      expect(await label(tester, time, now: now), '3:07 PM');
+      expect(await label(tester, time, now: now, use24Hour: true), '15:07');
+    });
+
+    testWidgets('yesterday by calendar day, across a month end', (
+      tester,
+    ) async {
+      expect(
+        await label(tester, DateTime(2026, 11, 4, 0, 5), now: now),
+        'Yesterday',
+      );
+      expect(
+        await label(
+          tester,
+          DateTime(2026, 10, 31, 23, 55),
+          now: DateTime(2026, 11, 1, 0, 30),
+        ),
+        'Yesterday',
+      );
+      expect(
+        await label(tester, DateTime(2026, 11, 3, 23, 59), now: now),
+        'Nov 3',
+      );
+    });
+
+    testWidgets('yesterday is found on the day after a DST change', (
+      tester,
+    ) async {
+      // Whatever the time zone, the day before is found by calendar date,
+      // not by subtracting 24 hours from midnight.
+      expect(
+        await label(
+          tester,
+          DateTime(2026, 3, 29, 12),
+          now: DateTime(2026, 3, 30, 9),
+        ),
+        'Yesterday',
+      );
+      expect(
+        await label(
+          tester,
+          DateTime(2026, 3, 8, 12),
+          now: DateTime(2026, 3, 9, 9),
+        ),
+        'Yesterday',
+      );
+    });
+
+    testWidgets('older dates spell out the month, with the year if needed', (
+      tester,
+    ) async {
+      expect(await label(tester, DateTime(2026, 10, 29), now: now), 'Oct 29');
+      expect(
+        await label(tester, DateTime(2025, 12, 31), now: now),
+        'Dec 31, 2025',
+      );
     });
   });
 }
