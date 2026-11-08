@@ -128,6 +128,7 @@ void main() {
       'pinned_messages',
       'saved_items',
       'search_in_conversation',
+      'view_links',
       'view_files',
       'export_transcript',
       'clear_history',

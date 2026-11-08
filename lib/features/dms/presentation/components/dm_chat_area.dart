@@ -29,6 +29,7 @@ class _DmChatAreaState extends ConsumerState<DmChatArea> {
     _scrollController.dispose();
     super.dispose();
   }
+
   final _searchPanelKey = GlobalKey<SearchPanelState>();
 
   String get _recipientHandle {
@@ -155,6 +156,8 @@ class _DmChatAreaState extends ConsumerState<DmChatArea> {
         if (!deleted && mounted) {
           _showActionNotice("Couldn't delete the conversation. Try again.");
         }
+      default:
+        AppLogger.w('Unhandled DM menu action: $action', tag: 'DmChatArea');
     }
   }
 
@@ -493,8 +496,7 @@ class _DmChatAreaState extends ConsumerState<DmChatArea> {
                                                 : null,
                                             child: _MessageBubble(
                                               message: msg,
-                                              conversation:
-                                                  widget.conversation,
+                                              conversation: widget.conversation,
                                               channelId:
                                                   widget.conversation.channelId,
                                               onEdit: (id, text) => _composerKey
