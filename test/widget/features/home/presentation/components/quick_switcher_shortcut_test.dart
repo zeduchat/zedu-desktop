@@ -172,6 +172,53 @@ void main() {
       expect(find.byType(KeyboardShortcutsDialog), findsOneWidget);
     });
 
+    // German, Nordic and Swiss layouts type / as Shift+7.
+    Future<void> pressShiftedSlash(
+      WidgetTester tester,
+      LogicalKeyboardKey modifier, {
+      String character = '/',
+    }) async {
+      await tester.sendKeyDownEvent(modifier);
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+      await tester.sendKeyEvent(
+        LogicalKeyboardKey.digit7,
+        character: character,
+      );
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+      await tester.sendKeyUpEvent(modifier);
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('Ctrl+/ typed with Shift opens it', (tester) async {
+      await _pump(tester);
+
+      await pressShiftedSlash(tester, LogicalKeyboardKey.controlLeft);
+
+      expect(find.byType(KeyboardShortcutsDialog), findsOneWidget);
+    });
+
+    testWidgets('Cmd+/ typed with Shift opens it', (tester) async {
+      await _pump(tester);
+
+      await pressShiftedSlash(tester, LogicalKeyboardKey.metaLeft);
+
+      expect(find.byType(KeyboardShortcutsDialog), findsOneWidget);
+    });
+
+    testWidgets('Ctrl+Shift+7 that types another character does nothing', (
+      tester,
+    ) async {
+      await _pump(tester);
+
+      await pressShiftedSlash(
+        tester,
+        LogicalKeyboardKey.controlLeft,
+        character: '&',
+      );
+
+      expect(find.byType(KeyboardShortcutsDialog), findsNothing);
+    });
+
     testWidgets('Escape closes it', (tester) async {
       await _pump(tester);
       await _pressCtrlSlash(tester);
