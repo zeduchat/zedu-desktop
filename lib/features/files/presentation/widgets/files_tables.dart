@@ -327,6 +327,7 @@ class FilesTable extends StatelessWidget {
     this.onTogglePin,
     this.pinnedIds = const {},
     this.onInfo,
+    this.onRestore,
     this.onDelete,
     this.deletesPermanently = false,
     this.downloads = const {},
@@ -368,6 +369,9 @@ class FilesTable extends StatelessWidget {
   /// Info.
   final ValueChanged<WorkspaceFile>? onInfo;
 
+  /// Restores a file from Deleted files. When null, the menu has no Restore.
+  final ValueChanged<WorkspaceFile>? onRestore;
+
   /// Deletes a file. When null, the menu has no Delete.
   final ValueChanged<WorkspaceFile>? onDelete;
 
@@ -389,6 +393,7 @@ class FilesTable extends StatelessWidget {
     final share = onShare;
     final togglePin = onTogglePin;
     final info = onInfo;
+    final restore = onRestore;
     final delete = onDelete;
     final hasActions =
         download != null ||
@@ -398,6 +403,7 @@ class FilesTable extends StatelessWidget {
         share != null ||
         togglePin != null ||
         info != null ||
+        restore != null ||
         delete != null;
 
     return _Table(
@@ -467,6 +473,7 @@ class FilesTable extends StatelessWidget {
                 onTogglePin: togglePin == null ? null : () => togglePin(file),
                 isPinned: pinnedIds.contains(file.id),
                 onInfo: info == null ? null : () => info(file),
+                onRestore: restore == null ? null : () => restore(file),
                 onDelete: delete == null ? null : () => delete(file),
                 deleteLabel: deletesPermanently
                     ? 'Delete permanently'
@@ -479,7 +486,17 @@ class FilesTable extends StatelessWidget {
   }
 }
 
-enum _FileAction { download, preview, pin, share, rename, move, info, delete }
+enum _FileAction {
+  download,
+  preview,
+  pin,
+  share,
+  rename,
+  move,
+  info,
+  restore,
+  delete,
+}
 
 /// The ⋮ menu of a file row, holding the actions on that file. While the file
 /// downloads it shows a progress ring instead.
@@ -496,6 +513,7 @@ class _FileActionsMenu extends StatelessWidget {
     required this.onTogglePin,
     required this.isPinned,
     required this.onInfo,
+    required this.onRestore,
     required this.onDelete,
     required this.deleteLabel,
   });
@@ -511,6 +529,7 @@ class _FileActionsMenu extends StatelessWidget {
   final VoidCallback? onTogglePin;
   final bool isPinned;
   final VoidCallback? onInfo;
+  final VoidCallback? onRestore;
   final VoidCallback? onDelete;
   final String deleteLabel;
 
@@ -585,6 +604,7 @@ class _FileActionsMenu extends StatelessWidget {
         _FileAction.rename => onRename?.call(),
         _FileAction.move => onMove?.call(),
         _FileAction.info => onInfo?.call(),
+        _FileAction.restore => onRestore?.call(),
         _FileAction.delete => onDelete?.call(),
       },
       itemBuilder: (context) => [
@@ -605,6 +625,8 @@ class _FileActionsMenu extends StatelessWidget {
         if (onMove != null)
           item(_FileAction.move, Icons.drive_file_move_outline, 'Move'),
         if (onInfo != null) item(_FileAction.info, Icons.info_outline, 'Info'),
+        if (onRestore != null)
+          item(_FileAction.restore, Icons.restore, 'Restore'),
         if (onDelete != null)
           item(
             _FileAction.delete,

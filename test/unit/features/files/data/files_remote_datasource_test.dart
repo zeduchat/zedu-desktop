@@ -828,4 +828,17 @@ void main() {
       );
     });
   });
+
+  group('restoreFile', () {
+    test('restores the file from Deleted files', () async {
+      when(() => api.put<dynamic>(path: any(named: 'path'))).thenAnswer(
+        (_) async =>
+            const ApiResponseModel<dynamic>(statusCode: 200, data: null),
+      );
+
+      await datasource.restoreFile('f-1');
+
+      verify(() => api.put<dynamic>(path: '/files/file/f-1/restore')).called(1);
+    });
+  });
 }

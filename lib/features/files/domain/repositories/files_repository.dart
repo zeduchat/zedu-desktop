@@ -34,6 +34,9 @@ abstract class FilesRepository {
   /// [permanent].
   Future<Result<void>> deleteFile(String fileId, {bool permanent = false});
 
+  /// Restores [fileId] from Deleted files.
+  Future<Result<void>> restoreFile(String fileId);
+
   /// Renames [fileId] to [name].
   Future<Result<void>> renameFile(String fileId, String name);
 

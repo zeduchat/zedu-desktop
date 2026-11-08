@@ -100,6 +100,7 @@ class _FakeFilesRepository extends Fake implements FilesRepository {
   final createdFolders = <(String, String, String?)>[];
   final downloads = <(String, String)>[];
   final deletes = <(String, bool)>[];
+  final restores = <String>[];
   final renames = <(String, String)>[];
   final moves = <(String, String)>[];
   Result<void> moveResult = const Success(null);
@@ -219,6 +220,14 @@ class _FakeFilesRepository extends Fake implements FilesRepository {
 
   @override
   Future<Result<void>> deleteFolder(String id) async => const Success(null);
+
+  Result<void> restoreResult = const Success(null);
+
+  @override
+  Future<Result<void>> restoreFile(String fileId) async {
+    restores.add(fileId);
+    return restoreResult;
+  }
 
   /// What a download returns; complete it to finish the download.
   Completer<Result<void>> download = Completer()..complete(const Success(null));
@@ -1675,5 +1684,63 @@ void main() {
       ),
       findsOneWidget,
     );
+  });
+
+  group('restoring deleted files', () {
+    Future<void> openDeletedFiles(WidgetTester tester) async {
+      await tester.tap(find.text('Deleted files'));
+      await tester.pumpAndSettle();
+      await openFilesTab(tester);
+    }
+
+    testWidgets('restores a deleted file and reloads the list', (tester) async {
+      final repository = _FakeFilesRepository();
+      await _pump(tester, repository);
+      await openDeletedFiles(tester);
+      final loads = repository.queries.length;
+
+      await chooseInMenu(tester, 'Restore');
+
+      expect(repository.restores, ['f-1']);
+      expect(repository.deletes, isEmpty);
+      expect(find.text('Restored logo.png.'), findsOneWidget);
+      expect(repository.queries.length, loads + 1);
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets('a failed restore says so and keeps the file', (tester) async {
+      final repository = _FakeFilesRepository()
+        ..restoreResult = const Failure(
+          ApiFailure(message: 'nope', kind: ApiFailureKind.forbidden),
+        );
+      await _pump(tester, repository);
+      await openDeletedFiles(tester);
+      final loads = repository.queries.length;
+
+      await chooseInMenu(tester, 'Restore');
+
+      expect(
+        find.text(
+          "Could not restore logo.png. You don't have permission to do that.",
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('logo.png'), findsOneWidget);
+      expect(repository.queries.length, loads);
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets('only deleted files offer Restore', (tester) async {
+      await _pump(tester, _FakeFilesRepository());
+      await openFilesTab(tester);
+
+      await tester.tap(actionsMenu());
+      await tester.pumpAndSettle();
+
+      expect(find.text('Delete'), findsOneWidget);
+      expect(find.text('Restore'), findsNothing);
+    });
   });
 }

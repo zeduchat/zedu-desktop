@@ -383,6 +383,23 @@ class _FilesSection extends ConsumerWidget {
     );
   }
 
+  /// Restores [file] from Deleted files and says how it went. On success the
+  /// list reloads without it; on failure the row stays.
+  Future<void> _restore(
+    BuildContext context,
+    WidgetRef ref,
+    WorkspaceFile file,
+  ) async {
+    final overlay = Overlay.of(context, rootOverlay: true);
+    final error = await ref.read(fileRestoresProvider.notifier).restore(file);
+    if (!overlay.mounted) return;
+    AppToastService.showWith(
+      overlay,
+      type: error == null ? AppToastType.success : AppToastType.error,
+      message: error ?? 'Restored ${file.name}.',
+    );
+  }
+
   /// Name of the folder holding [path], such as `Downloads`.
   static String _folderName(String path) {
     final parts = path.split(RegExp(r'[\\/]'))..removeWhere((p) => p.isEmpty);
@@ -451,6 +468,7 @@ class _FilesSection extends ConsumerWidget {
                       ? file.owner
                       : ownerName(file.userId),
                 ),
+          onRestore: isTrash ? (file) => _restore(context, ref, file) : null,
           onDelete: (file) => _delete(context, file, permanent: isTrash),
           deletesPermanently: isTrash,
         );

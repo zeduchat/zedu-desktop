@@ -8,6 +8,7 @@ export 'domain/entities/workspace_file.dart';
 export 'domain/entities/workspace_file_info.dart';
 export 'domain/repositories/files_repository.dart';
 export 'presentation/providers/file_deletions_notifier.dart';
+export 'presentation/providers/file_restores_notifier.dart';
 export 'presentation/providers/file_downloads_notifier.dart';
 export 'presentation/providers/file_moves_notifier.dart';
 export 'presentation/providers/file_renames_notifier.dart';
