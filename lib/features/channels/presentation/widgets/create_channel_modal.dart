@@ -48,7 +48,12 @@ class _CreateChannelModalState extends ConsumerState<CreateChannelModal> {
         );
     if (!mounted) return;
     switch (result) {
-      case Success<Channel>():
+      case Success<Channel>(value: final channel):
+        // Open the new channel rather than leaving the old chat on screen
+        // (Ziki #3048).
+        ref
+            .read(activeChatProvider.notifier)
+            .selectChannel(channel.name, channelId: channel.id);
         final overlay = Overlay.of(context, rootOverlay: true);
         Navigator.of(context).pop();
         AppToastService.showWith(
