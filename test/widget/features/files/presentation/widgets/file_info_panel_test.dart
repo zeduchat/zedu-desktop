@@ -95,6 +95,25 @@ void main() {
     final copyBtn = find.byTooltip('Copy file name');
     expect(copyBtn, findsOneWidget);
 
+    String? copied;
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (call) async {
+        if (call.method == 'Clipboard.setData') {
+          copied = (call.arguments as Map)['text'] as String?;
+        } else if (call.method == 'Clipboard.getData') {
+          return <String, Object?>{'text': copied ?? ''};
+        }
+        return null;
+      },
+    );
+    addTearDown(
+      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        null,
+      ),
+    );
+
     await tester.tap(copyBtn);
     await tester.pumpAndSettle();
 

@@ -18,7 +18,7 @@ Map<String, dynamic> _profileJson({Map<String, dynamic>? extra}) =>
       'is_onboarded': true,
       'organisation_id': 'org-1',
       'current_organisation_slug': 'acme',
-      if (extra != null) ...extra,
+      ...?extra,
     };
 
 void main() {
