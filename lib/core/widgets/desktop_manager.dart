@@ -14,6 +14,12 @@ class DesktopManager extends ConsumerStatefulWidget {
 
 class _DesktopManagerState extends ConsumerState<DesktopManager>
     with WindowListener, TrayListener {
+  final _closeNotice = TrayCloseNotice();
+
+  /// Whether a tray icon was put up, so the first-close notice only points at
+  /// an icon that is there.
+  bool _trayIconShown = false;
+
   @override
   void initState() {
     super.initState();
@@ -40,6 +46,7 @@ class _DesktopManagerState extends ConsumerState<DesktopManager>
     try {
       if (Platform.isWindows) {
         await trayManager.setIcon('app_icon.ico');
+        _trayIconShown = true;
       }
 
       Menu menu = Menu(
@@ -64,6 +71,10 @@ class _DesktopManagerState extends ConsumerState<DesktopManager>
   @override
   void onWindowClose() async {
     await windowManager.hide();
+    await _closeNotice.showIfFirstClose(
+      trayIconShown: _trayIconShown,
+      platform: defaultTargetPlatform,
+    );
   }
 
   @override
