@@ -66,7 +66,9 @@ Future<void> _pump(
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.reset);
   await tester.pumpWidget(
-    buildTestMaterialApp(_Harness(save: save ?? (_) async => true)),
+    ProviderScope(
+      child: buildTestMaterialApp(_Harness(save: save ?? (_) async => true)),
+    ),
   );
 }
 
@@ -167,6 +169,49 @@ void main() {
       expect(_bar, findsOneWidget);
     });
 
+    testWidgets('has a Message sound switch, on by default', (tester) async {
+      await _pump(tester);
+
+      expect(find.text('Message sound'), findsOneWidget);
+      final toggle = tester.widget<Switch>(
+        find.descendant(
+          of: find.ancestor(
+            of: find.text('Message sound'),
+            matching: find.byType(Row),
+          ),
+          matching: find.byType(Switch),
+        ),
+      );
+      expect(toggle.value, isTrue);
+    });
+
+    testWidgets('the Message sound switch turns the sound off and on without '
+        'touching the unsaved bar', (tester) async {
+      await _pump(tester);
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(NotificationsSection)),
+      );
+      final row = find.ancestor(
+        of: find.text('Message sound'),
+        matching: find.byType(MergeSemantics),
+      );
+      final toggle = find.descendant(of: row, matching: find.byType(Switch));
+
+      await tester.ensureVisible(toggle);
+      await tester.tap(toggle);
+      await tester.pump();
+
+      expect(container.read(messageSoundEnabledProvider), isFalse);
+      expect(tester.widget<Switch>(toggle).value, isFalse);
+      expect(_bar, findsNothing);
+
+      await tester.tap(toggle);
+      await tester.pump();
+
+      expect(container.read(messageSoundEnabledProvider), isTrue);
+      expect(_bar, findsNothing);
+    });
+
     testWidgets('does not save twice while a save is running', (tester) async {
       final pending = Completer<bool>();
       var saves = 0;
@@ -213,7 +258,9 @@ void main() {
       addTearDown(tester.view.reset);
 
       await tester.pumpWidget(
-        buildTestMaterialApp(_Harness(save: (_) async => true)),
+        ProviderScope(
+          child: buildTestMaterialApp(_Harness(save: (_) async => true)),
+        ),
       );
       await tester.tap(_mentions);
       await tester.pump();

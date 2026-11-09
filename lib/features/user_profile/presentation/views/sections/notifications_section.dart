@@ -205,6 +205,9 @@ class NotificationsSectionState extends State<NotificationsSection> {
             ],
           ),
         ),
+        const SizedBox(height: 28),
+        const _GroupLabel('Sound'),
+        const _Panel(child: _MessageSoundRow()),
       ],
     );
   }
@@ -606,6 +609,25 @@ class _TimeSelect extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// The message sound switch. It is saved on this device the moment it is
+/// flipped, so it stays out of the draft and the unsaved-changes bar.
+class _MessageSoundRow extends ConsumerWidget {
+  const _MessageSoundRow();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return _ToggleRow(
+      icon: Icons.volume_up_outlined,
+      title: 'Message sound',
+      description:
+          'Play a short sound when a message notification appears on this '
+          'device. Nothing plays while notifications are paused.',
+      value: ref.watch(messageSoundEnabledProvider),
+      onChanged: ref.read(messageSoundEnabledProvider.notifier).setEnabled,
     );
   }
 }

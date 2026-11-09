@@ -3,6 +3,7 @@ export 'dm_repository.dart';
 export 'buzz_repository.dart';
 export 'agora_buzz_call_service.dart';
 export 'call_ringtone.dart';
+export 'message_sound.dart';
 export 'voice_recordings.dart';
 export 'composer_file_store.dart';
 export 'datasources/buzz_remote_datasource.dart';

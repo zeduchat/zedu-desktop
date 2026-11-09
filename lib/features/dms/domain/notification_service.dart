@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:zedu/core/core.dart';
 import 'package:zedu/features/features.dart';
 
@@ -61,6 +63,7 @@ class NotificationService {
   final GoRouter? _router;
   final Future<void> Function()? _bringToFront;
   final Future<bool> Function()? _isFocused;
+  final Future<void> Function(LocalNotification notification)? _show;
   final Map<String, DateTime> _lastNotificationTimes = {};
 
   NotificationService(
@@ -68,6 +71,7 @@ class NotificationService {
     this._router,
     this._bringToFront,
     this._isFocused,
+    this._show,
   ]);
 
   static Future<void> _defaultBringToFront() async {
@@ -162,8 +166,19 @@ class NotificationService {
     );
 
     try {
-      await notification.show();
-    } catch (_) {}
+      await (_show?.call(notification) ?? notification.show());
+    } catch (_) {
+      return;
+    }
+    _playMessageSound();
+  }
+
+  /// Plays the message sound, once a notification was really shown (so never
+  /// while paused, muted or suppressed: those return before this point), unless
+  /// the user turned the sound off in Settings > Notifications.
+  void _playMessageSound() {
+    if (!_ref.read(messageSoundEnabledProvider)) return;
+    unawaited(_ref.read(messageSoundProvider).play());
   }
 
   /// Handles a user clicking on a desktop notification.

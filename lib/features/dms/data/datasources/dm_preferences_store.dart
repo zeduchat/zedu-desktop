@@ -15,6 +15,7 @@ class DmPreferencesStore {
 
   static String pinnedKey(String userId) => 'dm_pinned_channels_$userId';
   static String mutedKey(String userId) => 'dm_muted_participants_$userId';
+  static String messageSoundKey(String userId) => 'message_sound_$userId';
 
   Future<Set<String>> read(String key) async {
     if (!locator.isRegistered<SecureStorageService>()) return {};
@@ -26,6 +27,29 @@ class DmPreferencesStore {
     } catch (error) {
       AppLogger.w('Could not read $key - $error', tag: _tag);
       return {};
+    }
+  }
+
+  /// A saved on/off choice, or null when nothing was saved or it can't be read.
+  Future<bool?> readFlag(String key) async {
+    if (!locator.isRegistered<SecureStorageService>()) return null;
+    try {
+      final raw = await locator<SecureStorageService>().readData(key);
+      if (raw == 'true') return true;
+      if (raw == 'false') return false;
+      return null;
+    } catch (error) {
+      AppLogger.w('Could not read $key - $error', tag: _tag);
+      return null;
+    }
+  }
+
+  Future<void> writeFlag(String key, bool value) async {
+    if (!locator.isRegistered<SecureStorageService>()) return;
+    try {
+      await locator<SecureStorageService>().writeData(key, '$value');
+    } catch (error) {
+      AppLogger.w('Could not save $key - $error', tag: _tag);
     }
   }
 
