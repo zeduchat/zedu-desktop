@@ -77,3 +77,31 @@ QuickSwitcherEntry? adjacentConversation(
   if (target < 0 || target >= entries.length) return null;
   return entries[target];
 }
+
+/// The nearest conversation [step] places from the open one (-1 above, 1
+/// below) that has unread messages, or null when there is none that way: the
+/// list does not wrap.
+///
+/// A DM is unread when its own count says so; a channel is unread when its id
+/// is in [unreadChannelIds]. With nothing open, going down gives the first
+/// unread conversation and going up does nothing.
+QuickSwitcherEntry? adjacentUnreadConversation(
+  List<QuickSwitcherEntry> entries,
+  int? openIndex,
+  int step, {
+  required Set<String> unreadChannelIds,
+}) {
+  bool isUnread(QuickSwitcherEntry entry) {
+    final conversation = entry.conversation;
+    if (conversation != null) return conversation.isUnread;
+    return unreadChannelIds.contains(entry.channelId);
+  }
+
+  if (openIndex == null && step < 0) return null;
+  var index = (openIndex ?? -1) + step;
+  while (index >= 0 && index < entries.length) {
+    if (isUnread(entries[index])) return entries[index];
+    index += step;
+  }
+  return null;
+}

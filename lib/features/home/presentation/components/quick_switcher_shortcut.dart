@@ -4,8 +4,9 @@ import 'package:zedu/features/features.dart';
 /// Opens the [QuickSwitcherDialog] on Cmd+K (macOS) or Ctrl+K (Windows,
 /// Linux), and the [KeyboardShortcutsDialog] on Cmd+/ or Ctrl+/, from any
 /// screen once the user is signed in. Alt+Up and Alt+Down move to the
-/// previous or next conversation in the Home sidebar, and Ctrl+1 to Ctrl+4
-/// (Cmd+1 to Cmd+4) open the rail's Home, DMs, People and Files.
+/// previous or next conversation in the Home sidebar, Alt+Shift+Up and
+/// Alt+Shift+Down to the previous or next one with unread messages, and Ctrl+1
+/// to Ctrl+4 (Cmd+1 to Cmd+4) open the rail's Home, DMs, People and Files.
 /// What Ctrl+1 to Ctrl+4 open, in the order the app rail lists them.
 const _railDestinations = <HomeSidebarType>[
   HomeSidebarType.home,
@@ -81,7 +82,8 @@ class _QuickSwitcherShortcutState extends ConsumerState<QuickSwitcherShortcut> {
 
   /// Opens the conversation [step] places from the open one in the sidebar's
   /// order (-1 above, 1 below). It stops at either end instead of wrapping.
-  void _moveConversation(int step) {
+  /// With [unreadOnly] it skips the conversations that have no unread messages.
+  void _moveConversation(int step, {bool unreadOnly = false}) {
     final signedIn =
         ref.read(authNotifierProvider).status == AuthStatus.authenticated;
     if (_open || !signedIn) return;
@@ -99,7 +101,18 @@ class _QuickSwitcherShortcutState extends ConsumerState<QuickSwitcherShortcut> {
       chat: ref.read(activeChatProvider),
       selectedDm: ref.read(selectedDmProvider),
     );
-    final next = adjacentConversation(entries, openIndex, step);
+    final next = unreadOnly
+        ? adjacentUnreadConversation(
+            entries,
+            openIndex,
+            step,
+            unreadChannelIds: {
+              for (final channel
+                  in ref.read(channelProvider).value ?? const <Channel>[])
+                if (channel.unreadCount > 0) channel.id,
+            },
+          )
+        : adjacentConversation(entries, openIndex, step);
     if (next != null) _openEntry(next);
   }
 
@@ -152,6 +165,18 @@ class _QuickSwitcherShortcutState extends ConsumerState<QuickSwitcherShortcut> {
             _moveConversation(-1),
         const SingleActivator(LogicalKeyboardKey.arrowDown, alt: true): () =>
             _moveConversation(1),
+        const SingleActivator(
+          LogicalKeyboardKey.arrowUp,
+          alt: true,
+          shift: true,
+        ): () =>
+            _moveConversation(-1, unreadOnly: true),
+        const SingleActivator(
+          LogicalKeyboardKey.arrowDown,
+          alt: true,
+          shift: true,
+        ): () =>
+            _moveConversation(1, unreadOnly: true),
         for (var i = 0; i < _railDestinations.length; i++) ...{
           SingleActivator(_railDigitKeys[i], control: true): () =>
               _openDestination(_railDestinations[i]),
