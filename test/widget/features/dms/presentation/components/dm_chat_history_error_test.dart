@@ -7,6 +7,14 @@ class MockDmRepository extends Mock implements DmRepository {}
 
 class MockDraftStore extends Mock implements DmDraftStore {}
 
+// The message bubble now hosts the Later bookmark button, which reads the
+// selected workspace. Without a registered AppConfig the real notifier would
+// kick off fetchWorkspaces through GetIt, so tests supply an empty one.
+class FakeWorkspaceNotifier extends WorkspaceNotifier {
+  @override
+  WorkspaceState build() => const WorkspaceState();
+}
+
 // Avoids the GetIt/locator setup the real AuthNotifier needs.
 class FakeAuthNotifier extends AuthNotifier {
   @override
@@ -51,6 +59,7 @@ void main() {
       ProviderScope(
         overrides: [
           authNotifierProvider.overrideWith(FakeAuthNotifier.new),
+          workspaceProvider.overrideWith(FakeWorkspaceNotifier.new),
           dmRepositoryProvider.overrideWithValue(repository),
           dmDraftStoreProvider.overrideWith((ref) => drafts),
         ],

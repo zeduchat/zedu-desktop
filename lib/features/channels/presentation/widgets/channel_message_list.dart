@@ -562,6 +562,7 @@ class _ChannelMessageTileState extends ConsumerState<ChannelMessageTile> {
                       ),
                   ],
                 ),
+                ?widget.saveAction,
                 const SizedBox(height: 4),
                 if (_message.text.isNotEmpty || _message.media.isEmpty)
                   ReportMessageMenu(

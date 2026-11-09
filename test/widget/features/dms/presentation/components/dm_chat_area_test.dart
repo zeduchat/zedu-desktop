@@ -14,6 +14,14 @@ class MockDmRepository extends Mock implements DmRepository {}
 
 class MockSecureStorageService extends Mock implements SecureStorageService {}
 
+// The message bubble now hosts the Later bookmark button, which reads the
+// selected workspace. Without a registered AppConfig the real notifier would
+// kick off fetchWorkspaces through GetIt, so tests supply an empty one.
+class FakeWorkspaceNotifier extends WorkspaceNotifier {
+  @override
+  WorkspaceState build() => const WorkspaceState();
+}
+
 class FakeSignedInAuthNotifier extends AuthNotifier {
   @override
   AuthState build() => AuthState(
@@ -64,6 +72,7 @@ void main() {
       ProviderScope(
         overrides: [
           authNotifierProvider.overrideWith(FakeAuthNotifier.new),
+          workspaceProvider.overrideWith(FakeWorkspaceNotifier.new),
           dmRepositoryProvider.overrideWithValue(repository),
           dmDraftStoreProvider.overrideWith(
             (ref) => DmDraftStore(storage, userId: 'u', orgId: 'o'),
@@ -121,6 +130,7 @@ void main() {
         ProviderScope(
           overrides: [
             authNotifierProvider.overrideWith(FakeAuthNotifier.new),
+            workspaceProvider.overrideWith(FakeWorkspaceNotifier.new),
             currentOrgIdProvider.overrideWithValue('org-1'),
             dmRepositoryProvider.overrideWithValue(repository),
             dmDraftStoreProvider.overrideWith(
@@ -200,6 +210,7 @@ void main() {
           overrides: [
             dmRepositoryProvider.overrideWithValue(repository),
             authNotifierProvider.overrideWith(FakeSignedInAuthNotifier.new),
+            workspaceProvider.overrideWith(FakeWorkspaceNotifier.new),
             dmDraftStoreProvider.overrideWith(
               (ref) => DmDraftStore(storage, userId: 'user-1', orgId: 'org-1'),
             ),
@@ -266,6 +277,7 @@ void main() {
           overrides: [
             dmRepositoryProvider.overrideWithValue(repository),
             authNotifierProvider.overrideWith(FakeSignedInAuthNotifier.new),
+            workspaceProvider.overrideWith(FakeWorkspaceNotifier.new),
             dmDraftStoreProvider.overrideWith(
               (ref) => DmDraftStore(storage, userId: 'user-1', orgId: 'org-1'),
             ),
@@ -356,6 +368,7 @@ void main() {
         ProviderScope(
           overrides: [
             authNotifierProvider.overrideWith(FakeSignedInAuthNotifier.new),
+            workspaceProvider.overrideWith(FakeWorkspaceNotifier.new),
             dmRepositoryProvider.overrideWithValue(repository),
             dmDraftStoreProvider.overrideWith(
               (ref) => DmDraftStore(storage, userId: 'user-1', orgId: 'org-1'),
@@ -435,6 +448,7 @@ void main() {
         ProviderScope(
           overrides: [
             authNotifierProvider.overrideWith(FakeSignedInAuthNotifier.new),
+            workspaceProvider.overrideWith(FakeWorkspaceNotifier.new),
             dmRepositoryProvider.overrideWithValue(repository),
             dmDraftStoreProvider.overrideWith(
               (ref) => DmDraftStore(storage, userId: 'user-1', orgId: 'org-1'),
