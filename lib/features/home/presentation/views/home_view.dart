@@ -200,7 +200,7 @@ class _ChatAreaSwitcher extends ConsumerWidget {
       final type = ref.read(activeChatProvider).type;
       if (type == ActiveChatType.newGroupChat ||
           type == ActiveChatType.channelDirectory) {
-        ref.read(activeChatProvider.notifier).selectChannel('general');
+        ref.read(activeChatProvider.notifier).selectChannel(generalChannelName);
       }
     }
 
@@ -409,9 +409,15 @@ class HomeChatArea extends ConsumerWidget {
     // text while it has none.
     final chat = ref.watch(activeChatProvider);
     final channels = ref.watch(channelProvider).value ?? const <Channel>[];
+    final pickedName = chat.id?.trim() ?? '';
+    // A channel pick without a name points at no channel: say so, rather than
+    // quietly opening #general, which may not exist (Ziki #3779).
+    if (chat.type == ActiveChatType.channel && pickedName.isEmpty) {
+      return const _NoChannelSelected();
+    }
     final channelName = chat.type == ActiveChatType.channel
-        ? (chat.id ?? 'general')
-        : 'general';
+        ? chat.id!
+        : generalChannelName;
     Channel? selected;
     // Two channels can differ only in letter case, so the picked id wins over
     // the name. The name still finds #general at the start, before any pick.
@@ -635,6 +641,30 @@ class _ArchivedChannelBanner extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Shown when a channel pick carries no name, so there is no channel to open.
+class _NoChannelSelected extends StatelessWidget {
+  const _NoChannelSelected();
+
+  static const message = 'Pick a channel from the sidebar.';
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+
+    return ColoredBox(
+      color: colors.background,
+      child: Center(
+        child: Text(
+          message,
+          style: context.textTheme.bodyMedium?.copyWith(
+            color: colors.textSecondary,
+          ),
+        ),
       ),
     );
   }

@@ -305,6 +305,43 @@ void main() {
       expect(find.text('# random'), findsNothing);
     });
 
+    testWidgets('starts on the shared generalChannelName channel (#3779)', (
+      tester,
+    ) async {
+      await pumpSidebarAndChat(tester);
+
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(HomeChatArea)),
+      );
+      expect(container.read(activeChatProvider).id, generalChannelName);
+      expect(find.text('# $generalChannelName'), findsOneWidget);
+    });
+
+    for (final name in ['', '   ']) {
+      testWidgets(
+        'a channel pick with no name says so, not #general (#3779, "$name")',
+        (tester) async {
+          await pumpSidebarAndChat(tester);
+          final container = ProviderScope.containerOf(
+            tester.element(find.byType(HomeChatArea)),
+          );
+
+          container.read(activeChatProvider.notifier).selectChannel(name);
+          await tester.pumpAndSettle();
+
+          expect(find.text('Pick a channel from the sidebar.'), findsOneWidget);
+          expect(find.text('# general'), findsNothing);
+          expect(find.text('Welcome to #general'), findsNothing);
+
+          // Picking a real channel afterwards opens it as usual.
+          await tester.tap(find.text('random'));
+          await tester.pumpAndSettle();
+          expect(find.text('# random'), findsOneWidget);
+          expect(find.text('Pick a channel from the sidebar.'), findsNothing);
+        },
+      );
+    }
+
     testWidgets('the channel composer gets the channel members to mention', (
       tester,
     ) async {

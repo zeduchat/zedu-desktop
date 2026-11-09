@@ -51,7 +51,7 @@ Future<void> setChannelArchived(
         ref
             .read(activeChatProvider.notifier)
             .selectChannel(
-              remaining.isEmpty ? 'general' : remaining.first.name,
+              remaining.isEmpty ? generalChannelName : remaining.first.name,
             );
       }
       AppToastService.showWith(
@@ -115,7 +115,9 @@ Future<void> confirmLeaveChannel(
           .toList();
       ref
           .read(activeChatProvider.notifier)
-          .selectChannel(remaining.isEmpty ? 'general' : remaining.first.name);
+          .selectChannel(
+            remaining.isEmpty ? generalChannelName : remaining.first.name,
+          );
       AppToastService.showWith(
         overlay,
         type: AppToastType.success,
