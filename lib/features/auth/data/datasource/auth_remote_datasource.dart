@@ -155,10 +155,11 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         return;
       }
 
-      AppLogger.d('POST auth/password-reset — $email', tag: _tag);
+      final normalizedEmail = email.trim().toLowerCase();
+      AppLogger.d('POST auth/password-reset — $normalizedEmail', tag: _tag);
       await _apiBaseService.post<dynamic>(
         path: '/auth/password-reset',
-        data: {'email': email},
+        data: {'email': normalizedEmail},
       );
     } on ApiFailure {
       rethrow;
@@ -184,10 +185,15 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         return;
       }
 
+      final normalizedEmail = email.trim().toLowerCase();
       AppLogger.d('POST /auth/password-reset/verify', tag: _tag);
       await _apiBaseService.post<dynamic>(
         path: '/auth/password-reset/verify',
-        data: {'email': email, 'token': token, 'new_password': newPassword},
+        data: {
+          'email': normalizedEmail,
+          'token': token,
+          'new_password': newPassword,
+        },
       );
     } on ApiFailure {
       rethrow;

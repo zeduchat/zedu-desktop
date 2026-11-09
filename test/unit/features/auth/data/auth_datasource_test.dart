@@ -218,6 +218,40 @@ void main() {
       });
     });
 
+    group('forgotPassword', () {
+      test(
+        'trims and lowercases the email before POST /auth/password-reset',
+        () async {
+          when(
+            () => mockApi.post<dynamic>(
+              path: '/auth/password-reset',
+              data: {'email': 'user@example.com'},
+            ),
+          ).thenAnswer(
+            (_) async =>
+                const ApiResponseModel<dynamic>(data: null, statusCode: 200),
+          );
+
+          final datasource = AuthRemoteDataSourceImpl(
+            config: const AppConfig(
+              apiBaseUrl: 'https://api.example.com',
+              usesMockData: false,
+            ),
+            apiBaseService: mockApi,
+          );
+
+          await datasource.forgotPassword(email: '  User@Example.COM  ');
+
+          verify(
+            () => mockApi.post<dynamic>(
+              path: '/auth/password-reset',
+              data: {'email': 'user@example.com'},
+            ),
+          ).called(1);
+        },
+      );
+    });
+
     group('resetPassword', () {
       test(
         'calls POST /auth/password-reset/verify with email, token and new password',
@@ -245,7 +279,7 @@ void main() {
           );
 
           await datasource.resetPassword(
-            email: 'user@example.com',
+            email: '  User@Example.COM  ',
             token: '123456',
             newPassword: 'NewSecret123',
           );
