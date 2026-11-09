@@ -14,6 +14,48 @@ String notificationPreview(String text) {
   return '${characters.take(77)}...';
 }
 
+/// The channel behind [channelId] in [channels], or null when it is not one
+/// of them (a DM, for instance).
+Channel? channelForNotification(List<Channel> channels, String channelId) {
+  for (final channel in channels) {
+    if (channel.id == channelId) return channel;
+  }
+  return null;
+}
+
+/// The title of a message notification: a channel message names the channel,
+/// a DM names the sender.
+String notificationTitle({required String senderName, Channel? channel}) {
+  if (channel == null) return 'New DM from $senderName';
+  return 'New message in #${channel.name}';
+}
+
+/// The body of a message notification. A channel message also says who wrote
+/// it, since the title only names the channel.
+String notificationBody({
+  required String senderName,
+  required String preview,
+  Channel? channel,
+}) {
+  if (channel == null) return preview;
+  return notificationPreview('$senderName: $preview');
+}
+
+/// Whether [channel] is the conversation on screen: the Home pane is showing
+/// it. The id of the picked channel wins; the name finds #general at the
+/// start, before any channel has been picked.
+bool isChannelOpen({
+  required ActiveChatState chat,
+  required HomeSidebarType sidebar,
+  required Channel channel,
+}) {
+  if (sidebar != HomeSidebarType.home) return false;
+  if (chat.type != ActiveChatType.channel) return false;
+  final pickedId = chat.channelId;
+  if (pickedId != null) return pickedId == channel.id;
+  return (chat.id ?? '').toLowerCase() == channel.name.toLowerCase();
+}
+
 /// Tags become a space so words on either side do not run together, entities
 /// are decoded until decoding no longer changes the text, and the whitespace
 /// that leaves behind is collapsed.
@@ -85,6 +127,13 @@ class NotificationService {
     }
   }
 
+  /// The channels the sidebar has already loaded. The list is never fetched
+  /// from here: a message from somewhere that is not in it is a DM.
+  List<Channel> _loadedChannels() {
+    if (!_ref.exists(channelProvider)) return const <Channel>[];
+    return _ref.read(channelProvider).value ?? const <Channel>[];
+  }
+
   Future<void> init() async {
     await localNotifier.setup(
       appName: 'Zedu',
@@ -107,6 +156,7 @@ class NotificationService {
     final currentUserId = authState.user?.id ?? '';
 
     final senderId = (message['user_id'] ?? message['userId']).toString();
+    final channel = channelForNotification(_loadedChannels(), channelId);
 
     // Never notify about our own messages (unless forced for testing).
     if (!forceShow && (senderId == currentUserId || senderId == 'me')) return;
@@ -126,6 +176,17 @@ class NotificationService {
       final selectedChannel = _ref.read(selectedDmProvider)?.channelId;
 
       if (isFocused && selectedChannel == channelId) {
+        return;
+      }
+
+      // A channel message is not a DM: skip it while that channel is open.
+      if (isFocused &&
+          channel != null &&
+          isChannelOpen(
+            chat: _ref.read(activeChatProvider),
+            sidebar: _ref.read(homeSidebarProvider),
+            channel: channel,
+          )) {
         return;
       }
 
@@ -150,8 +211,12 @@ class NotificationService {
     contentPreview = notificationPreview(contentPreview);
 
     final notification = LocalNotification(
-      title: 'New DM from $senderName',
-      body: contentPreview,
+      title: notificationTitle(senderName: senderName, channel: channel),
+      body: notificationBody(
+        senderName: senderName,
+        preview: contentPreview,
+        channel: channel,
+      ),
     );
 
     notification.onClick = () => handleNotificationClick(
@@ -168,9 +233,10 @@ class NotificationService {
 
   /// Handles a user clicking on a desktop notification.
   ///
-  /// Selects the DM conversation via [selectedDmProvider], switches the
-  /// sidebar to [HomeSidebarType.dms], and navigates to [AppRouter.home]
-  /// if not already on the home screen.
+  /// For a channel message it opens that channel on Home. Otherwise it selects
+  /// the DM conversation via [selectedDmProvider], switches the sidebar to
+  /// [HomeSidebarType.dms], and navigates to [AppRouter.home] if not already on
+  /// the home screen.
   Future<void> handleNotificationClick({
     required String channelId,
     required String senderName,
@@ -178,6 +244,16 @@ class NotificationService {
     required String contentPreview,
   }) async {
     await (_bringToFront?.call() ?? _defaultBringToFront());
+
+    final channel = channelForNotification(_loadedChannels(), channelId);
+    if (channel != null) {
+      _ref.read(homeSidebarProvider.notifier).setType(HomeSidebarType.home);
+      _ref
+          .read(activeChatProvider.notifier)
+          .selectChannel(channel.name, channelId: channel.id);
+      _goHome();
+      return;
+    }
 
     _ref.read(homeSidebarProvider.notifier).setType(HomeSidebarType.dms);
 
@@ -199,6 +275,10 @@ class NotificationService {
 
     _ref.read(selectedDmProvider.notifier).select(conversation);
 
+    _goHome();
+  }
+
+  void _goHome() {
     final router =
         _router ??
         (locator.isRegistered<GoRouter>()
