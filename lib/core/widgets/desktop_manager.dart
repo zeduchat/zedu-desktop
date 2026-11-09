@@ -1,8 +1,23 @@
-import 'dart:io';
-
 import 'package:zedu/core/core.dart';
 import 'package:zedu/features/dms/domain/notification_service.dart';
 
+/// Whether the app runs as a desktop app, where [DesktopManager] is mounted.
+bool get isDesktopApp =>
+    !kIsWeb &&
+    (defaultTargetPlatform == TargetPlatform.windows ||
+        defaultTargetPlatform == TargetPlatform.macOS ||
+        defaultTargetPlatform == TargetPlatform.linux);
+
+/// The tray icon, as a bundled asset: the tray plugin looks icons up in the
+/// app's assets. Windows needs an .ico; macOS and Linux take a PNG.
+String trayIconAsset(TargetPlatform platform) =>
+    platform == TargetPlatform.windows
+    ? 'assets/pngs/tray_icon.ico'
+    : 'assets/pngs/zedu_logo.png';
+
+/// Keeps the desktop app running in the tray: closing the window hides it,
+/// the tray icon and menu bring it back or quit, and desktop notifications are
+/// set up.
 class DesktopManager extends ConsumerStatefulWidget {
   final Widget child;
 
@@ -38,9 +53,7 @@ class _DesktopManagerState extends ConsumerState<DesktopManager>
     }
 
     try {
-      if (Platform.isWindows) {
-        await trayManager.setIcon('app_icon.ico');
-      }
+      await trayManager.setIcon(trayIconAsset(defaultTargetPlatform));
 
       Menu menu = Menu(
         items: [
@@ -78,6 +91,8 @@ class _DesktopManagerState extends ConsumerState<DesktopManager>
       await windowManager.show();
       await windowManager.focus();
     } else if (menuItem.key == 'exit_app') {
+      // Closing is prevented so X can hide to the tray; Exit must really quit.
+      await windowManager.setPreventClose(false);
       await windowManager.destroy();
     }
   }
