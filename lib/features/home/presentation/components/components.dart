@@ -1,3 +1,4 @@
+export 'new_message_action.dart';
 export 'sidebar_row_menu.dart';
 export 'sidebar_conversation_cycle.dart';
 export 'user_menu_button.dart';

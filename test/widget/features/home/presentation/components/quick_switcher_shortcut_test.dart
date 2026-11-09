@@ -34,6 +34,15 @@ class _Dms extends DmListNotifier {
   ];
 }
 
+/// The real notifier loads the workspaces from the API when first read.
+class _Workspace extends WorkspaceNotifier {
+  @override
+  WorkspaceState build() => const WorkspaceState();
+
+  @override
+  Future<void> fetchWorkspaces() async {}
+}
+
 class _FailingChannels extends ChannelNotifier {
   @override
   Future<List<Channel>> build() async => throw Exception('offline');
@@ -93,6 +102,7 @@ Future<ProviderContainer> _pump(
     overrides: [
       currentOrgIdProvider.overrideWithValue('org-test'),
       authNotifierProvider.overrideWith(() => _Auth(status)),
+      workspaceProvider.overrideWith(_Workspace.new),
       channelProvider.overrideWith(
         pendingChannels != null
             ? () => _PendingChannels(pendingChannels)
@@ -483,6 +493,124 @@ void main() {
       await _pressCtrlK(tester);
 
       expect(find.byType(QuickSwitcherDialog), findsOneWidget);
+    });
+  });
+
+  group('Ctrl+N (new message)', () {
+    Future<void> pressN(
+      WidgetTester tester, {
+      LogicalKeyboardKey modifier = LogicalKeyboardKey.controlLeft,
+    }) => _pressRailDigit(tester, LogicalKeyboardKey.keyN, modifier: modifier);
+
+    testWidgets('Ctrl+N opens the new-message page and goes home, even with a '
+        'text field focused', (tester) async {
+      final container = await _pump(tester);
+      expect(find.text('home screen'), findsNothing);
+
+      await pressN(tester);
+
+      expect(
+        container.read(activeChatProvider).type,
+        ActiveChatType.newGroupChat,
+      );
+      expect(find.text('home screen'), findsOneWidget);
+    });
+
+    testWidgets('Cmd+N works too', (tester) async {
+      final container = await _pump(tester);
+
+      await pressN(tester, modifier: LogicalKeyboardKey.metaLeft);
+
+      expect(
+        container.read(activeChatProvider).type,
+        ActiveChatType.newGroupChat,
+      );
+    });
+
+    testWidgets('it closes the open DM first, as the compose button does', (
+      tester,
+    ) async {
+      final container = await _pump(tester);
+      final dm = (await container.read(dmListProvider.future)).first;
+      container.read(selectedDmProvider.notifier).select(dm);
+      expect(container.read(selectedDmProvider), isNotNull);
+
+      await pressN(tester);
+
+      expect(container.read(selectedDmProvider), isNull);
+      expect(
+        container.read(activeChatProvider).type,
+        ActiveChatType.newGroupChat,
+      );
+    });
+
+    testWidgets('does nothing when signed out', (tester) async {
+      final container = await _pump(tester, status: AuthStatus.unauthenticated);
+
+      await pressN(tester);
+
+      expect(
+        container.read(activeChatProvider).type,
+        ActiveChatType.channelDirectory,
+      );
+      expect(find.text('home screen'), findsNothing);
+    });
+
+    testWidgets('a bare N does nothing', (tester) async {
+      final container = await _pump(tester);
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyN);
+      await tester.pumpAndSettle();
+
+      expect(
+        container.read(activeChatProvider).type,
+        ActiveChatType.channelDirectory,
+      );
+    });
+
+    testWidgets('does not start while the quick switcher is open', (
+      tester,
+    ) async {
+      final container = await _pump(tester);
+      await _pressCtrlK(tester);
+      expect(find.byType(QuickSwitcherDialog), findsOneWidget);
+
+      await pressN(tester);
+
+      expect(
+        container.read(activeChatProvider).type,
+        ActiveChatType.channelDirectory,
+      );
+    });
+
+    testWidgets('Ctrl+K still opens the switcher', (tester) async {
+      await _pump(tester);
+
+      await _pressCtrlK(tester);
+
+      expect(find.byType(QuickSwitcherDialog), findsOneWidget);
+    });
+
+    testWidgets('Alt+Down still opens the next conversation', (tester) async {
+      final container = await _pump(tester);
+      await container.read(channelProvider.future);
+      await container.read(dmListProvider.future);
+
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.altLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.altLeft);
+      await tester.pumpAndSettle();
+
+      expect(container.read(homeSidebarProvider), HomeSidebarType.dms);
+      expect(container.read(selectedDmProvider)?.channelId, 'c-gideon');
+    });
+
+    testWidgets('Ctrl+2 still opens the DMs tab', (tester) async {
+      final container = await _pump(tester);
+
+      await _pressRailDigit(tester, LogicalKeyboardKey.digit2);
+
+      expect(container.read(homeSidebarProvider), HomeSidebarType.dms);
     });
   });
 }

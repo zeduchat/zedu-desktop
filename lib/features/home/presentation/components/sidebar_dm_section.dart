@@ -36,10 +36,7 @@ class SidebarDmSection extends ConsumerWidget {
               // the workspace header.
               IconButton(
                 tooltip: 'New message',
-                onPressed: () {
-                  ref.read(selectedDmProvider.notifier).select(null);
-                  ref.read(activeChatProvider.notifier).selectNewGroupChat();
-                },
+                onPressed: () => openNewMessage(ref),
                 icon: Icon(
                   Icons.edit_note,
                   semanticLabel: 'New message',

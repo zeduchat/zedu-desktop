@@ -5,7 +5,8 @@ import 'package:zedu/features/features.dart';
 /// Linux), and the [KeyboardShortcutsDialog] on Cmd+/ or Ctrl+/, from any
 /// screen once the user is signed in. Alt+Up and Alt+Down move to the
 /// previous or next conversation in the Home sidebar, and Ctrl+1 to Ctrl+4
-/// (Cmd+1 to Cmd+4) open the rail's Home, DMs, People and Files.
+/// (Cmd+1 to Cmd+4) open the rail's Home, DMs, People and Files, and Ctrl+N
+/// (Cmd+N) starts a new message.
 /// What Ctrl+1 to Ctrl+4 open, in the order the app rail lists them.
 const _railDestinations = <HomeSidebarType>[
   HomeSidebarType.home,
@@ -118,6 +119,21 @@ class _QuickSwitcherShortcutState extends ConsumerState<QuickSwitcherShortcut> {
     }
   }
 
+  /// Starts a new message, as the compose button in the sidebar does. From a
+  /// screen that is not Home it goes to Home first.
+  void _startNewMessage() {
+    final signedIn =
+        ref.read(authNotifierProvider).status == AuthStatus.authenticated;
+    if (_open || !signedIn) return;
+
+    openNewMessage(ref);
+
+    final location = _router.routerDelegate.currentConfiguration.uri;
+    if (location.path != AppRouter.home) {
+      _router.go(AppRouter.home);
+    }
+  }
+
   void _openEntry(QuickSwitcherEntry entry) {
     final conversation = entry.conversation;
     if (conversation == null) {
@@ -148,6 +164,10 @@ class _QuickSwitcherShortcutState extends ConsumerState<QuickSwitcherShortcut> {
             _showShortcuts,
         const SingleActivator(LogicalKeyboardKey.slash, meta: true):
             _showShortcuts,
+        const SingleActivator(LogicalKeyboardKey.keyN, control: true):
+            _startNewMessage,
+        const SingleActivator(LogicalKeyboardKey.keyN, meta: true):
+            _startNewMessage,
         const SingleActivator(LogicalKeyboardKey.arrowUp, alt: true): () =>
             _moveConversation(-1),
         const SingleActivator(LogicalKeyboardKey.arrowDown, alt: true): () =>

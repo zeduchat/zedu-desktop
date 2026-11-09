@@ -123,10 +123,7 @@ class _WorkspaceSwitcherHeaderState
           ),
           IconButton(
             tooltip: 'New conversation',
-            onPressed: () {
-              ref.read(selectedDmProvider.notifier).select(null);
-              ref.read(activeChatProvider.notifier).selectNewGroupChat();
-            },
+            onPressed: () => openNewMessage(ref),
             icon: Icon(
               Icons.edit_note,
               color: colors.onPrimary.withValues(alpha: 0.7),
