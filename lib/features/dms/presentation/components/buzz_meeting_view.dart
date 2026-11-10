@@ -329,7 +329,7 @@ class _BuzzMeetingViewState extends ConsumerState<BuzzMeetingView> {
           Center(
             child: CircleAvatar(
               radius: 24,
-              backgroundColor: const Color(0xFF6458F5),
+              backgroundColor: context.colors.primary,
               foregroundImage: avatarUrl != null && avatarUrl.isNotEmpty
                   ? NetworkImage(avatarUrl)
                   : null,
