@@ -74,14 +74,60 @@ class FakeActiveChatNotifier extends ActiveChatNotifier {
   ActiveChatState build() => _initial;
 }
 
+class FakeChannelRepository extends Mock implements ChannelRepository {
+  String? lastAddedChannelId;
+  List<String>? lastAddedUserIds;
+  Result<void> addMembersResult = const Success(null);
+
+  @override
+  Future<Result<void>> addMembersToChannel({
+    required String channelId,
+    required List<String> userIds,
+  }) async {
+    lastAddedChannelId = channelId;
+    lastAddedUserIds = userIds;
+    return addMembersResult;
+  }
+
+  @override
+  Future<Result<List<Channel>>> fetchChannels(String orgId) async {
+    return const Success([
+      Channel(
+        id: 'c-general',
+        name: 'general',
+        description: 'General discussion',
+        organisationId: 'org-1',
+        isPrivate: false,
+        ownerId: 'u0',
+        archived: false,
+      ),
+      Channel(
+        id: 'c-design',
+        name: 'design',
+        description: 'Design chat',
+        organisationId: 'org-1',
+        isPrivate: false,
+        ownerId: 'u0',
+        archived: false,
+      ),
+    ]);
+  }
+}
+
+late FakeChannelRepository fakeChannelRepository;
+
 Widget buildModalUnderTest(
   Future<AddEveryoneResult> Function() result, {
   ActiveChatState chat = ActiveChatState.generalChannel,
+  ChannelRepository? channelRepository,
 }) {
+  fakeChannelRepository =
+      (channelRepository as FakeChannelRepository?) ?? FakeChannelRepository();
   return ProviderScope(
     overrides: [
       userProfileNotifierProvider.overrideWith(FakeUserProfileNotifier.new),
       activeChatProvider.overrideWith(() => FakeActiveChatNotifier(chat)),
+      channelRepositoryProvider.overrideWithValue(fakeChannelRepository),
       addEveryoneToChannelProvider.overrideWith(
         (ref) => fakeAddEveryone = FakeAddEveryoneToChannel(ref, result),
       ),
@@ -451,6 +497,94 @@ void main() {
       expect(notifier.invited, isEmpty);
       expect(find.text(errorText), findsOneWidget);
     });
+  });
+
+  group('InviteTeammatesModal channel member addition (#1543)', () {
+    TeamMember member(String id, String email, String? name) => TeamMember(
+      id: id,
+      email: email,
+      role: 'User',
+      dateJoined: '',
+      status: TeamMemberStatus.active,
+      name: name,
+    );
+
+    testWidgets(
+      'adds existing org member to channel via channelRepository when in channel context',
+      (tester) async {
+        orgMembers = [member('u1', 'alice@zedu.chat', 'Alice Ade')];
+        final repo = FakeChannelRepository();
+        await tester.pumpWidget(
+          buildModalUnderTest(
+            () async => const AddEveryoneNobodyToAdd('general'),
+            chat: const ActiveChatState(
+              type: ActiveChatType.channel,
+              id: 'general',
+              channelId: 'c-general',
+            ),
+            channelRepository: repo,
+          ),
+        );
+        await openModal(tester);
+
+        // Filter and select suggestion
+        await tester.enterText(find.byType(TextField), 'alice');
+        await tester.pump();
+
+        expect(find.text('Alice Ade'), findsOneWidget);
+        await tester.tap(find.text('Alice Ade'));
+        await tester.pump();
+
+        expect(find.widgetWithText(Chip, 'alice@zedu.chat'), findsOneWidget);
+
+        // Submit
+        await tester.tap(find.widgetWithText(ElevatedButton, 'Add'));
+        await tester.pumpAndSettle();
+
+        expect(repo.lastAddedChannelId, 'c-general');
+        expect(repo.lastAddedUserIds, ['u1']);
+        expect(find.text('Added 1 person to #general.'), findsOneWidget);
+        expect(find.byType(InviteTeammatesModal), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'shows error and resets loading state when adding member fails',
+      (tester) async {
+        orgMembers = [member('u1', 'alice@zedu.chat', 'Alice Ade')];
+        final repo = FakeChannelRepository()
+          ..addMembersResult = const Failure(
+            ApiFailure(message: 'Cannot add to channel'),
+          );
+        await tester.pumpWidget(
+          buildModalUnderTest(
+            () async => const AddEveryoneNobodyToAdd('general'),
+            chat: const ActiveChatState(
+              type: ActiveChatType.channel,
+              id: 'general',
+              channelId: 'c-general',
+            ),
+            channelRepository: repo,
+          ),
+        );
+        await openModal(tester);
+
+        await tester.enterText(find.byType(TextField), 'alice');
+        await tester.pump();
+        await tester.tap(find.text('Alice Ade'));
+        await tester.pump();
+
+        await tester.tap(find.widgetWithText(ElevatedButton, 'Add'));
+        await tester.pump();
+        await tester.pump();
+
+        expect(find.text('Cannot add to channel'), findsOneWidget);
+        // Modal remains open and button is interactive (not stuck loading)
+        expect(find.byType(InviteTeammatesModal), findsOneWidget);
+        expect(find.widgetWithText(ElevatedButton, 'Add'), findsOneWidget);
+        await drainToastTimer(tester);
+      },
+    );
   });
 
   group('InviteTeammatesModal error toasts', () {

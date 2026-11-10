@@ -105,47 +105,134 @@ class _InviteTeammatesModalState extends ConsumerState<InviteTeammatesModal> {
       _isLoading = true;
     });
 
-    final notifier = ref.read(userProfileNotifierProvider.notifier);
-    int successCount = 0;
-    String? lastError;
+    try {
+      final activeChat = ref.read(activeChatProvider);
+      final isChannelContext = activeChat.type == ActiveChatType.channel;
+      final channelName = openChannelName(activeChat);
 
-    // Loop through and invite all
-    for (final invite in _invites) {
-      // Assuming 'User' role by default since there's no dropdown in UI
-      await notifier.inviteMember(
-        email: invite['email']!,
-        role: 'User',
-        userId: invite['userId'],
-      );
-      final state = ref.read(userProfileNotifierProvider);
-      if (state.error != null) {
-        lastError = state.error;
-      } else {
-        successCount++;
+      final channelMembers = <String>[];
+      final workspaceInvites = <Map<String, String?>>[];
+
+      for (final invite in _invites) {
+        final userId = invite['userId'];
+        if (isChannelContext && userId != null && userId.isNotEmpty) {
+          channelMembers.add(userId);
+        } else {
+          workspaceInvites.add(invite);
+        }
       }
-    }
 
-    if (!mounted) return;
+      int addedToChannelCount = 0;
+      int invitedTeammatesCount = 0;
+      String? lastError;
 
-    if (successCount > 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            "Successfully invited $successCount ${successCount == 1 ? 'teammate' : 'teammates'}.",
+      // 1. If in channel context and we have existing members to add:
+      if (channelMembers.isNotEmpty) {
+        String? resolvedChannelId = activeChat.channelId;
+        if (resolvedChannelId == null || resolvedChannelId.isEmpty) {
+          final channels = ref.read(channelProvider).value ?? const <Channel>[];
+          final match = channels
+              .where(
+                (c) =>
+                    !c.archived &&
+                    c.name.toLowerCase() == channelName.toLowerCase(),
+              )
+              .firstOrNull;
+          resolvedChannelId = match?.id;
+        }
+
+        if (resolvedChannelId == null || resolvedChannelId.isEmpty) {
+          final orgId = ref.read(workspaceProvider).selectedWorkspace?.id;
+          if (orgId != null) {
+            final fetchRes = await ref
+                .read(channelRepositoryProvider)
+                .fetchChannels(orgId);
+            if (fetchRes is Success<List<Channel>>) {
+              final match = fetchRes.value
+                  .where(
+                    (c) =>
+                        !c.archived &&
+                        c.name.toLowerCase() == channelName.toLowerCase(),
+                  )
+                  .firstOrNull;
+              resolvedChannelId = match?.id;
+            }
+          }
+        }
+
+        if (resolvedChannelId != null && resolvedChannelId.isNotEmpty) {
+          final result = await ref
+              .read(channelRepositoryProvider)
+              .addMembersToChannel(
+                channelId: resolvedChannelId,
+                userIds: channelMembers,
+              );
+          switch (result) {
+            case Success<void>():
+              addedToChannelCount = channelMembers.length;
+              ref.invalidate(channelMembersProvider(resolvedChannelId));
+            case Failure<void>(:final error):
+              lastError = error.friendlyMessage.isNotEmpty
+                  ? error.friendlyMessage
+                  : 'Failed to add members to #$channelName.';
+          }
+        } else {
+          lastError = 'Could not find #$channelName.';
+        }
+      }
+
+      // 2. For users not yet in workspace (or non-channel context):
+      if (workspaceInvites.isNotEmpty && lastError == null) {
+        final notifier = ref.read(userProfileNotifierProvider.notifier);
+        for (final invite in workspaceInvites) {
+          await notifier.inviteMember(
+            email: invite['email']!,
+            role: 'User',
+            userId: invite['userId'],
+          );
+          final state = ref.read(userProfileNotifierProvider);
+          if (state.error != null) {
+            lastError = state.error;
+          } else {
+            invitedTeammatesCount++;
+          }
+        }
+      }
+
+      if (!mounted) return;
+
+      if (addedToChannelCount > 0 || invitedTeammatesCount > 0) {
+        final List<String> messages = [];
+        if (addedToChannelCount > 0) {
+          messages.add(
+            'Added $addedToChannelCount ${addedToChannelCount == 1 ? 'person' : 'people'} to #$channelName.',
+          );
+        }
+        if (invitedTeammatesCount > 0) {
+          messages.add(
+            "Successfully invited $invitedTeammatesCount ${invitedTeammatesCount == 1 ? 'teammate' : 'teammates'}.",
+          );
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(messages.join(' ')),
+            backgroundColor: context.colors.success,
           ),
-          backgroundColor: context.colors.success,
-        ),
-      );
-      Navigator.pop(context);
-    } else if (lastError != null) {
-      setState(() {
-        _isLoading = false;
-      });
-      AppToastService.show(
-        context,
-        type: AppToastType.error,
-        message: lastError,
-      );
+        );
+        Navigator.pop(context);
+      } else if (lastError != null) {
+        AppToastService.show(
+          context,
+          type: AppToastType.error,
+          message: lastError,
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
