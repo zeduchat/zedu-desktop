@@ -26,6 +26,14 @@ class _CreateOrganizationViewState
     super.dispose();
   }
 
+  void _leave() {
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.go(AppRouter.home);
+    }
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     if (_selectedCountry == null || _selectedCountry!.isEmpty) {
@@ -85,6 +93,15 @@ class _CreateOrganizationViewState
 
     return Scaffold(
       backgroundColor: colors.background,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          tooltip: 'Back',
+          icon: Icon(Icons.arrow_back, color: colors.textPrimary),
+          onPressed: isLoading ? null : _leave,
+        ),
+      ),
       body: Center(
         child: SingleChildScrollView(
           child: Container(
@@ -266,39 +283,58 @@ class _CreateOrganizationViewState
                   ),
                   const SizedBox(height: 48),
 
-                  // Submit Button
-                  ElevatedButton(
-                    onPressed: isLoading ? null : _submit,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: colors.primary,
-                      foregroundColor: Colors.white,
-                      disabledBackgroundColor: colors.primary.withValues(
-                        alpha: 0.5,
-                      ),
-                      padding: const EdgeInsets.symmetric(vertical: 20),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      elevation: 0,
-                    ),
-                    child: isLoading
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                Colors.white,
-                              ),
+                  // Submit and Cancel Buttons
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: isLoading ? null : _submit,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: colors.primary,
+                            foregroundColor: Colors.white,
+                            disabledBackgroundColor: colors.primary.withValues(
+                              alpha: 0.5,
                             ),
-                          )
-                        : const Text(
-                            'Submit',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
+                            padding: const EdgeInsets.symmetric(vertical: 20),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
                             ),
+                            elevation: 0,
                           ),
+                          child: isLoading
+                              ? const SizedBox(
+                                  height: 20,
+                                  width: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      Colors.white,
+                                    ),
+                                  ),
+                                )
+                              : const Text(
+                                  'Submit',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      TextButton(
+                        onPressed: isLoading ? null : _leave,
+                        style: TextButton.styleFrom(
+                          foregroundColor: colors.textSecondary,
+                          disabledForegroundColor: colors.textHint,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 20,
+                          ),
+                        ),
+                        child: const Text('Cancel'),
+                      ),
+                    ],
                   ),
                 ],
               ),
