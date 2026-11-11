@@ -310,7 +310,183 @@ void main() {
         findsOneWidget,
       );
       expect(find.text('Remove member'), findsOneWidget);
+      expect(tester.takeException(), isNull);
     });
+  });
+
+  group('UserManagementSection remove mounted check (Ziki #9089)', () {
+    testWidgets(
+      'confirming member removal calls onRemove when UserManagementSection is mounted',
+      (tester) async {
+        tester.view.physicalSize = const Size(1400, 1000);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+
+        final removedIds = <String>[];
+        await tester.pumpWidget(
+          ProviderScope(
+            child: MaterialApp(
+              home: Scaffold(
+                body: SingleChildScrollView(
+                  child: UserManagementSection(
+                    members: const [
+                      TeamMember(
+                        id: 'member-1',
+                        email: 'active@example.com',
+                        name: 'Active User',
+                        role: 'Administrator',
+                        dateJoined: 'Oct 1, 2026',
+                        status: TeamMemberStatus.active,
+                      ),
+                    ],
+                    isSaving: false,
+                    onInvite: ({required email, required role}) async {},
+                    onUpdate: (_) {},
+                    onRemove: removedIds.add,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.byTooltip('Remove member'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Remove team member?'), findsOneWidget);
+        await tester.tap(find.text('Remove member'));
+        await tester.pumpAndSettle();
+
+        expect(removedIds, ['member-1']);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'confirming member removal does not call onRemove if UserManagementSection unmounted while dialog is open',
+      (tester) async {
+        tester.view.physicalSize = const Size(1400, 1000);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+
+        final removedIds = <String>[];
+        Widget buildHarness({required bool showSection}) {
+          return ProviderScope(
+            child: MaterialApp(
+              home: Scaffold(
+                body: showSection
+                    ? SingleChildScrollView(
+                        child: UserManagementSection(
+                          members: const [
+                            TeamMember(
+                              id: 'member-1',
+                              email: 'active@example.com',
+                              name: 'Active User',
+                              role: 'Administrator',
+                              dateJoined: 'Oct 1, 2026',
+                              status: TeamMemberStatus.active,
+                            ),
+                          ],
+                          isSaving: false,
+                          onInvite: ({required email, required role}) async {},
+                          onUpdate: (_) {},
+                          onRemove: removedIds.add,
+                        ),
+                      )
+                    : const SizedBox.shrink(),
+              ),
+            ),
+          );
+        }
+
+        await tester.pumpWidget(buildHarness(showSection: true));
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.byTooltip('Remove member'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Remove team member?'), findsOneWidget);
+
+        // Unmount UserManagementSection while the confirmation dialog stays open
+        await tester.pumpWidget(buildHarness(showSection: false));
+        await tester.pump();
+
+        expect(find.byType(UserManagementSection), findsNothing);
+        expect(find.text('Remove member'), findsOneWidget);
+
+        await tester.tap(find.text('Remove member'));
+        await tester.pumpAndSettle();
+
+        expect(removedIds, isEmpty);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'confirming invite removal does not call onRemove if UserManagementSection unmounted while dialog is open',
+      (tester) async {
+        tester.view.physicalSize = const Size(1400, 1000);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+
+        final removedIds = <String>[];
+        Widget buildHarness({required bool showSection}) {
+          return ProviderScope(
+            child: MaterialApp(
+              home: Scaffold(
+                body: showSection
+                    ? SingleChildScrollView(
+                        child: UserManagementSection(
+                          members: const [
+                            TeamMember(
+                              id: 'invite-1',
+                              email: 'invited@example.com',
+                              name: 'Invited User',
+                              role: 'User',
+                              dateJoined: 'Oct 2, 2026',
+                              status: TeamMemberStatus.pending,
+                            ),
+                          ],
+                          isSaving: false,
+                          onInvite: ({required email, required role}) async {},
+                          onUpdate: (_) {},
+                          onRemove: removedIds.add,
+                        ),
+                      )
+                    : const SizedBox.shrink(),
+              ),
+            ),
+          );
+        }
+
+        await tester.pumpWidget(buildHarness(showSection: true));
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.text('Invites'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byTooltip('Remove invite'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Remove invitation?'), findsOneWidget);
+
+        // Unmount UserManagementSection while the confirmation dialog stays open
+        await tester.pumpWidget(buildHarness(showSection: false));
+        await tester.pump();
+
+        expect(find.byType(UserManagementSection), findsNothing);
+        expect(find.text('Remove invite'), findsOneWidget);
+
+        await tester.tap(find.text('Remove invite'));
+        await tester.pumpAndSettle();
+
+        expect(removedIds, isEmpty);
+        expect(tester.takeException(), isNull);
+      },
+    );
   });
 
   testWidgets('renders active tab count badge with primaryBg token', (

@@ -374,8 +374,10 @@ class _UserManagementSectionState extends State<UserManagementSection> {
                                             onTap: () => _confirmRemove(
                                               context,
                                               member.email,
-                                              () async =>
-                                                  widget.onRemove(member.id),
+                                              () async {
+                                                if (!mounted) return;
+                                                widget.onRemove(member.id);
+                                              },
                                             ),
                                           ),
                                         ],
@@ -597,7 +599,10 @@ class _UserManagementSectionState extends State<UserManagementSection> {
                                       onTap: () => _confirmRemove(
                                         context,
                                         invite.email,
-                                        () async => widget.onRemove(invite.id),
+                                        () async {
+                                          if (!mounted) return;
+                                          widget.onRemove(invite.id);
+                                        },
                                         pendingInvite: true,
                                       ),
                                     ),
