@@ -17,13 +17,15 @@ class App extends ConsumerWidget {
       darkTheme: AppTheme.dark,
       themeMode: ThemeMode.system,
       routerConfig: AppRouter.router,
-      builder: (context, child) => AppZoomShortcut(
-        child: DesktopWindowTitleListener(
-          child: CreditsPaymentDeepLinkListener(
-            child: AuthDeepLinkListener(
-              child: SessionExpiryListener(
-                child: QuickSwitcherShortcut(
-                  child: child ?? const SizedBox.shrink(),
+      builder: (context, child) => ShakeToReportListener(
+        child: AppZoomShortcut(
+          child: DesktopWindowTitleListener(
+            child: CreditsPaymentDeepLinkListener(
+              child: AuthDeepLinkListener(
+                child: SessionExpiryListener(
+                  child: QuickSwitcherShortcut(
+                    child: child ?? const SizedBox.shrink(),
+                  ),
                 ),
               ),
             ),
