@@ -38,8 +38,12 @@ abstract interface class UserProfileRemoteDataSource {
     required String role,
     required String orgId,
   });
-  Future<TeamMemberModel> updateMember(TeamMember member);
-  Future<void> removeMember(String memberId);
+  Future<TeamMemberModel> updateMember(
+    TeamMember member, {
+    String? orgId,
+    String? roleId,
+  });
+  Future<void> removeMember(String memberId, {String? orgId});
   Future<List<RolePermissionModel>> getRolesAndPermissions({String? orgId});
   Future<BillingInfoModel> getBillingInfo();
 }
@@ -540,7 +544,11 @@ class UserProfileRemoteDataSourceImpl implements UserProfileRemoteDataSource {
   }
 
   @override
-  Future<TeamMemberModel> updateMember(TeamMember member) async {
+  Future<TeamMemberModel> updateMember(
+    TeamMember member, {
+    String? orgId,
+    String? roleId,
+  }) async {
     if (_config.usesMockData) {
       return TeamMemberModel(
         id: member.id,
@@ -552,20 +560,40 @@ class UserProfileRemoteDataSourceImpl implements UserProfileRemoteDataSource {
         avatarUrl: member.avatarUrl,
       );
     }
+    // The backend route is PATCH /organisations/{org_id}/users/{user_id}/role (#581).
+    // /profile/organization/members/{id} does not exist on the API.
+    final targetOrgId = (orgId != null && orgId.trim().isNotEmpty)
+        ? orgId.trim()
+        : '019700db-4e22-7f90-a20e-f9116291ef24';
     final response = await _apiBaseService.patch<Map<String, dynamic>>(
-      path: '/profile/organization/members/${member.id}',
-      data: {'email': member.email, 'role': member.role},
+      path: '/organisations/$targetOrgId/users/${member.id}/role',
+      data: {'role_id': roleId ?? member.role},
     );
-    return TeamMemberModel.fromJson(
-      response.data['data'] as Map<String, dynamic>,
+    final responseData = response.data['data'];
+    if (responseData is Map<String, dynamic>) {
+      return TeamMemberModel.fromJson(responseData);
+    }
+    return TeamMemberModel(
+      id: member.id,
+      email: member.email,
+      role: member.role,
+      dateJoined: member.dateJoined,
+      status: member.status,
+      name: member.name,
+      avatarUrl: member.avatarUrl,
     );
   }
 
   @override
-  Future<void> removeMember(String memberId) async {
+  Future<void> removeMember(String memberId, {String? orgId}) async {
     if (_config.usesMockData) return;
+    // The backend route is DELETE /organisations/{org_id}/users/{user_id} (#581).
+    // /profile/organization/members/{id} does not exist on the API.
+    final targetOrgId = (orgId != null && orgId.trim().isNotEmpty)
+        ? orgId.trim()
+        : '019700db-4e22-7f90-a20e-f9116291ef24';
     await _apiBaseService.delete<Map<String, dynamic>>(
-      path: '/profile/organization/members/$memberId',
+      path: '/organisations/$targetOrgId/users/$memberId',
     );
   }
 

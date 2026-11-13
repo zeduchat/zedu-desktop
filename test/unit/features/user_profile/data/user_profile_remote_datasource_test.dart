@@ -184,4 +184,123 @@ void main() {
       },
     );
   });
+
+  group('UserProfileRemoteDataSourceImpl.updateMember (Ziki #581)', () {
+    late MockApiBaseService mockApi;
+    late UserProfileRemoteDataSourceImpl datasource;
+
+    setUp(() {
+      mockApi = MockApiBaseService();
+      datasource = UserProfileRemoteDataSourceImpl(
+        config: const AppConfig(apiBaseUrl: '', usesMockData: false),
+        apiBaseService: mockApi,
+      );
+      when(
+        () => mockApi.patch<Map<String, dynamic>>(
+          path: any(named: 'path'),
+          data: any(named: 'data'),
+        ),
+      ).thenAnswer(
+        (_) async => const ApiResponseModel<Map<String, dynamic>>(
+          statusCode: 200,
+          data: {'data': <String, dynamic>{}},
+        ),
+      );
+    });
+
+    test(
+      'updates member role with PATCH /organisations/{org_id}/users/{user_id}/role',
+      () async {
+        const member = TeamMember(
+          id: 'user-42',
+          email: 'member@zedu.chat',
+          role: 'Administrator',
+          dateJoined: 'Nov 1, 2026',
+          status: TeamMemberStatus.active,
+        );
+
+        await datasource.updateMember(
+          member,
+          orgId: 'org-99',
+          roleId: 'role-admin-uuid',
+        );
+
+        verify(
+          () => mockApi.patch<Map<String, dynamic>>(
+            path: '/organisations/org-99/users/user-42/role',
+            data: {'role_id': 'role-admin-uuid'},
+          ),
+        ).called(1);
+      },
+    );
+
+    test(
+      'never calls the non-existent /profile/organization/members route',
+      () async {
+        const member = TeamMember(
+          id: 'user-42',
+          email: 'member@zedu.chat',
+          role: 'Administrator',
+          dateJoined: 'Nov 1, 2026',
+          status: TeamMemberStatus.active,
+        );
+
+        await datasource.updateMember(member, orgId: 'org-99');
+
+        verifyNever(
+          () => mockApi.patch<Map<String, dynamic>>(
+            path: '/profile/organization/members/user-42',
+            data: any(named: 'data'),
+          ),
+        );
+      },
+    );
+  });
+
+  group('UserProfileRemoteDataSourceImpl.removeMember (Ziki #581)', () {
+    late MockApiBaseService mockApi;
+    late UserProfileRemoteDataSourceImpl datasource;
+
+    setUp(() {
+      mockApi = MockApiBaseService();
+      datasource = UserProfileRemoteDataSourceImpl(
+        config: const AppConfig(apiBaseUrl: '', usesMockData: false),
+        apiBaseService: mockApi,
+      );
+      when(
+        () => mockApi.delete<Map<String, dynamic>>(path: any(named: 'path')),
+      ).thenAnswer(
+        (_) async => const ApiResponseModel<Map<String, dynamic>>(
+          statusCode: 200,
+          data: {'data': <String, dynamic>{}},
+        ),
+      );
+    });
+
+    test(
+      'removes member with DELETE /organisations/{org_id}/users/{user_id}',
+      () async {
+        await datasource.removeMember('user-42', orgId: 'org-99');
+
+        verify(
+          () => mockApi.delete<Map<String, dynamic>>(
+            path: '/organisations/org-99/users/user-42',
+          ),
+        ).called(1);
+      },
+    );
+
+    test(
+      'never calls the non-existent /profile/organization/members route',
+      () async {
+        await datasource.removeMember('user-42', orgId: 'org-99');
+
+        verifyNever(
+          () => mockApi.delete<Map<String, dynamic>>(
+            path: '/profile/organization/members/user-42',
+          ),
+        );
+      },
+    );
+  });
 }

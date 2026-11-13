@@ -310,6 +310,7 @@ class TeamMemberModel extends TeamMember {
 
 class RolePermissionModel extends RolePermission {
   const RolePermissionModel({
+    super.id,
     required super.role,
     required super.description,
     required super.permissions,
@@ -323,6 +324,7 @@ class RolePermissionModel extends RolePermission {
   factory RolePermissionModel.fromJson(Map<String, dynamic> json) {
     final name = json['name'] ?? json['role'];
     return RolePermissionModel(
+      id: json['id']?.toString(),
       role: name is String && name.trim().isNotEmpty ? name : 'User',
       description: json['description'] as String? ?? '',
       permissions: _readPermissions(json['permissions']),

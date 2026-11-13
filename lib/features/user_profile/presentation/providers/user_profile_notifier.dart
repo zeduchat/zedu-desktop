@@ -643,19 +643,39 @@ class UserProfileNotifier extends Notifier<UserProfileState> {
     }
   }
 
-  Future<void> updateMember(TeamMember member) async {
+  Future<void> updateMember(TeamMember member, {String? roleId}) async {
     state = state.copyWith(
       isSaving: true,
       clearError: true,
       clearSuccess: true,
     );
-    final result = await _repository.updateMember(member);
+    final orgId = ref.read(workspaceProvider).selectedWorkspace?.id;
+    final roles = await _fetchOrganisationRoles(orgId);
+    final roleName = member.role.trim();
+    final resolvedRoleId =
+        roleId ??
+        _resolveRoleId(roles, roleName) ??
+        roles
+            .where((r) => r['id']?.toString() == roleName)
+            .firstOrNull?['id']
+            ?.toString() ??
+        (roleName.isNotEmpty ? roleName : null);
+
+    final result = await _repository.updateMember(
+      member,
+      orgId: orgId,
+      roleId: resolvedRoleId,
+    );
     switch (result) {
       case Success<TeamMember>():
         state = state.copyWith(
           teamMembers: [
             for (final current in state.teamMembers)
-              current.id == result.value.id ? result.value : current,
+              current.id == result.value.id
+                  ? result.value.copyWith(
+                      role: roleName.isEmpty ? result.value.role : roleName,
+                    )
+                  : current,
           ],
           isSaving: false,
           successMessage: 'Team member updated successfully.',
@@ -674,7 +694,8 @@ class UserProfileNotifier extends Notifier<UserProfileState> {
       clearError: true,
       clearSuccess: true,
     );
-    final result = await _repository.removeMember(memberId);
+    final orgId = ref.read(workspaceProvider).selectedWorkspace?.id;
+    final result = await _repository.removeMember(memberId, orgId: orgId);
     switch (result) {
       case Success<void>():
         state = state.copyWith(

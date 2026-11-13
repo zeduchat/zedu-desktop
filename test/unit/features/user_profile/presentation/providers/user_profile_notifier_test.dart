@@ -638,4 +638,221 @@ void main() {
       expect(state.error, isNotNull);
     });
   });
+
+  group('UserProfileNotifier.updateMember (Ziki #581)', () {
+    late MockUserProfileRepository repository;
+    late _RecordingApi recorder;
+    String? lastUpdateOrgId;
+    String? lastUpdateRoleId;
+    TeamMember? lastUpdatedMember;
+
+    setUpAll(() {
+      registerFallbackValue(
+        const TeamMember(
+          id: 'fb-user',
+          email: 'fb@example.com',
+          role: 'User',
+          dateJoined: '2026-01-01',
+          status: TeamMemberStatus.active,
+        ),
+      );
+    });
+
+    setUp(() {
+      repository = MockUserProfileRepository();
+      when(
+        () => repository.getAccount(),
+      ).thenAnswer((_) async => Success(ProfileAccount.empty()));
+      when(
+        () => repository.getNotificationPreferences(orgId: any(named: 'orgId')),
+      ).thenAnswer((_) async => Success(NotificationPreferences.empty()));
+      when(
+        () => repository.getSecuritySessions(userId: any(named: 'userId')),
+      ).thenAnswer((_) async => const Success([]));
+      when(
+        () => repository.getOrganization(orgId: any(named: 'orgId')),
+      ).thenAnswer(
+        (_) async => const Success(
+          OrganizationProfile(
+            id: '',
+            name: '',
+            natureOfBusiness: '',
+            country: '',
+          ),
+        ),
+      );
+      when(
+        () => repository.getTeamMembers(orgId: any(named: 'orgId')),
+      ).thenAnswer((_) async => const Success([]));
+      when(
+        () => repository.getRolesAndPermissions(orgId: any(named: 'orgId')),
+      ).thenAnswer((_) async => const Success([]));
+      when(
+        () => repository.getBillingInfo(),
+      ).thenAnswer((_) async => Success(BillingInfo.empty()));
+
+      locator.registerSingleton<AppConfig>(
+        const AppConfig(apiBaseUrl: 'http://test', usesMockData: false),
+      );
+      locator.registerSingleton<SecureStorageService>(
+        MockSecureStorageService(),
+      );
+
+      recorder = _RecordingApi(
+        config: locator<AppConfig>(),
+        roles: _rolesResponse,
+      );
+      locator.registerSingleton<ApiBaseService>(recorder.service);
+    });
+
+    tearDown(() async {
+      await locator.reset();
+    });
+
+    ProviderContainer makeContainer() {
+      final container = ProviderContainer(
+        overrides: [
+          userProfileRepositoryProvider.overrideWithValue(repository),
+          workspaceProvider.overrideWith(_FakeWorkspaceNotifier.new),
+        ],
+      );
+      addTearDown(container.dispose);
+      return container;
+    }
+
+    Future<void> waitForLoad(ProviderContainer container) async {
+      while (container.read(userProfileNotifierProvider).isLoading) {
+        await Future<void>.delayed(Duration.zero);
+      }
+    }
+
+    test(
+      'passes orgId and resolved roleId to repository.updateMember',
+      () async {
+        when(
+          () => repository.updateMember(
+            any(),
+            orgId: any(named: 'orgId'),
+            roleId: any(named: 'roleId'),
+          ),
+        ).thenAnswer((inv) async {
+          lastUpdatedMember = inv.positionalArguments.first as TeamMember;
+          lastUpdateOrgId = inv.namedArguments[#orgId] as String?;
+          lastUpdateRoleId = inv.namedArguments[#roleId] as String?;
+          return Success(lastUpdatedMember!);
+        });
+
+        final container = makeContainer();
+        await waitForLoad(container);
+
+        const member = TeamMember(
+          id: 'u-123',
+          email: 'user@example.com',
+          role: 'Manager',
+          dateJoined: '2026-01-01',
+          status: TeamMemberStatus.active,
+        );
+
+        await container
+            .read(userProfileNotifierProvider.notifier)
+            .updateMember(member);
+
+        expect(lastUpdateOrgId, equals('org-1'));
+        expect(lastUpdateRoleId, equals('role-manager'));
+        expect(lastUpdatedMember?.id, equals('u-123'));
+      },
+    );
+  });
+
+  group('UserProfileNotifier.removeMember (Ziki #581)', () {
+    late MockUserProfileRepository repository;
+    String? lastRemoveMemberId;
+    String? lastRemoveOrgId;
+
+    setUp(() {
+      repository = MockUserProfileRepository();
+      when(
+        () => repository.getAccount(),
+      ).thenAnswer((_) async => Success(ProfileAccount.empty()));
+      when(
+        () => repository.getNotificationPreferences(orgId: any(named: 'orgId')),
+      ).thenAnswer((_) async => Success(NotificationPreferences.empty()));
+      when(
+        () => repository.getSecuritySessions(userId: any(named: 'userId')),
+      ).thenAnswer((_) async => const Success([]));
+      when(
+        () => repository.getOrganization(orgId: any(named: 'orgId')),
+      ).thenAnswer(
+        (_) async => const Success(
+          OrganizationProfile(
+            id: '',
+            name: '',
+            natureOfBusiness: '',
+            country: '',
+          ),
+        ),
+      );
+      when(
+        () => repository.getTeamMembers(orgId: any(named: 'orgId')),
+      ).thenAnswer((_) async => const Success([]));
+      when(
+        () => repository.getRolesAndPermissions(orgId: any(named: 'orgId')),
+      ).thenAnswer((_) async => const Success([]));
+      when(
+        () => repository.getBillingInfo(),
+      ).thenAnswer((_) async => Success(BillingInfo.empty()));
+
+      locator.registerSingleton<AppConfig>(
+        const AppConfig(apiBaseUrl: 'http://test', usesMockData: false),
+      );
+      locator.registerSingleton<SecureStorageService>(
+        MockSecureStorageService(),
+      );
+      final dio = Dio(BaseOptions(baseUrl: 'http://test'));
+      locator.registerSingleton<ApiBaseService>(
+        ApiBaseService(config: locator<AppConfig>(), dio: dio),
+      );
+    });
+
+    tearDown(() async {
+      await locator.reset();
+    });
+
+    ProviderContainer makeContainer() {
+      final container = ProviderContainer(
+        overrides: [
+          userProfileRepositoryProvider.overrideWithValue(repository),
+          workspaceProvider.overrideWith(_FakeWorkspaceNotifier.new),
+        ],
+      );
+      addTearDown(container.dispose);
+      return container;
+    }
+
+    Future<void> waitForLoad(ProviderContainer container) async {
+      while (container.read(userProfileNotifierProvider).isLoading) {
+        await Future<void>.delayed(Duration.zero);
+      }
+    }
+
+    test('passes memberId and orgId to repository.removeMember', () async {
+      when(
+        () => repository.removeMember(any(), orgId: any(named: 'orgId')),
+      ).thenAnswer((inv) async {
+        lastRemoveMemberId = inv.positionalArguments.first as String;
+        lastRemoveOrgId = inv.namedArguments[#orgId] as String?;
+        return const Success(null);
+      });
+
+      final container = makeContainer();
+      await waitForLoad(container);
+
+      await container
+          .read(userProfileNotifierProvider.notifier)
+          .removeMember('u-999');
+
+      expect(lastRemoveMemberId, equals('u-999'));
+      expect(lastRemoveOrgId, equals('org-1'));
+    });
+  });
 }
