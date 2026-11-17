@@ -47,7 +47,6 @@ app.*.map.json
 /android/app/release
 
 # Local env (keep `.env.example` tracked; copy to `.env` per machine)
-.env
 public/fonts/fa-solid-400.woff2
 *.woff2
 *.woff2
@@ -75,3 +74,5 @@ cmake-build-release/
 public/fonts/
 .gitignore
 branch_structure.json
+config.bat
+node_modules
