@@ -8,3 +8,4 @@ export 'email_mask.dart';
 export 'error_handling.dart';
 export 'initials.dart';
 export 'single_instance.dart';
+export 'shake_detector.dart';

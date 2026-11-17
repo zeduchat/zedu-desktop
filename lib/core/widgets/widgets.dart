@@ -10,3 +10,4 @@ export 'conversation_links_dialog.dart';
 export 'message_links.dart';
 export 'offline_status_indicator.dart';
 export 'report_content.dart';
+export 'shake_to_report_listener.dart';
