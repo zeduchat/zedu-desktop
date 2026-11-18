@@ -23,7 +23,13 @@ class App extends ConsumerWidget {
             child: AuthDeepLinkListener(
               child: SessionExpiryListener(
                 child: QuickSwitcherShortcut(
-                  child: child ?? const SizedBox.shrink(),
+                  // On desktop this keeps the app in the tray: closing hides it,
+                  // the tray icon and menu bring it back or quit, and desktop
+                  // notifications are set up. Web has no tray, so it is left
+                  // unwrapped there.
+                  child: isDesktopApp
+                      ? DesktopManager(child: child ?? const SizedBox.shrink())
+                      : child ?? const SizedBox.shrink(),
                 ),
               ),
             ),
