@@ -12,3 +12,4 @@ export 'own_space_intro.dart';
 export 'conversation_files_dialog.dart';
 export 'export_transcript_dialog.dart';
 export 'saved_items_dialog.dart';
+export 'pinned_messages_dialog.dart';

@@ -7,6 +7,8 @@ class MockChatHistory extends Mock implements ChatHistoryNotifier {}
 
 class MockDraftStore extends Mock implements DmDraftStore {}
 
+class MockDmRepository extends Mock implements DmRepository {}
+
 class _FakeAuthNotifier extends AuthNotifier {
   @override
   AuthState build() => const AuthState();
@@ -237,6 +239,17 @@ void main() {
     when(() => history.historyCleared).thenReturn(false);
     final drafts = MockDraftStore();
     when(() => drafts.load(any())).thenAnswer((_) async => null);
+    final repository = MockDmRepository();
+    when(() => repository.getPinnedMessages('chat-1')).thenAnswer(
+      (_) async => [
+        {
+          'thread_id': 't-1',
+          'message': 'Standup moved to 10am',
+          'full_name': 'Pinned Tester',
+          'created_at': '2026-11-10T09:00:00Z',
+        },
+      ],
+    );
 
     await tester.pumpWidget(
       ProviderScope(
@@ -244,6 +257,7 @@ void main() {
           authNotifierProvider.overrideWith(_FakeAuthNotifier.new),
           chatHistoryProvider('chat-1').overrideWith((ref) => history),
           dmDraftStoreProvider.overrideWith((ref) => drafts),
+          dmRepositoryProvider.overrideWithValue(repository),
         ],
         child: buildTestMaterialApp(
           Scaffold(
@@ -268,6 +282,8 @@ void main() {
     await tester.tap(find.text('Pinned messages'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Pinned messages are not available yet'), findsOneWidget);
+    // The menu item lists the pins the server has for this conversation.
+    verify(() => repository.getPinnedMessages('chat-1')).called(1);
+    expect(find.text('Standup moved to 10am'), findsOneWidget);
   });
 }

@@ -286,6 +286,17 @@ class DmRepository {
     );
   }
 
+  /// Every message pinned in a channel or DM, from the server (the route the
+  /// web app reads), so pins on messages that aren't loaded show too.
+  Future<List<Map<String, dynamic>>> getPinnedMessages(String channelId) async {
+    final response = await _apiClient.get<Map<String, dynamic>>(
+      path: '/channels/pin/$channelId',
+    );
+    final raw = response.data['data'];
+    if (raw is! List) return const [];
+    return raw.whereType<Map<String, dynamic>>().toList();
+  }
+
   Future<void> editMessage(
     String messageId, {
     required String content,

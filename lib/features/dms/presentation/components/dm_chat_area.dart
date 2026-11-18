@@ -29,6 +29,7 @@ class _DmChatAreaState extends ConsumerState<DmChatArea> {
     _scrollController.dispose();
     super.dispose();
   }
+
   final _searchPanelKey = GlobalKey<SearchPanelState>();
 
   String get _recipientHandle {
@@ -189,49 +190,12 @@ class _DmChatAreaState extends ConsumerState<DmChatArea> {
         false;
   }
 
-  Future<void> _showPinnedMessages() async {
-    final history = ref.read(
-      chatHistoryProvider(widget.conversation.channelId),
-    );
-    final pinned = history.messages
-        .where(
-          (message) =>
-              message['is_pinned'] == true || message['pinned'] == true,
-        )
-        .toList();
-    await showDialog<void>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('${widget.conversation.displayName} pinned messages'),
-        content: SizedBox(
-          width: 420,
-          child: pinned.isEmpty
-              ? const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 24),
-                  child: Center(
-                    child: Text('Pinned messages are not available yet'),
-                  ),
-                )
-              : ListView.builder(
-                  shrinkWrap: true,
-                  itemCount: pinned.length,
-                  itemBuilder: (context, index) {
-                    final msg = pinned[index];
-                    return ListTile(
-                      title: Text(msg['content']?.toString() ?? ''),
-                    );
-                  },
-                ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Close'),
-          ),
-        ],
-      ),
-    );
-  }
+  Future<void> _showPinnedMessages() => showPinnedMessages(
+    context,
+    ref,
+    channelId: widget.conversation.channelId,
+    title: '${widget.conversation.displayName} pinned messages',
+  );
 
   Future<void> _showConversationSearch() async {
     setState(() => _searchOpen = true);
@@ -493,8 +457,7 @@ class _DmChatAreaState extends ConsumerState<DmChatArea> {
                                                 : null,
                                             child: _MessageBubble(
                                               message: msg,
-                                              conversation:
-                                                  widget.conversation,
+                                              conversation: widget.conversation,
                                               channelId:
                                                   widget.conversation.channelId,
                                               onEdit: (id, text) => _composerKey
@@ -959,6 +922,11 @@ class _DmChatHeader extends StatelessWidget {
               ),
             ),
           const Spacer(),
+          PinnedMessagesButton(
+            channelId: conversation.channelId,
+            title: '${conversation.displayName} pinned messages',
+          ),
+          const SizedBox(width: 12),
           Consumer(
             builder: (context, ref, child) {
               return InkWell(

@@ -545,6 +545,13 @@ class HomeChatArea extends ConsumerWidget {
               ],
             ),
           ),
+          if (channel != null) ...[
+            PinnedMessagesButton(
+              channelId: channel.id,
+              title: '# $channelName pinned messages',
+            ),
+            const SizedBox(width: 12),
+          ],
           _HeaderAction(icon: Icons.headphones_outlined, label: 'Start Buzz'),
           const SizedBox(width: 12),
           // The same count the channel directory shows, so the two agree.
