@@ -3,20 +3,32 @@ import 'package:zedu/features/features.dart';
 
 import '../../../../../helpers/helpers.dart';
 
-/// Records each query and answers with [results].
+/// Records each query and page, and answers with [results] per page.
 class _FakeSearchService implements MessageSearchService {
   final queries = <String>[];
+  final pages = <int>[];
   List<SearchResultModel> results = const [];
+
+  /// Results for page two and later, when a test checks paging.
+  List<SearchResultModel> nextPageResults = const [];
+  int totalPages = 1;
   Object? error;
 
   @override
-  Future<List<SearchResultModel>> search({
+  Future<MessageSearchPage> search({
     required String orgId,
     required String query,
+    int page = 1,
+    int limit = MessageSearchService.pageSize,
   }) async {
     queries.add(query);
+    pages.add(page);
     if (error != null) throw error!;
-    return results;
+    return MessageSearchPage(
+      results: page == 1 ? results : nextPageResults,
+      currentPage: page,
+      totalPages: totalPages,
+    );
   }
 }
 
@@ -163,6 +175,42 @@ void main() {
 
       expect(opened?.id, 'm1');
       expect(find.byType(MessageSearchDialog), findsNothing);
+    });
+
+    testWidgets('loads the next page instead of stopping at the first', (
+      tester,
+    ) async {
+      service
+        ..results = [hit]
+        ..nextPageResults = [
+          SearchResultModel(
+            id: 'm2',
+            content: 'Older deploy note',
+            channelId: 'c2',
+            channelName: 'design',
+            senderName: 'Grace Hopper',
+            createdAt: DateTime(2026, 11, 3, 9, 5),
+          ),
+        ]
+        ..totalPages = 2;
+
+      await openDialog(tester);
+      await tester.enterText(
+        find.byKey(const Key('message-search-field')),
+        'deploy',
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('The deploy is done'), findsOneWidget);
+      expect(find.byKey(const Key('message-search-load-more')), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('message-search-load-more')));
+      await tester.pumpAndSettle();
+
+      expect(service.pages, [1, 2]);
+      expect(find.text('The deploy is done'), findsOneWidget);
+      expect(find.text('Older deploy note'), findsOneWidget);
+      expect(find.byKey(const Key('message-search-load-more')), findsNothing);
     });
 
     testWidgets('a failed search offers to try again', (tester) async {

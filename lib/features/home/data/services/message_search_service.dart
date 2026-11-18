@@ -2,31 +2,72 @@ import 'package:zedu/core/core.dart';
 import 'package:zedu/features/features.dart';
 
 /// Workspace-wide message search (#2825), through the endpoint the web app
-/// uses: `GET /search/organisation/{orgId}?query=…&sortBy=…`.
+/// uses: `GET /search/organisation/{orgId}?query=…&sortby=…&page=…&limit=…`.
 class MessageSearchService {
   MessageSearchService(this._apiClient);
+
+  /// Hits per page; the API's own default is 20.
+  static const int pageSize = 20;
 
   final ApiBaseService _apiClient;
 
   /// Searches every channel and conversation in [orgId] for [query], which
   /// already carries the filter tokens (see [buildMessageSearchQuery]).
-  /// Newest first. A 404 means nothing matched.
-  Future<List<SearchResultModel>> search({
+  /// Newest first, one API page at a time: the answer carries the hits on that
+  /// page and how many pages there are, so a query with more matches than one
+  /// page can be read in full. A 404 means nothing matched.
+  Future<MessageSearchPage> search({
     required String orgId,
     required String query,
+    int page = 1,
+    int limit = pageSize,
   }) async {
-    if (orgId.isEmpty || query.trim().isEmpty) return const [];
+    final resolvedPage = page < 1 ? 1 : page;
+    final resolvedLimit = limit < 1 ? pageSize : limit;
+
+    if (orgId.isEmpty || query.trim().isEmpty) {
+      return MessageSearchPage.empty(currentPage: resolvedPage);
+    }
+
     try {
       final response = await _apiClient.get<Map<String, dynamic>>(
         path: '/search/organisation/$orgId',
-        queryParameters: {'query': query, 'sortBy': 'newest'},
+        // The API reads `sortby`; any other spelling is ignored, and a value
+        // outside relevance/newest/oldest is refused with a 400.
+        queryParameters: {
+          'query': query,
+          'sortby': 'newest',
+          'page': resolvedPage,
+          'limit': resolvedLimit,
+        },
       );
-      return flattenMessageSearchResults(response.data['data']);
+
+      final data = response.data;
+      final results = flattenMessageSearchResults(data['data']);
+      final pagination = data['pagination'] is Map
+          ? Map<String, dynamic>.from(data['pagination'] as Map)
+          : const <String, dynamic>{};
+
+      return MessageSearchPage(
+        results: results,
+        currentPage: _asPageNumber(pagination['current_page']) ?? resolvedPage,
+        totalPages:
+            _asPageNumber(pagination['total_pages_count']) ??
+            (results.isEmpty ? 0 : resolvedPage),
+      );
     } on ApiFailure catch (failure) {
-      if (failure.statusCode == 404) return const [];
+      if (failure.statusCode == 404) {
+        return MessageSearchPage.empty(currentPage: resolvedPage);
+      }
       rethrow;
     }
   }
+}
+
+int? _asPageNumber(Object? value) {
+  if (value is int) return value;
+  if (value is num) return value.toInt();
+  return int.tryParse(value?.toString() ?? '');
 }
 
 /// The backend answers with groups, one per sender and channel, each holding

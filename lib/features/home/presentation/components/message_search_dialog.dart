@@ -296,16 +296,71 @@ class _Results extends ConsumerWidget {
                 : 'No messages match.',
           );
         }
+        // The API paginates, so the list ends with a control that fetches the
+        // next page instead of stopping at the first one.
+        final showFooter = state.hasMore || state.loadMoreFailed;
+
         return ListView.separated(
           key: const Key('message-search-results'),
           shrinkWrap: true,
           padding: const EdgeInsets.symmetric(vertical: 4),
-          itemCount: results.length,
+          itemCount: results.length + (showFooter ? 1 : 0),
           separatorBuilder: (_, _) => Divider(height: 1, color: colors.divider),
-          itemBuilder: (context, index) =>
-              _ResultTile(result: results[index], onTap: onOpen),
+          itemBuilder: (context, index) {
+            if (index == results.length) {
+              return _LoadMoreFooter(state: state);
+            }
+            return _ResultTile(result: results[index], onTap: onOpen);
+          },
         );
       },
+    );
+  }
+}
+
+/// The end of the results: fetches the next API page, or asks for another try
+/// when the last attempt failed.
+class _LoadMoreFooter extends ConsumerWidget {
+  const _LoadMoreFooter({required this.state});
+
+  final MessageSearchState state;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final colors = context.colors;
+    final notifier = ref.read(messageSearchProvider.notifier);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          if (state.loadMoreFailed)
+            Flexible(
+              child: Text(
+                "Couldn't load more results.",
+                style: TextStyle(fontSize: 13, color: colors.textSecondary),
+              ),
+            ),
+          if (state.isLoadingMore)
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 8),
+              child: SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            )
+          else
+            TextButton(
+              key: const Key('message-search-load-more'),
+              onPressed: state.isLoadingMore ? null : notifier.loadMore,
+              child: Text(
+                state.loadMoreFailed ? 'Try again' : 'Load more messages',
+              ),
+            ),
+        ],
+      ),
     );
   }
 }

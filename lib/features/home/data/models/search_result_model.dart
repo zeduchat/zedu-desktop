@@ -54,6 +54,29 @@ class SearchResultModel {
   };
 }
 
+/// One page of organisation search results, as the API paginates them.
+///
+/// The endpoint answers with `data` (the hits on this page) and
+/// `pagination.total_pages_count`, so callers page through it instead of
+/// treating the first response as the whole result set.
+class MessageSearchPage {
+  const MessageSearchPage({
+    required this.results,
+    required this.currentPage,
+    required this.totalPages,
+  });
+
+  const MessageSearchPage.empty({this.currentPage = 1})
+    : results = const [],
+      totalPages = 0;
+
+  final List<SearchResultModel> results;
+  final int currentPage;
+  final int totalPages;
+
+  bool get hasMore => totalPages > currentPage;
+}
+
 String _asString(Object? value) => value?.toString() ?? '';
 
 String? _asNullableString(Object? value) {
