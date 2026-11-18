@@ -6,6 +6,7 @@ class ThreadPanel extends StatefulWidget {
   final String parentAuthor;
   final String parentTimestamp;
   final VoidCallback onClose;
+  final bool initialNewestAtTop;
 
   const ThreadPanel({
     super.key,
@@ -13,6 +14,7 @@ class ThreadPanel extends StatefulWidget {
     required this.parentAuthor,
     this.parentTimestamp = '',
     required this.onClose,
+    this.initialNewestAtTop = true,
   });
 
   @override
@@ -22,6 +24,13 @@ class ThreadPanel extends StatefulWidget {
 class _ThreadPanelState extends State<ThreadPanel> {
   final List<String> _replies = [];
   final TextEditingController _replyController = TextEditingController();
+  late bool _newestAtTop;
+
+  @override
+  void initState() {
+    super.initState();
+    _newestAtTop = widget.initialNewestAtTop;
+  }
 
   @override
   void dispose() {
@@ -36,9 +45,15 @@ class _ThreadPanelState extends State<ThreadPanel> {
     _replyController.clear();
   }
 
+  void _toggleOrder() {
+    setState(() => _newestAtTop = !_newestAtTop);
+  }
+
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
+    final orderedReplies =
+        _newestAtTop ? _replies.reversed.toList() : _replies;
 
     return Container(
       width: 320,
@@ -67,6 +82,20 @@ class _ThreadPanelState extends State<ThreadPanel> {
                   ),
                 ),
                 IconButton(
+                  onPressed: _toggleOrder,
+                  icon: Icon(
+                    _newestAtTop
+                        ? Icons.vertical_align_top
+                        : Icons.vertical_align_bottom,
+                    size: 20,
+                    color: _newestAtTop ? colors.primary : colors.textHint,
+                  ),
+                  splashRadius: 20,
+                  tooltip: _newestAtTop
+                      ? 'Newest replies at top (tap for oldest first)'
+                      : 'Oldest replies first (tap for newest at top)',
+                ),
+                IconButton(
                   onPressed: widget.onClose,
                   icon: Icon(Icons.close, color: colors.textHint),
                   splashRadius: 20,
@@ -92,7 +121,7 @@ class _ThreadPanelState extends State<ThreadPanel> {
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 8),
                         child: Text(
-                          '${_replies.length} replies',
+                          '${_replies.length} replies • ${_newestAtTop ? "Newest at top" : "Oldest first"}',
                           style: TextStyle(
                             color: colors.textHint,
                             fontSize: 12,
@@ -103,11 +132,11 @@ class _ThreadPanelState extends State<ThreadPanel> {
                     ],
                   ),
                 ),
-                ..._replies.map(
+                ...orderedReplies.map(
                   (reply) => MessageBubble(
                     author: 'You',
                     text: reply,
-                    timestamp: '3:20 PM',
+                    timestamp: 'Just now',
                   ),
                 ),
               ],

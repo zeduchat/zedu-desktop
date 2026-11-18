@@ -21,6 +21,7 @@ class _DmChatAreaState extends ConsumerState<DmChatArea> {
   // Rows are about this tall, so a jump scrolls roughly to the message first.
   static const _estimatedRowHeight = 88.0;
   String? _highlightedId;
+  bool _isNewestAtTop = false;
   Timer? _highlightTimer;
 
   @override
@@ -90,6 +91,8 @@ class _DmChatAreaState extends ConsumerState<DmChatArea> {
   Future<void> _handleMenuAction(String action) async {
     final conversation = widget.conversation;
     switch (action) {
+      case 'toggle_order':
+        setState(() => _isNewestAtTop = !_isNewestAtTop);
       case 'view_profile':
         await showDialog<void>(
           context: context,
@@ -1016,6 +1019,7 @@ class _DmChatHeader extends StatelessWidget {
             icon: const Icon(Icons.more_vert),
             onSelected: onMenuAction,
             itemBuilder: (context) => [
+              menuItem('toggle_order', isNewestAtTop ? 'Show newest at bottom' : 'Show newest at top'),
               menuItem('view_profile', 'View profile'),
               menuItem('mute_notifications', 'Mute notifications'),
               menuItem('pin_conversation', 'Pin conversation'),
