@@ -212,4 +212,7 @@ class _FakeDmListNotifier extends AsyncNotifier<List<DmConversation>>
   Future<void> refresh() async {
     state = AsyncData(_items);
   }
+
+  @override
+  void clearUnread(String conversationKey) {}
 }
