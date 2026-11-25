@@ -152,7 +152,13 @@ void main() {
       previewMessage: 'Hello',
       unreadCount: 3,
     );
-    final other = _conversation('other-channel');
+    final other = DmConversation(
+      channelId: 'other-channel',
+      username: 'Other unread',
+      participantId: 'user-other',
+      previewMessage: 'Another message',
+      unreadCount: 5,
+    );
     container.read(dmListProvider.notifier).state = AsyncValue.data([
       unread,
       other,
@@ -164,7 +170,7 @@ void main() {
     expect(selected?.unreadCount, 0);
     expect(
       container.read(dmListProvider).requireValue.map((c) => c.unreadCount),
-      [0, 0],
+      [0, 5],
     );
     expect(
       container.read(dmListProvider).requireValue.first.channelId,
