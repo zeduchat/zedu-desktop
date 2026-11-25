@@ -33,6 +33,24 @@ class DmConversation {
     required this.unreadCount,
   });
 
+  DmConversation copyWith({int? unreadCount}) => DmConversation(
+    channelId: channelId,
+    username: username,
+    participantId: participantId,
+    participantEmail: participantEmail,
+    avatarUrl: avatarUrl,
+    defaultAvatarUrl: defaultAvatarUrl,
+    channelType: channelType,
+    isFavourite: isFavourite,
+    threadCount: threadCount,
+    lastThreadId: lastThreadId,
+    lastReadAt: lastReadAt,
+    previewMessage: previewMessage,
+    previewThreads: previewThreads,
+    participants: participants,
+    unreadCount: unreadCount ?? this.unreadCount,
+  );
+
   String get displayName => username.isNotEmpty ? username : 'Unknown';
 
   /// True when this is the signed-in user's own space: a DM with themselves.

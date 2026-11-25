@@ -25,6 +25,14 @@ class SelectedDmNotifier extends Notifier<DmConversation?> {
 
   void select(DmConversation? conversation) {
     state = conversation;
+    if (conversation == null || conversation.unreadCount == 0) return;
+
+    final readConversation = conversation.copyWith(unreadCount: 0);
+    state = readConversation;
+
+    ref
+        .read(dmListProvider.notifier)
+        .clearUnread(readConversation.conversationKey);
   }
 }
 
@@ -135,6 +143,17 @@ class DmListNotifier extends AsyncNotifier<List<DmConversation>> {
     _currentPage = 1;
     _hasMore = true;
     return _fetchPage(orgId, 1);
+  }
+
+  void clearUnread(String conversationKey) {
+    final conversations = state.value;
+    if (conversations == null) return;
+    state = AsyncValue.data([
+      for (final conversation in conversations)
+        conversation.conversationKey == conversationKey
+            ? conversation.copyWith(unreadCount: 0)
+            : conversation,
+    ]);
   }
 
   Future<List<DmConversation>> _fetchPage(String orgId, int page) async {

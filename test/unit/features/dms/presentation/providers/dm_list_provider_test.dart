@@ -144,6 +144,34 @@ void main() {
     expect(container.read(selectedDmProvider), same(selected));
   });
 
+  test('opening an unread DM clears it from the local unread state', () {
+    final unread = DmConversation(
+      channelId: 'unread-channel',
+      username: 'Unread',
+      participantId: 'user-unread',
+      previewMessage: 'Hello',
+      unreadCount: 3,
+    );
+    final other = _conversation('other-channel');
+    container.read(dmListProvider.notifier).state = AsyncValue.data([
+      unread,
+      other,
+    ]);
+
+    container.read(selectedDmProvider.notifier).select(unread);
+
+    final selected = container.read(selectedDmProvider);
+    expect(selected?.unreadCount, 0);
+    expect(
+      container.read(dmListProvider).requireValue.map((c) => c.unreadCount),
+      [0, 0],
+    );
+    expect(
+      container.read(dmListProvider).requireValue.first.channelId,
+      'unread-channel',
+    );
+  });
+
   test(
     'a page from the previous workspace is dropped after a switch',
     () async {
