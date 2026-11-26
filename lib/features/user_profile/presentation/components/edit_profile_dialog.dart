@@ -1,3 +1,5 @@
+import 'dart:io' show File;
+
 import 'package:zedu/core/core.dart';
 import 'package:zedu/features/features.dart';
 
@@ -60,24 +62,63 @@ String _canonicalCountryName(String value) {
 /// save succeeded.
 typedef EditProfileSave = Future<String?> Function(ProfileAccount account);
 
+/// Uploads the image at a file path as the profile photo; returns an error
+/// message, or null on success.
+typedef EditProfilePhotoUpload = Future<String?> Function(String filePath);
+
+/// Removes the profile photo; returns an error message, or null on success.
+typedef EditProfilePhotoRemove = Future<String?> Function();
+
+/// Lets the user choose an image; returns its path, or null when cancelled.
+typedef EditProfilePhotoPicker = Future<String?> Function();
+
+/// The photo types the API accepts, as on Zedu web.
+const kProfilePhotoExtensions = ['jpg', 'jpeg', 'png'];
+
+Future<String?> _pickProfilePhoto() async {
+  final result = await FilePicker.pickFiles(
+    type: FileType.custom,
+    allowedExtensions: kProfilePhotoExtensions,
+  );
+  return result?.files.single.path;
+}
+
 /// Opens the editor. It stays open while [onSave] runs and closes only when
 /// the save succeeds; on failure it keeps the draft and shows the error.
 Future<void> showEditProfileDialog(
   BuildContext context,
   ProfileAccount account,
-  EditProfileSave onSave,
-) async {
+  EditProfileSave onSave, {
+  EditProfilePhotoUpload? onUploadPhoto,
+  EditProfilePhotoRemove? onRemovePhoto,
+  EditProfilePhotoPicker pickPhoto = _pickProfilePhoto,
+}) async {
   await showDialog<void>(
     context: context,
-    builder: (context) => _EditProfileDialog(account: account, onSave: onSave),
+    builder: (context) => _EditProfileDialog(
+      account: account,
+      onSave: onSave,
+      onUploadPhoto: onUploadPhoto,
+      onRemovePhoto: onRemovePhoto,
+      pickPhoto: pickPhoto,
+    ),
   );
 }
 
 class _EditProfileDialog extends StatefulWidget {
-  const _EditProfileDialog({required this.account, required this.onSave});
+  const _EditProfileDialog({
+    required this.account,
+    required this.onSave,
+    required this.pickPhoto,
+    this.onUploadPhoto,
+    this.onRemovePhoto,
+  });
 
   final ProfileAccount account;
   final EditProfileSave onSave;
+  final EditProfilePhotoUpload? onUploadPhoto;
+  final EditProfilePhotoRemove? onRemovePhoto;
+  final EditProfilePhotoPicker pickPhoto;
 
   @override
   State<_EditProfileDialog> createState() => _EditProfileDialogState();
@@ -103,6 +144,86 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
   String? _saveError;
   bool _confirmingDiscard = false;
 
+  /// The saved photo's link, or null once it is removed.
+  String? _photoUrl;
+
+  /// A photo uploaded in this dialog, shown until the account reloads.
+  String? _uploadedPhotoPath;
+  bool _photoBusy = false;
+  String? _photoError;
+
+  bool get _hasPhoto =>
+      _uploadedPhotoPath != null || (_photoUrl?.isNotEmpty ?? false);
+
+  Future<void> _uploadPhoto() async {
+    final upload = widget.onUploadPhoto;
+    if (upload == null || _photoBusy) return;
+    final path = await widget.pickPhoto();
+    if (path == null || !mounted) return;
+    final ext = path.split('.').last.toLowerCase();
+    if (!kProfilePhotoExtensions.contains(ext)) {
+      setState(() => _photoError = 'Choose a JPG or PNG image.');
+      return;
+    }
+    setState(() {
+      _photoBusy = true;
+      _photoError = null;
+    });
+    final error = await upload(path);
+    if (!mounted) return;
+    setState(() {
+      _photoBusy = false;
+      if (error == null) {
+        _uploadedPhotoPath = path;
+      } else {
+        _photoError = error;
+      }
+    });
+  }
+
+  Future<void> _removePhoto() async {
+    final remove = widget.onRemovePhoto;
+    if (remove == null || _photoBusy) return;
+    setState(() {
+      _photoBusy = true;
+      _photoError = null;
+    });
+    final error = await remove();
+    if (!mounted) return;
+    setState(() {
+      _photoBusy = false;
+      if (error == null) {
+        _uploadedPhotoPath = null;
+        _photoUrl = null;
+      } else {
+        _photoError = error;
+      }
+    });
+  }
+
+  Widget _photoPlaceholder(AppPalette colors) =>
+      Icon(Icons.person, size: 80, color: colors.accent);
+
+  Widget _photoPreview(AppPalette colors) {
+    final uploaded = _uploadedPhotoPath;
+    if (uploaded != null) {
+      return Image.file(
+        File(uploaded),
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => _photoPlaceholder(colors),
+      );
+    }
+    final url = _photoUrl;
+    if (url != null && url.isNotEmpty) {
+      return Image.network(
+        url,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => _photoPlaceholder(colors),
+      );
+    }
+    return _photoPlaceholder(colors);
+  }
+
   @override
   void initState() {
     super.initState();
@@ -118,6 +239,7 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
 
     selectedTimezone = normalizeProfileTimezone(widget.account.timezone);
     selectedCountry = widget.account.country;
+    _photoUrl = widget.account.avatarUrl;
   }
 
   @override
@@ -579,57 +701,67 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
                               child: Container(
                                 width: 160,
                                 height: 160,
+                                clipBehavior: Clip.antiAlias,
                                 decoration: BoxDecoration(
                                   color: colors.accent.withValues(alpha: 0.15),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
-                                child: Icon(
-                                  Icons.person,
-                                  size: 80,
-                                  color: colors.accent,
-                                ),
+                                child: _photoBusy
+                                    ? const Center(
+                                        child: CircularProgressIndicator(),
+                                      )
+                                    : _photoPreview(colors),
                               ),
                             ),
                             const SizedBox(height: 12),
-                            // Photo upload isn't supported yet, so both
-                            // buttons are disabled and say why (Ziki #117).
-                            Center(
-                              child: Tooltip(
-                                message: 'Coming soon',
+                            if (widget.onUploadPhoto != null)
+                              Center(
                                 child: TextButton.icon(
-                                  onPressed: null,
+                                  onPressed: _photoBusy ? null : _uploadPhoto,
                                   icon: Icon(
                                     Icons.upload_outlined,
                                     size: 16,
-                                    color: colors.textHint,
+                                    color: colors.primary,
                                   ),
                                   label: Text(
                                     'Upload photo',
                                     style: context.textTheme.bodySmall
                                         ?.copyWith(
-                                          color: colors.textHint,
+                                          color: colors.primary,
                                           fontWeight: FontWeight.w500,
                                         ),
                                   ),
                                 ),
                               ),
-                            ),
-                            Center(
-                              child: Tooltip(
-                                message: 'Coming soon',
+                            if (widget.onRemovePhoto != null)
+                              Center(
                                 child: TextButton(
-                                  onPressed: null,
+                                  onPressed: _photoBusy || !_hasPhoto
+                                      ? null
+                                      : _removePhoto,
                                   child: Text(
                                     'Remove photo',
                                     style: context.textTheme.bodySmall
                                         ?.copyWith(
-                                          color: colors.textHint,
+                                          color: _hasPhoto
+                                              ? colors.error
+                                              : colors.textHint,
                                           fontWeight: FontWeight.w500,
                                         ),
                                   ),
                                 ),
                               ),
-                            ),
+                            if (_photoError != null)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 4),
+                                child: Text(
+                                  _photoError!,
+                                  textAlign: TextAlign.center,
+                                  style: context.textTheme.bodySmall?.copyWith(
+                                    color: colors.error,
+                                  ),
+                                ),
+                              ),
                           ],
                         ),
                       ),
