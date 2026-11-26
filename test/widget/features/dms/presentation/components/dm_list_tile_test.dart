@@ -178,6 +178,39 @@ void main() {
     expect(find.descendant(of: sidebar, matching: material), findsOneWidget);
   });
 
+  group('preview', () {
+    testWidgets('shows an HTML preview as plain text', (tester) async {
+      await tester.pumpWidget(
+        buildTileUnderTest(
+          buildConversation(
+            previewMessage: '<p>Tom &amp; <strong>Jerry</strong></p>',
+          ),
+        ),
+      );
+
+      expect(find.text('Tom & Jerry'), findsOneWidget);
+      expect(find.textContaining('<p>'), findsNothing);
+    });
+
+    testWidgets('joins paragraphs onto one line', (tester) async {
+      await tester.pumpWidget(
+        buildTileUnderTest(
+          buildConversation(previewMessage: '<p>first</p><p>second</p>'),
+        ),
+      );
+
+      expect(find.text('first second'), findsOneWidget);
+    });
+
+    testWidgets('shows a plain-text preview unchanged', (tester) async {
+      await tester.pumpWidget(
+        buildTileUnderTest(buildConversation(previewMessage: 'see you <soon>')),
+      );
+
+      expect(find.text('see you <soon>'), findsOneWidget);
+    });
+  });
+
   group('DmListTile time', () {
     DmConversation conversation({
       List<DmPreviewThread> previewThreads = const [],
