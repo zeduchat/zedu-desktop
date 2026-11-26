@@ -299,5 +299,28 @@ void main() {
 
       expect(find.text('Sign up screen'), findsOneWidget);
     });
+
+    testWidgets(
+      'MagicLinkSentView renders check icon and container using theme tokens',
+      (tester) async {
+        await tester.binding.setSurfaceSize(const Size(1440, 1024));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: AppTheme.light,
+            home: const MagicLinkSentView(email: 'test@example.com'),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.byType(MagicLinkSentView), findsOneWidget);
+        expect(find.byIcon(Icons.check_rounded), findsOneWidget);
+        final scaffold = tester.widget<Scaffold>(find.byType(Scaffold));
+        expect(scaffold.backgroundColor, AppPalette.light.background);
+        final icon = tester.widget<Icon>(find.byIcon(Icons.check_rounded));
+        expect(icon.color, AppPalette.light.onPrimary);
+      },
+    );
   });
 }
