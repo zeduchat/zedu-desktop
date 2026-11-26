@@ -789,9 +789,11 @@ class ChatHistoryNotifier extends ChangeNotifier {
     _editsInFlight.add(messageId);
     try {
       final repository = ref.read(dmRepositoryProvider);
-      // The edit route is addressed by the message, not the channel (#2745).
+      // zedu-be routes DM edits as PUT /dms/messages/:channelId and finds the
+      // message by the thread_id in the body (EditThreadDm), so the path takes
+      // the channel id, as on web and mobile (ziki-2400).
       await repository.editMessage(
-        messageId,
+        channelId,
         content: newContent,
         threadId: threadId,
       );
