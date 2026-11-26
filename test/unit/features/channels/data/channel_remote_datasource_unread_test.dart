@@ -40,10 +40,16 @@ void main() {
       );
     });
 
+    // fetchChannels pages the channel list (Ziki #1433); one short page is
+    // the whole list.
     void stubChannels(List<Map<String, dynamic>> items) {
       when(
         () => mockApi.get<Map<String, dynamic>>(
           path: '/organisations/org-1/channels',
+          queryParameters: {
+            'page': 1,
+            'limit': ChannelRemoteDataSourceImpl.channelPageSize,
+          },
         ),
       ).thenAnswer((_) async => _listResponse(items));
     }
