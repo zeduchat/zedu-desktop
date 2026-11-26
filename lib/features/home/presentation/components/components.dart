@@ -8,6 +8,8 @@ export 'app_sidebar_rail.dart';
 export 'sidebar_popouts.dart';
 export 'top_user_menu.dart';
 export 'notifications_dialog.dart';
+export 'notification_bell_button.dart';
+export 'notification_preview_popover.dart';
 export 'dm_empty_state.dart';
 export 'sidebar_channel_list.dart';
 export 'sidebar_dm_section.dart';
