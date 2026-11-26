@@ -9,6 +9,13 @@ class CreditTransactionModel extends CreditTransaction {
     required super.createdAt,
   });
 
+  /// Used when a transaction has no usable date. A fixed epoch keeps sorting
+  /// deterministic instead of making an old row look like a new purchase.
+  static final DateTime _unknownCreatedAt = DateTime.fromMillisecondsSinceEpoch(
+    0,
+    isUtc: true,
+  );
+
   factory CreditTransactionModel.fromJson(Map<String, dynamic> json) {
     final createdRaw = json['created_at'] as String?;
     return CreditTransactionModel(
@@ -17,8 +24,8 @@ class CreditTransactionModel extends CreditTransaction {
       credits: (json['credits'] as num?)?.toInt() ?? 0,
       status: json['status'] as String? ?? 'completed',
       createdAt: createdRaw != null
-          ? DateTime.tryParse(createdRaw) ?? DateTime.now()
-          : DateTime.now(),
+          ? DateTime.tryParse(createdRaw) ?? _unknownCreatedAt
+          : _unknownCreatedAt,
     );
   }
 }
