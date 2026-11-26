@@ -74,14 +74,16 @@ class DmRepository {
     int page = 1,
   }) async {
     final response = await _apiClient.get<Map<String, dynamic>>(
-      path: '/channels/$channelId/messages',
+      path: '/dms/channels/$channelId/threads',
       queryParameters: {'page': page, 'limit': pageSize},
     );
 
     final data = response.data;
     final rawMessages = data['messages'] ?? data['data'];
     final messages = rawMessages is Map<String, dynamic>
-        ? rawMessages['messages'] ?? rawMessages['data']
+        ? rawMessages['messages'] ??
+              rawMessages['threads'] ??
+              rawMessages['data']
         : rawMessages;
 
     if (messages is! List) return const [];
