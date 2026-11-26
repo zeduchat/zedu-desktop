@@ -179,7 +179,11 @@ class DmListTile extends ConsumerWidget {
                 )
               else
                 Text(
-                  conversation.previewMessage,
+                  // Previews arrive as message HTML (`<p>Hi</p>`). Show the
+                  // text on one line, without tags or entities.
+                  htmlMessageToPlainText(
+                    conversation.previewMessage,
+                  ).replaceAll('\n', ' '),
                   style: TextStyle(
                     color: hasUnread
                         ? colors.onPrimary
