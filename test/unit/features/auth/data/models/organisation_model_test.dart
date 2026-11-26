@@ -110,8 +110,14 @@ void main() {
         expect(model.totalMessagesCount, 0);
         expect(model.orgRoles, isEmpty);
         expect(model.pinned, false);
-        expect(model.createdAt, DateTime.fromMillisecondsSinceEpoch(0));
-        expect(model.updatedAt, DateTime.fromMillisecondsSinceEpoch(0));
+        expect(
+          model.createdAt,
+          DateTime.fromMillisecondsSinceEpoch(0, isUtc: true),
+        );
+        expect(
+          model.updatedAt,
+          DateTime.fromMillisecondsSinceEpoch(0, isUtc: true),
+        );
         expect(model.organisationSlug, '');
         expect(model.userRole.roleId, '');
         expect(model.userRole.roleName, '');
@@ -127,8 +133,14 @@ void main() {
       };
 
       final model = OrganisationModel.fromJson(json);
-      expect(model.createdAt, DateTime.fromMillisecondsSinceEpoch(0));
-      expect(model.updatedAt, DateTime.fromMillisecondsSinceEpoch(0));
+      expect(
+        model.createdAt,
+        DateTime.fromMillisecondsSinceEpoch(0, isUtc: true),
+      );
+      expect(
+        model.updatedAt,
+        DateTime.fromMillisecondsSinceEpoch(0, isUtc: true),
+      );
     });
   });
 }

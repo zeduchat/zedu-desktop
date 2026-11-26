@@ -59,14 +59,14 @@ class UserModel {
       username: json['username'] as String? ?? '',
       isVerified: json['is_verified'] as bool,
       isOnboarded: json['is_onboarded'] as bool,
-      createdAt: parseApiTimestamp(json['created_at'], field: 'created_at'),
-      updatedAt: parseApiTimestamp(json['updated_at'], field: 'updated_at'),
+      createdAt: parseApiTimestampOrEpoch(json['created_at']),
+      updatedAt: parseApiTimestampOrEpoch(json['updated_at']),
       avatarUrl: json['avatar_url'] as String? ?? '',
       currentOrg: json['current_org'] as String? ?? '',
       currentOrganisationSlug:
           json['current_organisation_slug'] as String? ?? '',
       defaultAvatarUrl: json['default_avatar_url'] as String? ?? '',
-      expiresIn: parseApiTimestamp(json['expires_in'], field: 'expires_in'),
+      expiresIn: parseApiTimestampOrEpoch(json['expires_in']),
       isActive: json['is_active'] as bool,
       online: json['online'] as bool,
       organisation: OrganisationModel.fromJson(
