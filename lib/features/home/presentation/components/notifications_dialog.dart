@@ -94,7 +94,7 @@ class NotificationsDialog extends ConsumerWidget {
                   padding: const EdgeInsets.symmetric(vertical: 6),
                   children: [
                     for (final conversation in unread)
-                      _UnreadDmRow(
+                      UnreadDmRow(
                         conversation: conversation,
                         onTap: () =>
                             _openConversation(context, ref, conversation),
@@ -109,8 +109,13 @@ class NotificationsDialog extends ConsumerWidget {
   }
 }
 
-class _UnreadDmRow extends StatelessWidget {
-  const _UnreadDmRow({required this.conversation, required this.onTap});
+/// One unread DM in the notifications panel and the bell's hover preview.
+class UnreadDmRow extends StatelessWidget {
+  const UnreadDmRow({
+    super.key,
+    required this.conversation,
+    required this.onTap,
+  });
 
   final DmConversation conversation;
   final VoidCallback onTap;

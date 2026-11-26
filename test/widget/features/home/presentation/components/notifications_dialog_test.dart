@@ -143,6 +143,9 @@ void main() {
     });
 
     testWidgets('sidebar bell opens the panel', (tester) async {
+      tester.view.physicalSize = const Size(1200, 1000);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
       await tester.pumpWidget(
         ProviderScope(
           overrides: [dmListProvider.overrideWith(() => _Dms(const []))],
@@ -156,7 +159,7 @@ void main() {
         ),
       );
 
-      await tester.tap(find.byTooltip('Notifications'));
+      await tester.tap(find.byIcon(Icons.notifications_none_outlined));
       await tester.pumpAndSettle();
 
       expect(find.byType(NotificationsDialog), findsOneWidget);

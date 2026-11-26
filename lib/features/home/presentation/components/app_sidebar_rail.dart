@@ -139,18 +139,7 @@ class _AppSidebarRailState extends ConsumerState<AppSidebarRail> {
               );
             },
           ),
-          _RailBottomIcon(
-            icon: Icons.notifications_none_outlined,
-            hasNotification: hasUnreadDms,
-            tooltip: 'Notifications',
-            onTap: () {
-              showDialog<void>(
-                context: context,
-                barrierColor: Colors.black.withValues(alpha: 0.3),
-                builder: (context) => const NotificationsDialog(),
-              );
-            },
-          ),
+          NotificationBellButton(hasUnread: hasUnreadDms),
           _RailBottomIcon(
             icon: Icons.settings_outlined,
             selected: settingsSelected,
@@ -282,14 +271,12 @@ class _RailNavItemState extends State<_RailNavItem> {
 class _RailBottomIcon extends StatelessWidget {
   const _RailBottomIcon({
     required this.icon,
-    this.hasNotification = false,
     this.selected = false,
     this.tooltip,
     this.onTap,
   });
 
   final IconData icon;
-  final bool hasNotification;
   final bool selected;
   final String? tooltip;
   final VoidCallback? onTap;
@@ -317,20 +304,6 @@ class _RailBottomIcon extends StatelessWidget {
               ),
               child: Icon(icon, color: colors.onPrimary, size: 20),
             ),
-            if (hasNotification)
-              Positioned(
-                right: 6,
-                top: 6,
-                child: Container(
-                  key: const Key('notification-unread-indicator'),
-                  width: 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    color: colors.error,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-              ),
           ],
         ),
       ),
