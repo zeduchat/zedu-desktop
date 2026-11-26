@@ -4,8 +4,9 @@ import 'package:zedu/features/features.dart';
 /// Opens the [QuickSwitcherDialog] on Cmd+K (macOS) or Ctrl+K (Windows,
 /// Linux), and the [KeyboardShortcutsDialog] on Cmd+/ or Ctrl+/, from any
 /// screen once the user is signed in. Alt+Up and Alt+Down move to the
-/// previous or next conversation in the Home sidebar, and Ctrl+1 to Ctrl+4
-/// (Cmd+1 to Cmd+4) open the rail's Home, DMs, People and Files.
+/// previous or next conversation in the Home sidebar, Ctrl+1 to Ctrl+4
+/// (Cmd+1 to Cmd+4) open the rail's Home, DMs, People and Files, and Cmd+, or
+/// Ctrl+, opens Settings.
 /// What Ctrl+1 to Ctrl+4 open, in the order the app rail lists them.
 const _railDestinations = <HomeSidebarType>[
   HomeSidebarType.home,
@@ -118,6 +119,18 @@ class _QuickSwitcherShortcutState extends ConsumerState<QuickSwitcherShortcut> {
     }
   }
 
+  /// Opens Settings, the page the rail's Settings icon opens.
+  void _openSettings() {
+    final signedIn =
+        ref.read(authNotifierProvider).status == AuthStatus.authenticated;
+    if (_open || !signedIn) return;
+
+    final location = _router.routerDelegate.currentConfiguration.uri;
+    if (location.path != AppRouter.profile) {
+      _router.go(AppRouter.profile);
+    }
+  }
+
   void _openEntry(QuickSwitcherEntry entry) {
     final conversation = entry.conversation;
     if (conversation == null) {
@@ -158,6 +171,10 @@ class _QuickSwitcherShortcutState extends ConsumerState<QuickSwitcherShortcut> {
           SingleActivator(_railDigitKeys[i], meta: true): () =>
               _openDestination(_railDestinations[i]),
         },
+        const SingleActivator(LogicalKeyboardKey.comma, control: true):
+            _openSettings,
+        const SingleActivator(LogicalKeyboardKey.comma, meta: true):
+            _openSettings,
       },
       child: widget.child,
     );

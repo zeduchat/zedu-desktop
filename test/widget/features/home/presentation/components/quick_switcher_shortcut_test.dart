@@ -63,23 +63,28 @@ Channel _channel(String id, String name, {bool archived = false}) => Channel(
   archived: archived,
 );
 
-GoRouter _router({required bool withTextField}) => GoRouter(
-  initialLocation: '/settings',
-  routes: [
-    GoRoute(
-      path: AppRouter.home,
-      builder: (_, _) => const Scaffold(body: Text('home screen')),
-    ),
-    GoRoute(
-      path: '/settings',
-      builder: (_, _) => Scaffold(
-        body: withTextField
-            ? const TextField(autofocus: true)
-            : const Text('settings screen'),
-      ),
-    ),
-  ],
-);
+GoRouter _router({required bool withTextField, String initial = '/settings'}) =>
+    GoRouter(
+      initialLocation: initial,
+      routes: [
+        GoRoute(
+          path: AppRouter.home,
+          builder: (_, _) => const Scaffold(body: Text('home screen')),
+        ),
+        GoRoute(
+          path: AppRouter.profile,
+          builder: (_, _) => const Scaffold(body: Text('profile screen')),
+        ),
+        GoRoute(
+          path: '/settings',
+          builder: (_, _) => Scaffold(
+            body: withTextField
+                ? const TextField(autofocus: true)
+                : const Text('settings screen'),
+          ),
+        ),
+      ],
+    );
 
 Future<ProviderContainer> _pump(
   WidgetTester tester, {
@@ -87,8 +92,9 @@ Future<ProviderContainer> _pump(
   bool withTextField = true,
   bool channelsFail = false,
   Completer<List<Channel>>? pendingChannels,
+  String initial = '/settings',
 }) async {
-  final router = _router(withTextField: withTextField);
+  final router = _router(withTextField: withTextField, initial: initial);
   final container = ProviderContainer(
     overrides: [
       currentOrgIdProvider.overrideWithValue('org-test'),
@@ -125,6 +131,17 @@ Future<void> _pressCtrlK(WidgetTester tester) async {
   await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
   await tester.sendKeyEvent(LogicalKeyboardKey.keyK);
   await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+  await tester.pumpAndSettle();
+}
+
+Future<void> _pressComma(
+  WidgetTester tester, {
+  LogicalKeyboardKey modifier = LogicalKeyboardKey.controlLeft,
+  LogicalKeyboardKey key = LogicalKeyboardKey.comma,
+}) async {
+  await tester.sendKeyDownEvent(modifier);
+  await tester.sendKeyEvent(key);
+  await tester.sendKeyUpEvent(modifier);
   await tester.pumpAndSettle();
 }
 
@@ -255,6 +272,76 @@ void main() {
 
       expect(tester.takeException(), isNull);
       expect(find.byType(SingleChildScrollView), findsOneWidget);
+    });
+  });
+
+  group('Settings shortcut', () {
+    testWidgets('Ctrl+, opens Settings, even with a text field focused', (
+      tester,
+    ) async {
+      await _pump(tester);
+      expect(find.byType(TextField), findsOneWidget);
+
+      await _pressComma(tester);
+
+      expect(find.text('profile screen'), findsOneWidget);
+    });
+
+    testWidgets('Cmd+, opens Settings', (tester) async {
+      await _pump(tester);
+
+      await _pressComma(tester, modifier: LogicalKeyboardKey.metaLeft);
+
+      expect(find.text('profile screen'), findsOneWidget);
+    });
+
+    testWidgets('pressing it on Settings stays there', (tester) async {
+      await _pump(tester, initial: AppRouter.profile);
+
+      await _pressComma(tester);
+
+      expect(find.text('profile screen'), findsOneWidget);
+    });
+
+    testWidgets('a bare comma and Ctrl+period do nothing', (tester) async {
+      await _pump(tester, withTextField: false);
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.comma);
+      await _pressComma(tester, key: LogicalKeyboardKey.period);
+
+      expect(find.text('profile screen'), findsNothing);
+      expect(find.text('settings screen'), findsOneWidget);
+    });
+
+    testWidgets('does nothing when signed out', (tester) async {
+      await _pump(tester, status: AuthStatus.unauthenticated);
+
+      await _pressComma(tester);
+
+      expect(find.text('profile screen'), findsNothing);
+    });
+
+    testWidgets('does nothing while the quick switcher is open', (
+      tester,
+    ) async {
+      await _pump(tester);
+      await _pressCtrlK(tester);
+
+      await _pressComma(tester);
+
+      expect(find.byType(QuickSwitcherDialog), findsOneWidget);
+      expect(find.text('profile screen'), findsNothing);
+    });
+
+    testWidgets('Ctrl+K still opens the switcher and does not open Settings', (
+      tester,
+    ) async {
+      await _pump(tester);
+
+      await _pressCtrlK(tester);
+
+      expect(find.byType(QuickSwitcherDialog), findsOneWidget);
+      expect(find.text('profile screen'), findsNothing);
     });
   });
 
