@@ -30,7 +30,9 @@ class OrganisationPlanModel {
         json['updated_at'] as String? ?? '0001-01-01T00:00:00Z',
       ),
       planDetails: PlanDetailsModel.fromJson(
-        json['plan_details'] as Map<String, dynamic>,
+        json['plan_details'] is Map<String, dynamic>
+            ? json['plan_details'] as Map<String, dynamic>
+            : const {},
       ),
     );
   }
