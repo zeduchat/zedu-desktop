@@ -46,6 +46,8 @@ void main() {
   Future<void> pumpShell(
     WidgetTester tester, {
     ValueChanged<UserProfileSection>? onSectionSelected,
+    VoidCallback? onDismiss,
+    Widget child = const SizedBox.shrink(),
   }) async {
     tester.view.physicalSize = const Size(1280, 800);
     tester.view.devicePixelRatio = 1;
@@ -65,7 +67,8 @@ void main() {
           home: ProfileSettingsShell(
             selectedSection: UserProfileSection.account,
             onSectionSelected: onSectionSelected ?? (_) {},
-            child: const SizedBox.shrink(),
+            onDismiss: onDismiss,
+            child: child,
           ),
         ),
       ),
@@ -194,6 +197,66 @@ void main() {
       await tester.pump();
 
       expect(selected, UserProfileSection.billing);
+    });
+  });
+
+  group('Escape', () {
+    testWidgets('closes settings', (tester) async {
+      var dismissed = 0;
+      await pumpShell(tester, onDismiss: () => dismissed++);
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pump();
+
+      expect(dismissed, 1);
+    });
+
+    testWidgets('still closes settings after a text field drops focus', (
+      tester,
+    ) async {
+      var dismissed = 0;
+      await pumpShell(
+        tester,
+        onDismiss: () => dismissed++,
+        child: const TextField(key: Key('settings-field')),
+      );
+
+      await tester.tap(find.byKey(const Key('settings-field')));
+      await tester.pump();
+      FocusManager.instance.primaryFocus?.unfocus();
+      await tester.pump();
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pump();
+
+      expect(dismissed, 1);
+    });
+
+    testWidgets('only closes a dialog opened from settings', (tester) async {
+      var dismissed = 0;
+      await pumpShell(
+        tester,
+        onDismiss: () => dismissed++,
+        child: Builder(
+          builder: (context) => TextButton(
+            onPressed: () => showDialog<void>(
+              context: context,
+              builder: (_) => const AlertDialog(content: Text('Dialog body')),
+            ),
+            child: const Text('Open dialog'),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Open dialog'));
+      await tester.pumpAndSettle();
+      expect(find.text('Dialog body'), findsOneWidget);
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Dialog body'), findsNothing);
+      expect(dismissed, 0);
     });
   });
 }

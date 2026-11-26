@@ -7,11 +7,16 @@ class ProfileSettingsShell extends ConsumerWidget {
     required this.selectedSection,
     required this.onSectionSelected,
     required this.child,
+    this.onDismiss,
   });
 
   final UserProfileSection selectedSection;
   final ValueChanged<UserProfileSection> onSectionSelected;
   final Widget child;
+
+  /// Called when the user presses Escape to close settings. Defaults to
+  /// going back to Home.
+  final VoidCallback? onDismiss;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -25,38 +30,51 @@ class ProfileSettingsShell extends ConsumerWidget {
       userName = state.account!.name;
     }
 
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: SafeArea(
-        child: Column(
-          children: [
-            _ProfileTopBar(userName: userName),
-            Expanded(
-              child: Row(
-                children: [
-                  AppSidebarRail(
-                    activeType: null,
-                    settingsSelected: true,
-                    onTypeSelected: (type) {
-                      ref.read(homeSidebarProvider.notifier).setType(type);
-                      context.go(AppRouter.home);
-                    },
+    // Escape closes settings, like the other modal surfaces. Dialogs opened
+    // from settings are their own routes, so Escape there only closes them.
+    return CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.escape):
+            onDismiss ?? () => context.go(AppRouter.home),
+      },
+      // A scope, so a text field that drops focus hands it back here and
+      // Escape keeps working.
+      child: FocusScope(
+        autofocus: true,
+        child: Scaffold(
+          backgroundColor: Colors.white,
+          body: SafeArea(
+            child: Column(
+              children: [
+                _ProfileTopBar(userName: userName),
+                Expanded(
+                  child: Row(
+                    children: [
+                      AppSidebarRail(
+                        activeType: null,
+                        settingsSelected: true,
+                        onTypeSelected: (type) {
+                          ref.read(homeSidebarProvider.notifier).setType(type);
+                          context.go(AppRouter.home);
+                        },
+                      ),
+                      _SettingsNavigation(
+                        userName: userName,
+                        selectedSection: selectedSection,
+                        onSectionSelected: onSectionSelected,
+                      ),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [Expanded(child: child)],
+                        ),
+                      ),
+                    ],
                   ),
-                  _SettingsNavigation(
-                    userName: userName,
-                    selectedSection: selectedSection,
-                    onSectionSelected: onSectionSelected,
-                  ),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [Expanded(child: child)],
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );

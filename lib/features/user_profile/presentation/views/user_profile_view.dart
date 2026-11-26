@@ -23,6 +23,18 @@ class _UserProfileViewState extends ConsumerState<UserProfileView> {
     ref.read(userProfileNotifierProvider.notifier).selectSection(section);
   }
 
+  /// Escape closes settings. Unsaved notification edits get to ask first,
+  /// the same as switching section.
+  Future<void> _dismiss() async {
+    final current = ref.read(userProfileNotifierProvider).section;
+    if (current == UserProfileSection.notifications &&
+        !(await _notificationsKey.currentState?.confirmLeave() ?? true)) {
+      return;
+    }
+    if (!mounted) return;
+    context.go(AppRouter.home);
+  }
+
   @override
   Widget build(BuildContext context) {
     ref.listen<UserProfileState>(userProfileNotifierProvider, (previous, next) {
@@ -59,6 +71,7 @@ class _UserProfileViewState extends ConsumerState<UserProfileView> {
     return ProfileSettingsShell(
       selectedSection: state.section,
       onSectionSelected: _selectSection,
+      onDismiss: _dismiss,
       child: _ProfileContent(
         state: state,
         notifier: notifier,
