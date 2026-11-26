@@ -95,6 +95,8 @@ void main() {
     );
     await tester.pump();
 
+    await tester.tap(find.byTooltip('More actions'));
+    await tester.pump();
     await tester.tap(find.byTooltip('Voice message'));
     await tester.pumpAndSettle();
 

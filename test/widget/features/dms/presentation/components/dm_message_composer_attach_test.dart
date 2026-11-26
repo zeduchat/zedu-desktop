@@ -69,9 +69,11 @@ Future<void> pumpComposer(WidgetTester tester) async {
   await tester.pumpAndSettle();
 }
 
-/// Taps Attach file and lets the composer check the picked files on disk,
-/// which needs real time.
+/// Opens the More actions menu, taps Attach file and lets the composer check
+/// the picked files on disk, which needs real time.
 Future<void> attachFiles(WidgetTester tester) async {
+  await tester.tap(find.byTooltip('More actions'));
+  await tester.pump();
   await tester.runAsync(() async {
     await tester.tap(find.byTooltip('Attach file'));
     await Future<void>.delayed(const Duration(milliseconds: 200));
