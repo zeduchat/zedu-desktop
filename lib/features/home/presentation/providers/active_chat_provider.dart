@@ -21,7 +21,7 @@ class ActiveChatState {
 
   static const generalChannel = ActiveChatState(
     type: ActiveChatType.channel,
-    id: 'general',
+    id: generalChannelName,
   );
   static const newGroupChat = ActiveChatState(
     type: ActiveChatType.newGroupChat,

@@ -22,8 +22,6 @@ class AddEveryoneFailed extends AddEveryoneResult {
   final String message;
 }
 
-const generalChannelName = 'general';
-
 /// The channel "Add everyone" adds to: the one open in the sidebar, or
 /// #general when no channel is open (for example a direct message).
 String openChannelName(ActiveChatState chat) {

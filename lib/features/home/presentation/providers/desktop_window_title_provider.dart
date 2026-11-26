@@ -28,7 +28,10 @@ String _formatChannelTitle(String name) {
 bool _isChannelMatch(Channel c, String? activeId) {
   if (activeId == null) return false;
   if (c.id == activeId || c.name == activeId) return true;
-  if (activeId == 'general' && c.name.toLowerCase() == 'general') return true;
+  if (activeId == generalChannelName &&
+      c.name.toLowerCase() == generalChannelName) {
+    return true;
+  }
   final cleanName = c.name.startsWith('#')
       ? c.name.substring(1).trim()
       : c.name.trim();
@@ -64,8 +67,8 @@ final desktopWindowTitleProvider = Provider<String>((ref) {
       final ch = channels.firstWhere(
         (c) => _isChannelMatch(c, activeChat.id),
         orElse: () => Channel(
-          id: activeChat.id ?? 'general',
-          name: activeChat.id == 'general' || activeChat.id == null
+          id: activeChat.id ?? generalChannelName,
+          name: activeChat.id == generalChannelName || activeChat.id == null
               ? 'General'
               : activeChat.id!,
           description: '',

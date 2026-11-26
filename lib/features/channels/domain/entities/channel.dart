@@ -1,3 +1,7 @@
+/// The name of the default channel every organisation has, which the app
+/// opens when no other channel is picked.
+const generalChannelName = 'general';
+
 class Channel {
   final String id;
   final String name;
