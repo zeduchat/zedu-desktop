@@ -18,7 +18,8 @@ extension MediaQueryValues on BuildContext {
   /// 1.0 when window ≥ design width; proportionally smaller when narrower.
   double get _scale {
     final w = screenWidth;
-    return w >= SizeConfig.baseWidth ? 1.0 : w / SizeConfig.baseWidth;
+    final scale = w / SizeConfig.baseWidth;
+    return scale.clamp(0.75, 1.0);
   }
 
   /// Scale a single dimension.
