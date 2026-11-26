@@ -343,6 +343,52 @@ void main() {
     expect(decoration?.color, equals(AppPalette.light.primaryBg));
   });
 
+  group('UserManagementSection tab alignment (Ziki #212)', () {
+    Finder tabOf(String label) => find
+        .ancestor(of: find.text(label), matching: find.byType(InkWell))
+        .first;
+    Finder underlineOf(String label) =>
+        find.byKey(ValueKey('user_management_tab_underline_$label'));
+
+    void expectTabsAligned(WidgetTester tester) {
+      final members = tester.getRect(tabOf('Members'));
+      final invites = tester.getRect(tabOf('Invites'));
+      expect(invites.top, members.top);
+      expect(invites.height, members.height);
+      expect(
+        tester.getCenter(find.text('Invites')).dy,
+        tester.getCenter(find.text('Members')).dy,
+      );
+      for (final label in ['Members', 'Invites']) {
+        final tab = tester.getRect(tabOf(label));
+        final underline = tester.getRect(underlineOf(label));
+        expect(underline.width, tab.width);
+        expect(underline.bottom, tab.bottom);
+      }
+    }
+
+    Color? underlineColor(WidgetTester tester, String label) =>
+        tester.widget<Container>(underlineOf(label)).color;
+
+    testWidgets('keeps both tabs level whichever one is active', (
+      tester,
+    ) async {
+      await tester.pumpWidget(buildUnderTest(createMembers(2)));
+      await tester.pumpAndSettle();
+
+      expectTabsAligned(tester);
+      expect(underlineColor(tester, 'Members'), AppPalette.light.primary);
+      expect(underlineColor(tester, 'Invites'), Colors.transparent);
+
+      await tester.tap(find.text('Invites'));
+      await tester.pumpAndSettle();
+
+      expectTabsAligned(tester);
+      expect(underlineColor(tester, 'Members'), Colors.transparent);
+      expect(underlineColor(tester, 'Invites'), AppPalette.light.primary);
+    });
+  });
+
   group('UserManagementSection pagination page-jump (Ziki #240)', () {
     testWidgets(
       'renders page jump input and navigates directly to requested page',

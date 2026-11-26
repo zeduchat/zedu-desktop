@@ -661,45 +661,58 @@ class _TabLabel extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(4),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Text(
-                label,
-                style: context.textTheme.bodyMedium?.copyWith(
-                  fontWeight: active ? FontWeight.w600 : FontWeight.w400,
-                  color: active
-                      ? context.colors.primary
-                      : context.colors.textSecondary,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: active
-                      ? context.colors.primaryBg
-                      : context.colors.divider,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Text(
-                  count.toString(),
-                  style: context.textTheme.labelSmall?.copyWith(
+      // Both tabs reserve the underline's space, so the active and inactive
+      // tabs are the same height and their labels and badges line up. The
+      // underline spans the tab's own width instead of a fixed 80px.
+      child: IntrinsicWidth(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  label,
+                  style: context.textTheme.bodyMedium?.copyWith(
+                    fontWeight: active ? FontWeight.w600 : FontWeight.w400,
                     color: active
                         ? context.colors.primary
                         : context.colors.textSecondary,
-                    fontSize: 10,
                   ),
                 ),
-              ),
-            ],
-          ),
-          if (active) ...[
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: active
+                        ? context.colors.primaryBg
+                        : context.colors.divider,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    count.toString(),
+                    style: context.textTheme.labelSmall?.copyWith(
+                      color: active
+                          ? context.colors.primary
+                          : context.colors.textSecondary,
+                      fontSize: 10,
+                    ),
+                  ),
+                ),
+              ],
+            ),
             const SizedBox(height: 8),
-            Container(height: 2, width: 80, color: context.colors.primary),
+            Container(
+              key: ValueKey('user_management_tab_underline_$label'),
+              height: 2,
+              color: active ? context.colors.primary : Colors.transparent,
+            ),
           ],
-        ],
+        ),
       ),
     );
   }
