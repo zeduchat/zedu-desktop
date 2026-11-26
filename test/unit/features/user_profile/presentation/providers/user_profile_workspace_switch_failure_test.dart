@@ -22,6 +22,9 @@ void main() {
     repo = _MockRepo();
     final storage = _MockStorage();
     locator.registerSingleton<SecureStorageService>(storage);
+    locator.registerSingleton<AppConfig>(
+      const AppConfig(apiBaseUrl: 'https://api.test', usesMockData: false),
+    );
     when(() => storage.readData(any())).thenAnswer((_) async => null);
     Future<Result<T>> failed<T>() async =>
         Failure<T>(const ApiFailure(message: 'unavailable'));
