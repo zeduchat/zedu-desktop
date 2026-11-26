@@ -32,6 +32,7 @@ List<TeamMember> orgMembers = [];
 // Avoids the locator and API: serves [orgMembers], invites are recorded.
 class FakeUserProfileNotifier extends UserProfileNotifier {
   final List<String> invited = [];
+  Future<void> Function(String email)? onInvite;
 
   @override
   UserProfileState build() => const UserProfileState();
@@ -46,6 +47,9 @@ class FakeUserProfileNotifier extends UserProfileNotifier {
     String? userId,
   }) async {
     invited.add(email);
+    final hook = onInvite;
+    if (hook != null) await hook(email);
+    if (state.error == null) state = const UserProfileState();
   }
 }
 
@@ -63,6 +67,7 @@ class FakeAddEveryoneToChannel extends AddEveryoneToChannel {
 }
 
 late FakeAddEveryoneToChannel fakeAddEveryone;
+late FakeUserProfileNotifier fakeUserProfile;
 
 // Lets a test open the window while a given channel is open in the sidebar.
 class FakeActiveChatNotifier extends ActiveChatNotifier {
@@ -80,7 +85,9 @@ Widget buildModalUnderTest(
 }) {
   return ProviderScope(
     overrides: [
-      userProfileNotifierProvider.overrideWith(FakeUserProfileNotifier.new),
+      userProfileNotifierProvider.overrideWith(
+        () => fakeUserProfile = FakeUserProfileNotifier(),
+      ),
       activeChatProvider.overrideWith(() => FakeActiveChatNotifier(chat)),
       addEveryoneToChannelProvider.overrideWith(
         (ref) => fakeAddEveryone = FakeAddEveryoneToChannel(ref, result),
@@ -115,6 +122,12 @@ Future<void> openModal(WidgetTester tester) async {
   await tester.tap(find.text('Open'));
   await tester.pumpAndSettle();
   expect(find.byType(InviteTeammatesModal), findsOneWidget);
+}
+
+Future<void> addRecipient(WidgetTester tester, String email) async {
+  await tester.enterText(find.byType(TextField), email);
+  await tester.testTextInput.receiveAction(TextInputAction.done);
+  await tester.pump();
 }
 
 void main() {
@@ -355,6 +368,141 @@ void main() {
 
       expect(find.byTooltip('Copy Invite Link'), findsOneWidget);
       expect(find.widgetWithText(ElevatedButton, 'Add'), findsOneWidget);
+    });
+  });
+
+  // Regression for https://ziki.dev/zedu/web/issues/462
+  group('InviteTeammatesModal submission stability', () {
+    testWidgets('control: three unchanged recipients are all invited', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        buildModalUnderTest(
+          () async => const AddEveryoneNobodyToAdd('general'),
+        ),
+      );
+      await openModal(tester);
+
+      await addRecipient(tester, 'one@test.com');
+      await addRecipient(tester, 'two@test.com');
+      await addRecipient(tester, 'three@test.com');
+      expect(find.byType(Chip), findsNWidgets(3));
+
+      await tester.tap(find.widgetWithText(ElevatedButton, 'Add'));
+      await tester.pumpAndSettle();
+
+      expect(fakeUserProfile.invited, [
+        'one@test.com',
+        'two@test.com',
+        'three@test.com',
+      ]);
+      expect(tester.takeException(), isNull);
+      expect(find.byType(InviteTeammatesModal), findsNothing);
+    });
+
+    testWidgets(
+      'disables chip removal while submitting and still completes a slow batch',
+      (tester) async {
+        final firstRequest = Completer<void>();
+        await tester.pumpWidget(
+          buildModalUnderTest(
+            () async => const AddEveryoneNobodyToAdd('general'),
+          ),
+        );
+        await openModal(tester);
+
+        await addRecipient(tester, 'one@test.com');
+        await addRecipient(tester, 'two@test.com');
+        await addRecipient(tester, 'three@test.com');
+
+        fakeUserProfile.onInvite = (email) async {
+          if (email == 'one@test.com') await firstRequest.future;
+        };
+
+        await tester.tap(find.widgetWithText(ElevatedButton, 'Add'));
+        // First pump rebuilds (starting the Chip delete-icon exit animation
+        // of _kDrawerDuration); the second advances past it so the removed
+        // delete icons leave the tree.
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 200));
+
+        // Recipient editing is blocked during the in-flight submission.
+        expect(
+          find.descendant(
+            of: find.byType(Chip),
+            matching: find.byIcon(Icons.close),
+          ),
+          findsNothing,
+        );
+
+        firstRequest.complete();
+        await tester.pumpAndSettle();
+
+        // The full snapshot is attempted: no skipped invites, no stuck
+        // spinner, and the dialog closes after the successful batch.
+        expect(fakeUserProfile.invited, [
+          'one@test.com',
+          'two@test.com',
+          'three@test.com',
+        ]);
+        expect(tester.takeException(), isNull);
+        expect(find.byType(InviteTeammatesModal), findsNothing);
+      },
+    );
+
+    testWidgets('returns Add to a usable state when an invite throws', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        buildModalUnderTest(
+          () async => const AddEveryoneNobodyToAdd('general'),
+        ),
+      );
+      await openModal(tester);
+
+      await addRecipient(tester, 'one@test.com');
+      await addRecipient(tester, 'two@test.com');
+
+      fakeUserProfile.onInvite = (_) async {
+        throw Exception('network error');
+      };
+
+      await tester.tap(find.widgetWithText(ElevatedButton, 'Add'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(InviteTeammatesModal), findsOneWidget);
+      final button = tester.widget<ElevatedButton>(
+        find.widgetWithText(ElevatedButton, 'Add'),
+      );
+      expect(button.onPressed, isNotNull);
+    });
+
+    testWidgets('returns Add to a usable state when the batch fails', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        buildModalUnderTest(
+          () async => const AddEveryoneNobodyToAdd('general'),
+        ),
+      );
+      await openModal(tester);
+
+      await addRecipient(tester, 'one@test.com');
+      await addRecipient(tester, 'two@test.com');
+
+      fakeUserProfile.onInvite = (_) async {
+        fakeUserProfile.state = const UserProfileState(error: 'Invite failed.');
+      };
+
+      await tester.tap(find.widgetWithText(ElevatedButton, 'Add'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Invite failed.'), findsOneWidget);
+      expect(find.byType(InviteTeammatesModal), findsOneWidget);
+      final button = tester.widget<ElevatedButton>(
+        find.widgetWithText(ElevatedButton, 'Add'),
+      );
+      expect(button.onPressed, isNotNull);
     });
   });
 
