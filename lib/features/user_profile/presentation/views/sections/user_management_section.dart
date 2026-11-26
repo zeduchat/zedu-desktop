@@ -24,7 +24,7 @@ class UserManagementSection extends StatefulWidget {
   final List<TeamMember> members;
   final bool isSaving;
   final Future<void> Function({required String email, required String role})
-  onInvite;
+      onInvite;
   final ValueChanged<TeamMember> onUpdate;
   final ValueChanged<String> onRemove;
   final List<TeamMember>? invites;
@@ -38,6 +38,7 @@ class _UserManagementSectionState extends State<UserManagementSection> {
   final _pageJumpController = TextEditingController();
   final _tableScrollController = ScrollController();
   String _roleFilter = 'All Roles';
+  String _statusFilter = 'All Statuses';
   int _currentPage = 1;
   static const int _pageSize = 10;
   _UserManagementTab _currentTab = _UserManagementTab.members;
@@ -48,6 +49,65 @@ class _UserManagementSectionState extends State<UserManagementSection> {
     _pageJumpController.dispose();
     _tableScrollController.dispose();
     super.dispose();
+  }
+
+  void _clearAllFilters() {
+    setState(() {
+      _searchController.clear();
+      _roleFilter = 'All Roles';
+      _statusFilter = 'All Statuses';
+      _currentTab = _UserManagementTab.members;
+      _currentPage = 1;
+      _pageJumpController.text = '1';
+    });
+  }
+
+  void _clearSearch() {
+    setState(() {
+      _searchController.clear();
+      _currentPage = 1;
+      _pageJumpController.text = '1';
+    });
+  }
+
+  void _clearRole() {
+    setState(() {
+      _roleFilter = 'All Roles';
+      _currentPage = 1;
+      _pageJumpController.text = '1';
+    });
+  }
+
+  void _clearStatus() {
+    setState(() {
+      _statusFilter = 'All Statuses';
+      _currentPage = 1;
+      _pageJumpController.text = '1';
+    });
+  }
+
+  bool _matchesRole(String memberRole, String selectedRole) {
+    if (selectedRole == 'All Roles') return true;
+    final m = memberRole.trim().toLowerCase();
+    final s = selectedRole.trim().toLowerCase();
+    if (m == s) return true;
+    if (s == 'administrator' &&
+        (m == 'admin' || m == 'administrator' || m == 'owner')) {
+      return true;
+    }
+    if (s == 'manager' && (m == 'manager' || m == 'lead')) {
+      return true;
+    }
+    if (s == 'user' && (m == 'user' || m == 'member')) {
+      return true;
+    }
+    return false;
+  }
+
+  bool _matchesStatus(TeamMemberStatus status, String selectedStatus) {
+    if (selectedStatus == 'All Statuses') return true;
+    return status.name.trim().toLowerCase() ==
+        selectedStatus.trim().toLowerCase();
   }
 
   void _jumpToPage(String value, int totalPages) {
@@ -66,33 +126,39 @@ class _UserManagementSectionState extends State<UserManagementSection> {
   @override
   Widget build(BuildContext context) {
     final query = _searchController.text.trim().toLowerCase();
-    final hasActiveFilter = query.isNotEmpty || _roleFilter != 'All Roles';
+    final hasActiveFilter = query.isNotEmpty ||
+        _roleFilter != 'All Roles' ||
+        _statusFilter != 'All Statuses' ||
+        _currentTab != _UserManagementTab.members;
+
     final filtered = widget.members.where((member) {
-      final matchesQuery =
-          query.isEmpty ||
+      final matchesQuery = query.isEmpty ||
           member.email.toLowerCase().contains(query) ||
           (member.name?.toLowerCase().contains(query) ?? false);
-      final matchesRole =
-          _roleFilter == 'All Roles' || member.role == _roleFilter;
-      return matchesQuery && matchesRole;
+      final matchesRole = _matchesRole(member.role, _roleFilter);
+      final matchesStatus = _matchesStatus(member.status, _statusFilter);
+      return matchesQuery && matchesRole && matchesStatus;
     }).toList();
 
     final totalPages = (filtered.length / _pageSize).ceil();
     final currentPage = totalPages == 0 ? 1 : _currentPage.clamp(1, totalPages);
     final startIndex = (currentPage - 1) * _pageSize;
     final paginatedMembers = filtered.skip(startIndex).take(_pageSize).toList();
-    final invitesList =
-        widget.invites ??
+    final invitesList = widget.invites ??
         widget.members
             .where((m) => m.status == TeamMemberStatus.pending)
             .toList();
+
     // The selected role stays listed after its last member is removed, since a
     // dropdown can't hold a value it has no item for.
     final roleOptions = {
       for (final member in widget.members)
         if (member.role.isNotEmpty) member.role,
       if (_roleFilter != 'All Roles') _roleFilter,
-    }.toList()..sort();
+    }.toList()
+      ..sort();
+
+    const statusOptions = ['All Statuses', 'Active', 'Pending', 'Inactive'];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -113,10 +179,10 @@ class _UserManagementSectionState extends State<UserManagementSection> {
           onPressed: widget.isSaving
               ? null
               : () => showDialog<void>(
-                  context: context,
-                  barrierDismissible: false,
-                  builder: (_) => const BulkInviteDialog(),
-                ),
+                    context: context,
+                    barrierDismissible: false,
+                    builder: (_) => const BulkInviteDialog(),
+                  ),
           icon: const Icon(Icons.group_add_outlined),
           label: const Text('Invite multiple people'),
         ),
@@ -125,7 +191,9 @@ class _UserManagementSectionState extends State<UserManagementSection> {
           children: [
             _TabLabel(
               label: 'Members',
-              count: widget.members.length,
+              count: widget.members
+                  .where((m) => m.status != TeamMemberStatus.pending)
+                  .length,
               active: _currentTab == _UserManagementTab.members,
               onTap: () {
                 if (_currentTab != _UserManagementTab.members) {
@@ -159,12 +227,13 @@ class _UserManagementSectionState extends State<UserManagementSection> {
           ProfileCard(
             padding: EdgeInsets.zero,
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Padding(
                   padding: const EdgeInsets.all(20),
                   child: LayoutBuilder(
                     builder: (context, constraints) {
-                      final isNarrow = constraints.maxWidth < 480;
+                      final isNarrow = constraints.maxWidth < 640;
                       final searchField = TextField(
                         controller: _searchController,
                         onChanged: (_) => setState(() {
@@ -185,7 +254,9 @@ class _UserManagementSectionState extends State<UserManagementSection> {
                       );
 
                       final roleDropdown = DropdownButton<String>(
-                        value: _roleFilter,
+                        value: roleOptions.contains(_roleFilter)
+                            ? _roleFilter
+                            : 'All Roles',
                         underline: const SizedBox(),
                         items: [
                           const DropdownMenuItem(
@@ -202,31 +273,121 @@ class _UserManagementSectionState extends State<UserManagementSection> {
                         }),
                       );
 
+                      final statusDropdown = DropdownButton<String>(
+                        value: _statusFilter,
+                        underline: const SizedBox(),
+                        items: [
+                          for (final status in statusOptions)
+                            DropdownMenuItem(
+                              value: status,
+                              child: Text(status),
+                            ),
+                        ],
+                        onChanged: (value) => setState(() {
+                          _statusFilter = value ?? 'All Statuses';
+                          _currentPage = 1;
+                          _pageJumpController.text = '1';
+                        }),
+                      );
+
+                      Widget buildActiveChips() {
+                        if (!hasActiveFilter) return const SizedBox.shrink();
+                        final chips = <Widget>[];
+                        if (query.isNotEmpty) {
+                          chips.add(
+                            Chip(
+                              label: Text('Search: "$query"'),
+                              onDeleted: _clearSearch,
+                            ),
+                          );
+                        }
+                        if (_roleFilter != 'All Roles') {
+                          chips.add(
+                            Chip(
+                              label: Text('Role: $_roleFilter'),
+                              onDeleted: _clearRole,
+                            ),
+                          );
+                        }
+                        if (_statusFilter != 'All Statuses') {
+                          chips.add(
+                            Chip(
+                              label: Text('Status: $_statusFilter'),
+                              onDeleted: _clearStatus,
+                            ),
+                          );
+                        }
+                        if (_currentTab == _UserManagementTab.invites) {
+                          chips.add(
+                            Chip(
+                              label: const Text('Tab: Invites'),
+                              onDeleted: () {
+                                setState(() {
+                                  _currentTab = _UserManagementTab.members;
+                                  _currentPage = 1;
+                                  _pageJumpController.text = '1';
+                                });
+                              },
+                            ),
+                          );
+                        }
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 12),
+                          child: Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              ...chips,
+                              TextButton(
+                                onPressed: _clearAllFilters,
+                                child: const Text('Clear all'),
+                              ),
+                            ],
+                          ),
+                        );
+                      }
+
                       if (isNarrow) {
                         return Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
                             searchField,
                             const SizedBox(height: 12),
-                            Align(
-                              alignment: Alignment.centerLeft,
-                              child: roleDropdown,
+                            Wrap(
+                              spacing: 16,
+                              runSpacing: 8,
+                              children: [
+                                roleDropdown,
+                                statusDropdown,
+                              ],
                             ),
+                            buildActiveChips(),
                           ],
                         );
                       }
 
-                      return Row(
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          Flexible(
-                            fit: FlexFit.loose,
-                            child: ConstrainedBox(
-                              constraints: const BoxConstraints(maxWidth: 320),
-                              child: searchField,
-                            ),
+                          Row(
+                            children: [
+                              Flexible(
+                                fit: FlexFit.loose,
+                                child: ConstrainedBox(
+                                  constraints: const BoxConstraints(
+                                    maxWidth: 320,
+                                  ),
+                                  child: searchField,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              roleDropdown,
+                              const SizedBox(width: 12),
+                              statusDropdown,
+                            ],
                           ),
-                          const SizedBox(width: 12),
-                          roleDropdown,
+                          buildActiveChips(),
                         ],
                       );
                     },
@@ -270,7 +431,7 @@ class _UserManagementSectionState extends State<UserManagementSection> {
                           const SizedBox(height: 6),
                           Text(
                             hasActiveFilter
-                                ? 'Try adjusting your search terms or role filters.'
+                                ? 'Try adjusting your search terms, role, or status filters.'
                                 : 'Invite people to your team to start collaborating.',
                             textAlign: TextAlign.center,
                             style: context.textTheme.bodySmall?.copyWith(
@@ -279,6 +440,13 @@ class _UserManagementSectionState extends State<UserManagementSection> {
                               ),
                             ),
                           ),
+                          if (hasActiveFilter) ...[
+                            const SizedBox(height: 16),
+                            OutlinedButton(
+                              onPressed: _clearAllFilters,
+                              child: const Text('Clear all filters'),
+                            ),
+                          ],
                         ],
                       ),
                     ),
@@ -348,8 +516,13 @@ class _UserManagementSectionState extends State<UserManagementSection> {
                                       ),
                                     ),
                                     DataCell(
-                                      ProfileStatusPill(
-                                        status: member.status.name,
+                                      ConstrainedBox(
+                                        constraints: const BoxConstraints(
+                                          maxWidth: 130,
+                                        ),
+                                        child: ProfileStatusPill(
+                                          status: member.status.name,
+                                        ),
                                       ),
                                     ),
                                     DataCell(
@@ -393,7 +566,10 @@ class _UserManagementSectionState extends State<UserManagementSection> {
                 if (totalPages > 1) ...[
                   const Divider(height: 1),
                   Padding(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 12,
+                    ),
                     child: Row(
                       children: [
                         AppButton.outlined(
@@ -467,10 +643,10 @@ class _UserManagementSectionState extends State<UserManagementSection> {
                                     ),
                                   ),
                                   hintText: '$currentPage',
-                                  hintStyle: context.textTheme.bodySmall
-                                      ?.copyWith(
-                                        color: context.colors.textHint,
-                                      ),
+                                  hintStyle:
+                                      context.textTheme.bodySmall?.copyWith(
+                                    color: context.colors.textHint,
+                                  ),
                                 ),
                                 onSubmitted: (val) =>
                                     _jumpToPage(val, totalPages),
@@ -515,101 +691,134 @@ class _UserManagementSectionState extends State<UserManagementSection> {
         else
           ProfileCard(
             padding: EdgeInsets.zero,
-            child: invitesList.isEmpty
-                ? Padding(
-                    padding: const EdgeInsets.symmetric(
-                      vertical: 48,
-                      horizontal: 24,
-                    ),
-                    child: Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            width: 56,
-                            height: 56,
-                            decoration: BoxDecoration(
-                              color: context.colors.divider,
-                              shape: BoxShape.circle,
-                            ),
-                            child: Icon(
-                              Icons.mail_outline_rounded,
-                              size: 28,
-                              color: context.colors.textHint,
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            'No pending invitations',
-                            style: context.textTheme.titleSmall?.copyWith(
-                              fontWeight: FontWeight.w600,
-                              color: context.colors.textPrimary,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            'When you invite teammates, their pending invites will show up here.',
-                            textAlign: TextAlign.center,
-                            style: context.textTheme.bodySmall?.copyWith(
-                              color: context.colors.textSecondary.withValues(
-                                alpha: 0.7,
-                              ),
-                            ),
-                          ),
-                        ],
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      Chip(
+                        label: const Text('Tab: Invites'),
+                        onDeleted: () {
+                          setState(() {
+                            _currentTab = _UserManagementTab.members;
+                            _currentPage = 1;
+                            _pageJumpController.text = '1';
+                          });
+                        },
                       ),
-                    ),
-                  )
-                : SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(minWidth: 880),
-                      child: DataTable(
-                        headingRowColor: WidgetStateProperty.all(
-                          const Color(0xFFFAFAFA),
+                      TextButton(
+                        onPressed: _clearAllFilters,
+                        child: const Text('Clear all'),
+                      ),
+                    ],
+                  ),
+                ),
+                invitesList.isEmpty
+                    ? Padding(
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 48,
+                          horizontal: 24,
                         ),
-                        columns: const [
-                          DataColumn(label: Text('Email Address')),
-                          DataColumn(label: Text('Role')),
-                          DataColumn(label: Text('Date Invited')),
-                          DataColumn(label: Text('Status')),
-                          DataColumn(label: Text('Actions')),
-                        ],
-                        rows: invitesList.map((invite) {
-                          return DataRow(
-                            cells: [
-                              DataCell(_MemberIdentity(email: invite.email)),
-                              DataCell(Text(invite.role)),
-                              DataCell(
-                                Text(_formatDateJoined(invite.dateJoined)),
+                        child: Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 56,
+                                height: 56,
+                                decoration: BoxDecoration(
+                                  color: context.colors.divider,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  Icons.mail_outline_rounded,
+                                  size: 28,
+                                  color: context.colors.textHint,
+                                ),
                               ),
-                              DataCell(
-                                ProfileStatusPill(status: invite.status.name),
+                              const SizedBox(height: 16),
+                              Text(
+                                'No pending invitations',
+                                style: context.textTheme.titleSmall?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                  color: context.colors.textPrimary,
+                                ),
                               ),
-                              DataCell(
-                                Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    SquareIconButton(
-                                      icon: Icons.delete_outline,
-                                      tooltip: 'Remove invite',
-                                      size: 28,
-                                      onTap: () => _confirmRemove(
-                                        context,
-                                        invite.email,
-                                        () async => widget.onRemove(invite.id),
-                                        pendingInvite: true,
-                                      ),
-                                    ),
-                                  ],
+                              const SizedBox(height: 6),
+                              Text(
+                                'When you invite teammates, their pending invites will show up here.',
+                                textAlign: TextAlign.center,
+                                style: context.textTheme.bodySmall?.copyWith(
+                                  color:
+                                      context.colors.textSecondary.withValues(
+                                    alpha: 0.7,
+                                  ),
                                 ),
                               ),
                             ],
-                          );
-                        }).toList(),
+                          ),
+                        ),
+                      )
+                    : SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(minWidth: 880),
+                          child: DataTable(
+                            headingRowColor: WidgetStateProperty.all(
+                              const Color(0xFFFAFAFA),
+                            ),
+                            columns: const [
+                              DataColumn(label: Text('Email Address')),
+                              DataColumn(label: Text('Role')),
+                              DataColumn(label: Text('Date Invited')),
+                              DataColumn(label: Text('Status')),
+                              DataColumn(label: Text('Actions')),
+                            ],
+                            rows: invitesList.map((invite) {
+                              return DataRow(
+                                cells: [
+                                  DataCell(
+                                      _MemberIdentity(email: invite.email)),
+                                  DataCell(Text(invite.role)),
+                                  DataCell(
+                                    Text(_formatDateJoined(invite.dateJoined)),
+                                  ),
+                                  DataCell(
+                                    ProfileStatusPill(
+                                        status: invite.status.name),
+                                  ),
+                                  DataCell(
+                                    Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        SquareIconButton(
+                                          icon: Icons.delete_outline,
+                                          tooltip: 'Remove invite',
+                                          size: 28,
+                                          onTap: () => _confirmRemove(
+                                            context,
+                                            invite.email,
+                                            () async =>
+                                                widget.onRemove(invite.id),
+                                            pendingInvite: true,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              );
+                            }).toList(),
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
+              ],
+            ),
           ),
       ],
     );
@@ -618,30 +827,33 @@ class _UserManagementSectionState extends State<UserManagementSection> {
   void _showInviteDialog(
     BuildContext context,
     Future<void> Function({required String email, required String role})
-    onInvite,
-  ) => showInviteMemberDialog(context, onInvite);
+        onInvite,
+  ) =>
+      showInviteMemberDialog(context, onInvite);
 
   void _showMemberDialog(
     BuildContext context,
     TeamMember member,
     ValueChanged<TeamMember> onUpdate,
-  ) => showEditMemberDialog(context, member, onUpdate);
+  ) =>
+      showEditMemberDialog(context, member, onUpdate);
 
   Future<void> _confirmRemove(
     BuildContext context,
     String email,
     Future<void> Function() onConfirm, {
     bool pendingInvite = false,
-  }) => showProfileConfirmDialog(
-    context,
-    title: pendingInvite ? 'Remove invitation?' : 'Remove team member?',
-    message: pendingInvite
-        ? 'The invitation to $email will be cancelled. They will not join this organization.'
-        : '$email will lose access to this organization.',
-    confirmLabel: pendingInvite ? 'Remove invite' : 'Remove member',
-    onConfirm: onConfirm,
-    destructive: true,
-  );
+  }) =>
+      showProfileConfirmDialog(
+        context,
+        title: pendingInvite ? 'Remove invitation?' : 'Remove team member?',
+        message: pendingInvite
+            ? 'The invitation to $email will be cancelled. They will not join this organization.'
+            : '$email will lose access to this organization.',
+        confirmLabel: pendingInvite ? 'Remove invite' : 'Remove member',
+        onConfirm: onConfirm,
+        destructive: true,
+      );
 }
 
 class _TabLabel extends StatelessWidget {
