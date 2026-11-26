@@ -120,27 +120,40 @@ class DmRepository {
     return ConversationSearchHit.fromResponse(response.data['data']);
   }
 
+  /// Loads one page of a DM's history, newest first.
+  ///
+  /// DM history lives on the DM threads route, the same one the web app reads
+  /// and the one [sendMessage] posts to. `/channels/:id/messages` only serves
+  /// ordinary channel members, so it answers a DM channel with a 400.
   Future<List<Map<String, dynamic>>> getMessages(
     String channelId, {
     int page = 1,
   }) async {
     final response = await _apiClient.get<Map<String, dynamic>>(
-      path: '/channels/$channelId/messages',
+      path: '/dms/channels/$channelId/threads',
       queryParameters: {'page': page, 'limit': pageSize},
     );
 
-    final data = response.data;
-    final rawMessages = data['messages'] ?? data['data'];
-    final messages = rawMessages is Map<String, dynamic>
-        ? rawMessages['messages'] ?? rawMessages['data']
-        : rawMessages;
+    final threads = response.data['data'];
+    if (threads is! List) return const [];
 
-    if (messages is! List) return const [];
-
-    return messages
+    return threads
         .whereType<Map<dynamic, dynamic>>()
-        .map((message) => Map<String, dynamic>.from(message))
+        .map((thread) => threadToMessage(Map<String, dynamic>.from(thread)))
         .toList();
+  }
+
+  /// Maps a DM thread to the message shape the chat reads: the thread's
+  /// `thread_id` becomes `id` (the id the edit and delete routes take) and its
+  /// `message` text becomes `content`. The server's own `status` is dropped,
+  /// because the chat reads a `status` as "still sending" or "failed". Every
+  /// other field (`user_id`, `username`, `created_at`, `media`, ...) is kept.
+  static Map<String, dynamic> threadToMessage(Map<String, dynamic> thread) {
+    return {
+      ...thread,
+      'id': thread['thread_id'] ?? thread['id'],
+      'content': thread['message'] ?? thread['content'] ?? '',
+    }..remove('status');
   }
 
   /// Opens (or creates) the direct message with [participantId].
