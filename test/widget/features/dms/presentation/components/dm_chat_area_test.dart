@@ -194,6 +194,8 @@ void main() {
             dmHistoryClearStoreProvider.overrideWithValue(
               DmHistoryClearStore(storage, userId: 'user-1'),
             ),
+            // Each bubble's Later button reads the server's saved list.
+            savedMessagesProvider.overrideWith((ref) async => []),
           ],
           child: buildTestMaterialApp(
             Scaffold(
@@ -262,6 +264,8 @@ void main() {
               unawaited(store.load());
               return store;
             }),
+            // Each bubble's Later button reads the server's saved list.
+            savedMessagesProvider.overrideWith((ref) async => []),
           ],
           child: buildTestMaterialApp(
             Scaffold(
@@ -348,6 +352,8 @@ void main() {
             dmDraftStoreProvider.overrideWith(
               (ref) => DmDraftStore(storage, userId: 'user-1', orgId: 'org-1'),
             ),
+            // Each bubble's Later button reads the server's saved list.
+            savedMessagesProvider.overrideWith((ref) async => []),
           ],
           child: buildTestMaterialApp(
             Scaffold(
