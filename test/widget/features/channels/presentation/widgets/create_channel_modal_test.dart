@@ -83,6 +83,24 @@ void main() {
       expect(input.focusNode.hasFocus, isTrue);
     });
 
+    testWidgets('the description and topic fields show placeholder text', (
+      tester,
+    ) async {
+      await openModal(tester);
+
+      final fields = tester
+          .widgetList<TextField>(find.byType(TextField))
+          .toList();
+      expect(fields, hasLength(3));
+      expect(
+        fields[1].decoration?.hintText,
+        'Describe what this channel is for',
+      );
+      expect(fields[2].decoration?.hintText, 'e.g. Weekly project updates');
+      expect(find.text('Describe what this channel is for'), findsOneWidget);
+      expect(find.text('e.g. Weekly project updates'), findsOneWidget);
+    });
+
     // AppToastService auto-dismisses on a 4s timer; let it fire before the
     // test ends so no timer is left pending.
     Future<void> drainToastTimer(WidgetTester tester) async {
