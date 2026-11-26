@@ -116,6 +116,31 @@ void main() {
     );
   });
 
+  testWidgets('default banner reads "with the ability to add"', (tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        child: buildTestMaterialApp(
+          Scaffold(
+            body: BillingSection(
+              billing: BillingInfo.empty(),
+              onInvite: ({required email, required role}) async {},
+              onComparePlans: () {},
+            ),
+          ),
+        ),
+      ),
+    );
+
+    expect(
+      find.text(
+        'You are enjoying the full Zedu experience with the ability to add '
+        'as many users to your organisation.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.textContaining('with ability to add'), findsNothing);
+  });
+
   testWidgets('Compare Plans opens the plan comparison flow', (tester) async {
     var comparePlansOpened = false;
 
