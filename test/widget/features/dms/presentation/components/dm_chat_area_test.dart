@@ -701,6 +701,89 @@ void main() {
       expect(opened, [Uri.parse('https://example.com/bold')]);
     });
 
+    List<String> mockClipboard() {
+      final copied = <String>[];
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(SystemChannels.platform, (call) async {
+            if (call.method == 'Clipboard.setData') {
+              copied.add((call.arguments as Map)['text'] as String);
+            }
+            return null;
+          });
+      addTearDown(
+        () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(SystemChannels.platform, null),
+      );
+      return copied;
+    }
+
+    testWidgets('Copy text copies the message without its Markdown marks', (
+      tester,
+    ) async {
+      final copied = mockClipboard();
+      await pumpChat(tester, [
+        message('m1', '**bold** and *soft* and ~~gone~~ and `code`'),
+      ]);
+
+      await tester.longPress(find.textContaining('bold', findRichText: true));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Copy text'));
+      await tester.pumpAndSettle();
+
+      expect(copied, ['bold and soft and gone and code']);
+    });
+
+    testWidgets('a message with only attachments offers no Copy text', (
+      tester,
+    ) async {
+      await pumpChat(tester, [
+        {
+          ...message('m1', ''),
+          'media': [
+            {
+              'file_name': 'report.pdf',
+              'file_type': 'pdf',
+              'file_link': 'https://files.test/report.pdf',
+            },
+          ],
+        },
+      ]);
+
+      await tester.longPress(find.text('report.pdf'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Pin message'), findsOneWidget);
+      expect(find.text('Copy text'), findsNothing);
+    });
+
+    testWidgets('message text can be selected and copied with the keyboard', (
+      tester,
+    ) async {
+      final copied = mockClipboard();
+      await pumpChat(tester, [message('m1', 'call me on **0801**')]);
+
+      final text = find.text('call me on 0801', findRichText: true);
+      final start = tester.getTopLeft(text) + const Offset(1, 4);
+      final end = tester.getTopRight(text) + const Offset(-1, 4);
+      final gesture = await tester.startGesture(
+        start,
+        kind: PointerDeviceKind.mouse,
+      );
+      await tester.pump();
+      await gesture.moveTo(end);
+      await tester.pump();
+      await gesture.up();
+      await tester.pumpAndSettle();
+
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyC);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+      await tester.pumpAndSettle();
+
+      expect(copied.single, contains('call me on 0801'));
+      expect(copied.single, isNot(contains('**')));
+    });
+
     testWidgets('the conversation menu opens its shared links view', (
       tester,
     ) async {

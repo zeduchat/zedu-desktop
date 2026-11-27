@@ -465,94 +465,107 @@ class _DmChatAreaState extends ConsumerState<DmChatArea> {
                                       }
                                       return false;
                                     },
-                                child: CustomScrollView(
-                                  controller: _scrollController,
-                                  reverse: true,
-                                  slivers: [
-                                    SliverPadding(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 24,
-                                        vertical: 16,
-                                      ),
-                                      sliver: SliverList(
-                                        delegate: SliverChildBuilderDelegate((
-                                          context,
-                                          index,
-                                        ) {
-                                          final msg = messages[index];
-                                          final isTarget =
-                                              _highlightedId != null &&
-                                              msg['id']?.toString() ==
-                                                  _highlightedId;
-                                          return Container(
-                                            key: isTarget
-                                                ? _jumpTargetKey
-                                                : null,
-                                            color: isTarget
-                                                ? context.colors.primary
-                                                      .withValues(alpha: 0.12)
-                                                : null,
-                                            child: _MessageBubble(
-                                              message: msg,
-                                              conversation: widget.conversation,
-                                              channelId:
-                                                  widget.conversation.channelId,
-                                              onEdit: (id, text) => _composerKey
-                                                  .currentState
-                                                  ?.enterEditMode(id, text),
-                                            ),
-                                          );
-                                        }, childCount: messages.length),
-                                      ),
-                                    ),
-                                    if (historyState.isLoading)
-                                      const SliverToBoxAdapter(
-                                        child: Padding(
-                                          padding: EdgeInsets.symmetric(
-                                            vertical: 16,
-                                          ),
-                                          child: Center(
-                                            child: CircularProgressIndicator(),
-                                          ),
+                                // Drag selects text across bubbles and Ctrl/Cmd+C
+                                // copies it. No selection toolbar: a right-click
+                                // on a bubble opens its message menu instead.
+                                child: SelectionArea(
+                                  contextMenuBuilder: null,
+                                  child: CustomScrollView(
+                                    controller: _scrollController,
+                                    reverse: true,
+                                    slivers: [
+                                      SliverPadding(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 24,
+                                          vertical: 16,
                                         ),
-                                      ),
-                                    if (!historyState.isLoading &&
-                                        historyState.loadFailed)
-                                      SliverToBoxAdapter(
-                                        child: _HistoryLoadError(
-                                          message: "Couldn't load messages.",
-                                          onRetry: historyState.retryLoad,
-                                        ),
-                                      )
-                                    else if (!historyState.isLoading &&
-                                        historyState.loadMoreFailed)
-                                      SliverToBoxAdapter(
-                                        child: _HistoryLoadError(
-                                          message:
-                                              "Couldn't load older messages.",
-                                          onRetry: historyState.loadMore,
-                                        ),
-                                      ),
-                                    if (!historyState.hasMore)
-                                      SliverToBoxAdapter(
-                                        child: historyState.historyCleared
-                                            ? const _HistoryClearedNote()
-                                            : isOwnSpace
-                                            ? OwnSpaceIntro(
+                                        sliver: SliverList(
+                                          delegate: SliverChildBuilderDelegate((
+                                            context,
+                                            index,
+                                          ) {
+                                            final msg = messages[index];
+                                            final isTarget =
+                                                _highlightedId != null &&
+                                                msg['id']?.toString() ==
+                                                    _highlightedId;
+                                            return Container(
+                                              key: isTarget
+                                                  ? _jumpTargetKey
+                                                  : null,
+                                              color: isTarget
+                                                  ? context.colors.primary
+                                                        .withValues(alpha: 0.12)
+                                                  : null,
+                                              child: _MessageBubble(
+                                                message: msg,
                                                 conversation:
                                                     widget.conversation,
-                                                onEditProfile: _editOwnProfile,
-                                              )
-                                            : DmProfileCard(
-                                                conversation:
-                                                    widget.conversation,
-                                                onViewProfile: () =>
-                                                    _handleMenuAction(
-                                                      'view_profile',
-                                                    ),
+                                                channelId: widget
+                                                    .conversation
+                                                    .channelId,
+                                                onEdit: (id, text) =>
+                                                    _composerKey.currentState
+                                                        ?.enterEditMode(
+                                                          id,
+                                                          text,
+                                                        ),
                                               ),
+                                            );
+                                          }, childCount: messages.length),
+                                        ),
                                       ),
-                                  ],
+                                      if (historyState.isLoading)
+                                        const SliverToBoxAdapter(
+                                          child: Padding(
+                                            padding: EdgeInsets.symmetric(
+                                              vertical: 16,
+                                            ),
+                                            child: Center(
+                                              child:
+                                                  CircularProgressIndicator(),
+                                            ),
+                                          ),
+                                        ),
+                                      if (!historyState.isLoading &&
+                                          historyState.loadFailed)
+                                        SliverToBoxAdapter(
+                                          child: _HistoryLoadError(
+                                            message: "Couldn't load messages.",
+                                            onRetry: historyState.retryLoad,
+                                          ),
+                                        )
+                                      else if (!historyState.isLoading &&
+                                          historyState.loadMoreFailed)
+                                        SliverToBoxAdapter(
+                                          child: _HistoryLoadError(
+                                            message:
+                                                "Couldn't load older messages.",
+                                            onRetry: historyState.loadMore,
+                                          ),
+                                        ),
+                                      if (!historyState.hasMore)
+                                        SliverToBoxAdapter(
+                                          child: historyState.historyCleared
+                                              ? const _HistoryClearedNote()
+                                              : isOwnSpace
+                                              ? OwnSpaceIntro(
+                                                  conversation:
+                                                      widget.conversation,
+                                                  onEditProfile:
+                                                      _editOwnProfile,
+                                                )
+                                              : DmProfileCard(
+                                                  conversation:
+                                                      widget.conversation,
+                                                  onViewProfile: () =>
+                                                      _handleMenuAction(
+                                                        'view_profile',
+                                                      ),
+                                                ),
+                                        ),
+                                    ],
+                                  ),
                                 ),
                               );
                             },
@@ -1045,6 +1058,11 @@ const _bubbleMonths = [
   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
 ];
 
+/// The text of a DM as people read it, without the Markdown marks, for
+/// "Copy text".
+String dmMessagePlainText(String text) =>
+    buildInlineMarkdownSpan(text, const TextStyle()).toPlainText();
+
 class _MessageBubble extends ConsumerWidget {
   final Map<String, dynamic> message;
   final DmConversation conversation;
@@ -1092,14 +1110,27 @@ class _MessageBubble extends ConsumerWidget {
 
   Widget _buildMessageText(String content, TextStyle style) {
     return MessageLinkScope(
-      builder: (context, links) => _buildLinkedText(content, style, links),
+      builder: (context, links) =>
+          _buildLinkedText(context, content, style, links),
     );
   }
 
-  Widget _buildLinkedText(String content, TextStyle style, MessageLinks links) {
+  Widget _buildLinkedText(
+    BuildContext context,
+    String content,
+    TextStyle style,
+    MessageLinks links,
+  ) {
+    // Registers with the list's SelectionArea so the text can be selected.
+    Widget richText(String text) => RichText(
+      text: _parseRichText(text, style, links),
+      selectionRegistrar: SelectionContainer.maybeOf(context),
+      selectionColor: DefaultSelectionStyle.of(context).selectionColor,
+    );
+
     final parts = _splitOnDividers(content);
     if (parts.length == 1) {
-      return RichText(text: _parseRichText(content, style, links));
+      return richText(content);
     }
 
     final divider = Divider(
@@ -1118,8 +1149,7 @@ class _MessageBubble extends ConsumerWidget {
           children: [
             for (var i = 0; i < parts.length; i++) ...[
               if (i > 0) divider,
-              if (parts[i].isNotEmpty)
-                RichText(text: _parseRichText(parts[i], style, links)),
+              if (parts[i].isNotEmpty) richText(parts[i]),
             ],
           ],
         ),
@@ -1322,6 +1352,8 @@ class _MessageBubble extends ConsumerWidget {
                     isSaved: isSaved,
                     onPin: () => _pin(context, ref, messageId),
                     onToggleSave: toggleSaved,
+                    onCopy: () =>
+                        copyMessageText(context, dmMessagePlainText(content)),
                     onEdit: isMe && status == null
                         ? () => onEdit(messageId, content)
                         : null,
@@ -1361,6 +1393,7 @@ class _MessageBubble extends ConsumerWidget {
                             isSaved: isSaved,
                             onPin: () => _pin(context, ref, messageId),
                             onToggleSave: toggleSaved,
+                            onCopy: null,
                             onEdit: null,
                             onDelete: isMe && status == null
                                 ? () => _confirmDelete(context, ref, messageId)
@@ -1582,7 +1615,8 @@ class MessageAttachmentList extends StatelessWidget {
 }
 
 /// Shows a "more" button on hover, and a right-click or long-press menu, for
-/// a message: Pin and Save on every message, and Edit and Delete on your own.
+/// a message: Copy text when it has text, Pin and Save on every message, and
+/// Edit and Delete on your own.
 /// The long press is for touch input, where there is no hover or right click.
 ///
 /// Your own messages keep a fixed gutter for the button so the bubble never
@@ -1595,6 +1629,7 @@ class _MessageMenu extends StatefulWidget {
     required this.isSaved,
     required this.onPin,
     required this.onToggleSave,
+    required this.onCopy,
     required this.onEdit,
     required this.onDelete,
     required this.child,
@@ -1605,6 +1640,9 @@ class _MessageMenu extends StatefulWidget {
   final bool isSaved;
   final VoidCallback onPin;
   final VoidCallback onToggleSave;
+
+  /// Null when the message has no text to copy (attachments only).
+  final VoidCallback? onCopy;
 
   /// Null on other people's messages, which can't be edited or deleted.
   final VoidCallback? onEdit;
@@ -1628,12 +1666,15 @@ class _MessageMenuState extends State<_MessageMenu> {
       tooltip: 'Message actions',
       icon: const Icon(Icons.more_horiz, size: 18),
       onSelected: (value) => switch (value) {
+        'copy' => widget.onCopy?.call(),
         'pin' => widget.onPin(),
         'edit' => widget.onEdit?.call(),
         'save' => widget.onToggleSave(),
         _ => widget.onDelete?.call(),
       },
       itemBuilder: (_) => [
+        if (widget.onCopy != null)
+          const PopupMenuItem(value: 'copy', child: Text('Copy text')),
         const PopupMenuItem(value: 'pin', child: Text('Pin message')),
         if (widget.onEdit != null)
           const PopupMenuItem(value: 'edit', child: Text('Edit message')),
