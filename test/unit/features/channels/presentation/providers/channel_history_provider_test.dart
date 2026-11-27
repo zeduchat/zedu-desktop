@@ -58,6 +58,52 @@ void main() {
     verifyNever(() => repository.fetchChannelMessages('ch-1', page: 2));
   });
 
+  test('applyEdit replaces the text of the edited message only', () async {
+    when(() => repository.fetchChannelMessages('ch-1', page: 1)).thenAnswer(
+      (_) async => const Success(
+        ChannelMessagePage(
+          messages: [
+            ChannelMessage(
+              id: 't-2',
+              senderName: 'Ada',
+              text: 'other',
+              threadId: 't-2',
+            ),
+            ChannelMessage(
+              id: 't-1',
+              senderName: 'Me',
+              text: 'my typo',
+              threadId: 't-1',
+              userId: 'me',
+            ),
+          ],
+          hasMore: true,
+        ),
+      ),
+    );
+    await open();
+
+    notifier().applyEdit('t-1', 'fixed text');
+
+    final messages = current().messages;
+    expect(messages.map((m) => m.text), ['other', 'fixed text']);
+    expect(messages.last.rawContent, 'fixed text');
+    expect(messages.last.id, 't-1');
+    expect(messages.last.userId, 'me');
+    expect(current().hasMore, isTrue);
+    verify(() => repository.fetchChannelMessages('ch-1', page: 1)).called(1);
+  });
+
+  test('applyEdit ignores a message that is not loaded', () async {
+    stubPage(1, _page(['t-1'], hasMore: false));
+    await open();
+    final before = current();
+
+    notifier().applyEdit('t-9', 'fixed text');
+
+    expect(identical(current(), before), isTrue);
+  });
+
   test('loadMore appends older messages in order', () async {
     stubPage(1, _page(['t-4', 't-3'], hasMore: true));
     stubPage(2, _page(['t-2', 't-1'], hasMore: false));

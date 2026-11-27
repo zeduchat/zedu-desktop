@@ -183,14 +183,22 @@ void main() {
         verifyNever(
           () => dmRepository.editMessage(any(), content: any(named: 'content')),
         );
-        // The channel's messages are loaded again, so the edit shows.
+        // The edit shows in the loaded history straight away, without a
+        // refetch that could still return the old text (Ziki #12383).
+        final messages = container
+            .read(channelHistoryProvider('channel-1'))
+            .requireValue
+            .messages;
+        expect(
+          messages.firstWhere((m) => m.threadId == 'thread-2').text,
+          'my edited message',
+        );
         verify(
           () => channelRepository.fetchChannelMessages(
             'channel-1',
             page: any(named: 'page'),
           ),
-        ).called(greaterThanOrEqualTo(2));
-        expect(container.read(channelHistoryProvider('channel-1')), isNotNull);
+        ).called(1);
       });
 
       testWidgets('Up does nothing when I have no message in the channel', (

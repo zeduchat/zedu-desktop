@@ -638,7 +638,7 @@ void main() {
       );
     });
 
-    testWidgets('Edit saves the new text and reloads the channel', (
+    testWidgets('Edit saves the new text and shows it straight away', (
       tester,
     ) async {
       await pumpList(tester, const Success([mine]));
@@ -661,7 +661,11 @@ void main() {
           content: 'fixed text',
         ),
       ).called(1);
-      verify(() => repository.fetchChannelMessages('ch-1')).called(2);
+      // The server still answers with the old text for a while after an edit
+      // (Ziki #12383), so the list shows the edit without refetching.
+      expect(find.text('fixed text'), findsOneWidget);
+      expect(find.text('my typo'), findsNothing);
+      verify(() => repository.fetchChannelMessages('ch-1')).called(1);
     });
 
     testWidgets('Delete asks first, then deletes and reloads', (tester) async {

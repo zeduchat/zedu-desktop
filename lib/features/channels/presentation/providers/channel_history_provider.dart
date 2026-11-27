@@ -104,6 +104,35 @@ class ChannelHistoryNotifier extends AsyncNotifier<ChannelHistoryState> {
     }
   }
 
+  /// Shows the saved edit of the message with [threadId] as [text] straight
+  /// away. A refetch can still return the old text for a while after the
+  /// edit (Ziki #12383), so the loaded message is patched in place instead.
+  void applyEdit(String threadId, String text) {
+    final current = state.value;
+    if (current == null) return;
+    if (!current.messages.any((m) => m.threadId == threadId)) return;
+    final messages = [
+      for (final m in current.messages)
+        if (m.threadId == threadId)
+          ChannelMessage(
+            id: m.id,
+            senderName: m.senderName,
+            text: text,
+            rawContent: text,
+            avatarUrl: m.avatarUrl,
+            createdAt: m.createdAt,
+            status: m.status,
+            media: m.media,
+            threadId: m.threadId,
+            userId: m.userId,
+            reactions: m.reactions,
+          )
+        else
+          m,
+    ];
+    state = AsyncData(current.copyWith(messages: messages));
+  }
+
   Future<ChannelMessagePage> _fetchPage(
     ChannelRepository repository,
     int page,

@@ -636,7 +636,9 @@ Future<void> _editChannelMessage(
   if (!context.mounted) return;
   switch (result) {
     case Success():
-      ref.invalidate(channelHistoryProvider(channelId));
+      ref
+          .read(channelHistoryProvider(channelId).notifier)
+          .applyEdit(threadId, text);
     case Failure():
       AppToastService.show(
         context,
