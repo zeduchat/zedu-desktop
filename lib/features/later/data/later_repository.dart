@@ -63,7 +63,7 @@ class LaterRepository {
     for (var page = 1; page <= 100; page++) {
       final response = await api.get<Map<String, dynamic>>(
         path: isDm
-            ? '/channels/${item.channelId}/messages'
+            ? '/dms/channels/${item.channelId}/threads'
             : '/threads/channels/${item.channelId}',
         queryParameters: {'page': page, 'limit': 50},
       );

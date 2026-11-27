@@ -74,22 +74,41 @@ class DmRepository {
     int page = 1,
   }) async {
     final response = await _apiClient.get<Map<String, dynamic>>(
-      path: '/channels/$channelId/messages',
+      path: '/dms/channels/$channelId/threads',
       queryParameters: {'page': page, 'limit': pageSize},
     );
 
-    final data = response.data;
-    final rawMessages = data['messages'] ?? data['data'];
-    final messages = rawMessages is Map<String, dynamic>
-        ? rawMessages['messages'] ?? rawMessages['data']
-        : rawMessages;
+    return _extractMessages(response.data);
+  }
 
-    if (messages is! List) return const [];
+  static List<Map<String, dynamic>> _extractMessages(
+    Map<String, dynamic> response,
+  ) {
+    dynamic raw = response;
+    const keys = ['messages', 'threads', 'data', 'items', 'results'];
 
-    return messages
-        .whereType<Map<dynamic, dynamic>>()
-        .map((message) => Map<String, dynamic>.from(message))
-        .toList();
+    for (var depth = 0; depth < 4; depth++) {
+      if (raw is List) {
+        return raw
+            .whereType<Map<dynamic, dynamic>>()
+            .map((message) => Map<String, dynamic>.from(message))
+            .toList();
+      }
+      if (raw is! Map) return const [];
+
+      final map = Map<String, dynamic>.from(raw);
+      dynamic found;
+      for (final key in keys) {
+        if (map[key] != null) {
+          found = map[key];
+          break;
+        }
+      }
+      if (found == null) return const [];
+      raw = found;
+    }
+
+    return const [];
   }
 
   /// Opens (or creates) the direct message with [participantId].
