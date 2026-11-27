@@ -24,6 +24,16 @@ class AppPalette {
   /// Dark semi-transparent dot — user is away/offline.
   final Color presenceAway;
 
+  /// An @mention of someone in a message, as on web.
+  final Color mention;
+  final Color mentionBg;
+
+  /// An @channel mention's text, shown on [mentionHighlightBg].
+  final Color channelMention;
+
+  /// The yellow behind @channel and @mentions of the signed-in user.
+  final Color mentionHighlightBg;
+
   const AppPalette({
     required this.brightness,
     required this.primary,
@@ -43,6 +53,10 @@ class AppPalette {
     required this.primaryBg,
     required this.presenceActive,
     required this.presenceAway,
+    required this.mention,
+    required this.mentionBg,
+    required this.channelMention,
+    required this.mentionHighlightBg,
   });
 
   static const light = AppPalette(
@@ -64,6 +78,10 @@ class AppPalette {
     primaryBg: Color(0xFFF3EFFF),
     presenceActive: Color(0xFF22C55E),
     presenceAway: Color(0x661E1E1E),
+    mention: Color(0xFF1264A3),
+    mentionBg: Color(0xFFE8F0FE),
+    channelMention: Color(0xFF9A6700),
+    mentionHighlightBg: Color(0xFFFFF3B0),
   );
 
   static const dark = AppPalette(
@@ -85,5 +103,9 @@ class AppPalette {
     primaryBg: Color(0xFF2A2650),
     presenceActive: Color(0xFF22C55E),
     presenceAway: Color(0x99FFFFFF),
+    mention: Color(0xFF6CB6FF),
+    mentionBg: Color(0xFF1A3F66),
+    channelMention: Color(0xFFF5D90A),
+    mentionHighlightBg: Color(0xFF4A3F00),
   );
 }

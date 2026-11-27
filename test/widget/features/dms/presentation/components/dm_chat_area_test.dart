@@ -622,6 +622,19 @@ void main() {
       expect(find.text('<p></p>', findRichText: true), findsNothing);
     });
 
+    testWidgets('highlights an @mention as its own span', (tester) async {
+      await pumpChat(tester, [message('m1', 'thanks @ada for this')]);
+
+      TextSpan? mention;
+      for (final rich in tester.widgetList<RichText>(find.byType(RichText))) {
+        rich.text.visitChildren((span) {
+          if (span is TextSpan && span.text == '@ada') mention = span;
+          return mention == null;
+        });
+      }
+      expect(mention?.style?.backgroundColor, AppPalette.light.mentionBg);
+    });
+
     testWidgets('still shows the text of a normal message', (tester) async {
       await pumpChat(tester, [message('m1', 'hello there')]);
 

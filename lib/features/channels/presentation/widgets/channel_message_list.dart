@@ -456,6 +456,13 @@ class _ChannelMessageTileState extends ConsumerState<ChannelMessageTile> {
                           _message.text,
                           TextStyle(fontSize: 15, color: colors.textPrimary),
                           plainText: links.span,
+                          mentions: MentionHighlight(
+                            colors: colors,
+                            // Only a message with an @ needs the user.
+                            selfUsername: _message.text.contains('@')
+                                ? ref.watch(authNotifierProvider).user?.username
+                                : null,
+                          ),
                         ),
                       ),
                     ),
