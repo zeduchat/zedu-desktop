@@ -329,8 +329,9 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
                             AppTextField(
                               label: 'Phone Number',
                               controller: phoneCtrl,
-                              hint: '+1 234 567 8900',
+                              hint: '801 234 5678',
                               keyboardType: TextInputType.phone,
+                              prefix: PhoneCountryPrefix(controller: phoneCtrl),
                             ),
                             const SizedBox(height: 16),
                             AppTextField(
