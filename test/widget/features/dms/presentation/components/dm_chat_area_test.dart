@@ -757,4 +757,71 @@ void main() {
       expect(find.byType(IntrinsicWidth), findsNothing);
     });
   });
+
+  group('MessageAttachmentList', () {
+    late List<Uri> launched;
+
+    setUp(() {
+      launched = [];
+      final original = messageLinkLauncher;
+      messageLinkLauncher = (uri) async {
+        launched.add(uri);
+        return true;
+      };
+      addTearDown(() => messageLinkLauncher = original);
+    });
+
+    Future<void> pumpAttachment(WidgetTester tester, String link) =>
+        tester.pumpWidget(
+          buildTestMaterialApp(
+            Scaffold(
+              body: MessageAttachmentList(
+                media: [
+                  {
+                    'file_name': 'report.pdf',
+                    'file_type': 'pdf',
+                    'file_link': link,
+                  },
+                ],
+              ),
+            ),
+          ),
+        );
+
+    GestureDetector attachment(WidgetTester tester) =>
+        tester.widget<GestureDetector>(
+          find
+              .ancestor(
+                of: find.text('report.pdf'),
+                matching: find.byType(GestureDetector),
+              )
+              .first,
+        );
+
+    testWidgets('opens a web attachment link', (tester) async {
+      await pumpAttachment(tester, 'https://files.test/report.pdf');
+
+      await tester.tap(find.text('report.pdf'));
+      await tester.pump();
+
+      expect(launched, [Uri.parse('https://files.test/report.pdf')]);
+    });
+
+    for (final link in [
+      'file:///C:/Windows/System32/calc.exe',
+      'javascript:alert(1)',
+      'ms-settings:privacy',
+      'zedu-evil://open/report.pdf',
+    ]) {
+      testWidgets('does not open a "$link" attachment link', (tester) async {
+        await pumpAttachment(tester, link);
+
+        await tester.tap(find.text('report.pdf'));
+        await tester.pump();
+
+        expect(launched, isEmpty);
+        expect(attachment(tester).onTap, isNull);
+      });
+    }
+  });
 }

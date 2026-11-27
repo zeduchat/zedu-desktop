@@ -8,6 +8,15 @@ class MockDmRepository extends Mock implements DmRepository {}
 Map<String, dynamic> _message(String id, [List<Map<String, dynamic>>? media]) =>
     {'id': id, 'content': 'msg $id', 'user_id': 'u1', 'media': ?media};
 
+/// Links a sender could put on an attachment that must not reach the
+/// operating system's protocol handlers.
+const _unsafeLinks = [
+  ('local.txt', 'file:///C:/Windows/System32/calc.exe'),
+  ('script.txt', 'javascript:alert(1)'),
+  ('settings.txt', 'ms-settings:privacy'),
+  ('custom.txt', 'zedu-evil://open/report.pdf'),
+];
+
 /// A full first page (so there is more), whose first message has report.pdf,
 /// and a short second page with an older photo.png.
 List<Map<String, dynamic>> _page(int page) {
@@ -19,6 +28,8 @@ List<Map<String, dynamic>> _page(int page) {
           'file_type': 'pdf',
           'file_link': 'https://files.test/report.pdf',
         },
+        for (final (name, link) in _unsafeLinks)
+          {'file_name': name, 'file_type': 'txt', 'file_link': link},
       ]),
       for (var i = 1; i < DmRepository.pageSize; i++) _message('m$i'),
     ];
@@ -55,7 +66,15 @@ void main() {
 
   tearDown(() => container.dispose());
 
-  Future<void> pumpDialog(WidgetTester tester) async {
+  Future<void> pumpDialog(
+    WidgetTester tester, {
+    bool overrideOpen = true,
+  }) async {
+    // Tall enough that every file in the list is built.
+    tester.view.physicalSize = const Size(1200, 2000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
     await tester.pumpWidget(
       MaterialApp(
         theme: AppTheme.light.copyWith(splashFactory: NoSplash.splashFactory),
@@ -63,7 +82,7 @@ void main() {
           body: ConversationFilesDialog(
             title: 'Ada files',
             history: history,
-            openLink: (link) async => opened.add(link),
+            openLink: overrideOpen ? (link) async => opened.add(link) : null,
           ),
         ),
       ),
@@ -108,5 +127,49 @@ void main() {
       ),
     );
     expect(tile.enabled, isFalse);
+  });
+
+  group('with the default opener', () {
+    late List<Uri> launched;
+
+    setUp(() {
+      launched = [];
+      final original = messageLinkLauncher;
+      messageLinkLauncher = (uri) async {
+        launched.add(uri);
+        return true;
+      };
+      addTearDown(() => messageLinkLauncher = original);
+    });
+
+    testWidgets('a web link opens in the browser', (tester) async {
+      await pumpDialog(tester, overrideOpen: false);
+
+      await tester.tap(find.text('photo.png'));
+      await tester.pump();
+
+      expect(launched, [Uri.parse('https://files.test/photo.png')]);
+    });
+
+    for (final (name, link) in _unsafeLinks) {
+      testWidgets('a "$link" link is shown but cannot be opened', (
+        tester,
+      ) async {
+        await pumpDialog(tester, overrideOpen: false);
+
+        await tester.tap(find.text(name));
+        await tester.pump();
+
+        expect(launched, isEmpty);
+        final tile = tester.widget<ListTile>(
+          find.ancestor(of: find.text(name), matching: find.byType(ListTile)),
+        );
+        expect(tile.enabled, isFalse);
+        expect(
+          find.byTooltip("This file's link can't be opened"),
+          findsWidgets,
+        );
+      });
+    }
   });
 }

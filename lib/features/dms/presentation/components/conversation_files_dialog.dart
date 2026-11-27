@@ -15,7 +15,8 @@ class ConversationFilesDialog extends StatefulWidget {
   final String title;
   final ChatHistoryNotifier history;
 
-  /// Opens a file's link. Defaults to the system handler (browser or app).
+  /// Opens a file's link. Defaults to [openMessageLink], which opens web links
+  /// in the browser. Files whose link is not a web link can't be clicked.
   final Future<void> Function(String link)? openLink;
 
   @override
@@ -48,8 +49,7 @@ class _ConversationFilesDialogState extends State<ConversationFilesDialog> {
   Future<void> _open(String link) async {
     final open = widget.openLink;
     if (open != null) return open(link);
-    final uri = Uri.tryParse(link);
-    if (uri != null && await canLaunchUrl(uri)) await launchUrl(uri);
+    await openMessageLink(link);
   }
 
   @override
@@ -79,9 +79,14 @@ class _ConversationFilesDialogState extends State<ConversationFilesDialog> {
                     final file = files[index];
                     final name = file['file_name']?.toString() ?? 'Attachment';
                     final link = file['file_link']?.toString() ?? '';
-                    final canOpen = link.isNotEmpty;
+                    // The sender supplies the link, so only web links open.
+                    final canOpen = messageLinkUri(link) != null;
                     return Tooltip(
-                      message: canOpen ? 'Open $name' : 'No link for this file',
+                      message: canOpen
+                          ? 'Open $name'
+                          : link.isEmpty
+                          ? 'No link for this file'
+                          : "This file's link can't be opened",
                       child: ListTile(
                         enabled: canOpen,
                         mouseCursor: canOpen

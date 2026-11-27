@@ -136,7 +136,15 @@ Future<void> _open(WidgetTester tester) async {
 }
 
 void main() {
-  for (final link in ['', 'relative/report.pdf', 'http://[invalid']) {
+  for (final link in [
+    '',
+    'relative/report.pdf',
+    'http://[invalid',
+    'file:///C:/Windows/System32/calc.exe',
+    'javascript:alert(1)',
+    'ms-settings:privacy',
+    'zedu-evil://open/report.pdf',
+  ]) {
     testWidgets('invalid link "$link" reports failure without launching', (
       tester,
     ) async {

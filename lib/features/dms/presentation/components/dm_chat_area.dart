@@ -1430,13 +1430,6 @@ class MessageAttachmentList extends StatelessWidget {
     this.isMe = false,
   });
 
-  void _launchUrl(String url) async {
-    final uri = Uri.tryParse(url);
-    if (uri != null && await canLaunchUrl(uri)) {
-      await launchUrl(uri);
-    }
-  }
-
   void _openImage(BuildContext context, String imageUrl, String fileName) {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
@@ -1454,8 +1447,11 @@ class MessageAttachmentList extends StatelessWidget {
     BuildContext context,
   ) {
     final colors = context.colors;
+    // The sender supplies the link, so only web links open (see
+    // [messageLinkUri]); any other scheme leaves the file not clickable.
+    final canOpen = messageLinkUri(fileLink) != null;
     return GestureDetector(
-      onTap: fileLink.isNotEmpty ? () => _launchUrl(fileLink) : null,
+      onTap: canOpen ? () => openMessageLink(fileLink) : null,
       child: Container(
         width: 120,
         padding: const EdgeInsets.all(8),

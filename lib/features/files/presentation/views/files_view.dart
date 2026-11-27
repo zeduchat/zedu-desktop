@@ -251,8 +251,10 @@ class _FilesSection extends ConsumerWidget {
   Future<void> _open(BuildContext context, WorkspaceFile file) async {
     var opened = false;
     try {
-      final uri = Uri.tryParse(file.link.trim());
-      if (uri != null && uri.hasScheme && await canLaunchUrl(uri)) {
+      // Only web links open: other schemes would reach the operating system's
+      // protocol handlers, and the link comes from whoever uploaded the file.
+      final uri = messageLinkUri(file.link);
+      if (uri != null && await canLaunchUrl(uri)) {
         opened = await launchUrl(uri);
       }
     } catch (_) {
