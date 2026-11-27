@@ -413,6 +413,15 @@ class _ChannelMessageTileState extends ConsumerState<ChannelMessageTile> {
                                   color: colors.textSecondary,
                                 ),
                               ),
+                            if (_message.edited)
+                              TextSpan(
+                                text: '  (edited)',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.normal,
+                                  color: colors.textHint,
+                                ),
+                              ),
                           ],
                         ),
                       ),

@@ -861,4 +861,19 @@ void main() {
     expect(find.text('Optimistic message'), findsOneWidget);
     expect(find.byIcon(Icons.add_reaction_outlined), findsNothing);
   });
+
+  testWidgets('marks an edited message (edited) next to its time', (
+    tester,
+  ) async {
+    stubPage(
+      1,
+      _page(const [
+        ChannelMessage(id: '2', senderName: 'gold', text: 'new', edited: true),
+        ChannelMessage(id: '1', senderName: 'Ada', text: 'old'),
+      ]),
+    );
+    await pumpList(tester);
+
+    expect(find.textContaining('(edited)', findRichText: true), findsOneWidget);
+  });
 }

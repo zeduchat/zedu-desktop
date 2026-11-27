@@ -1301,6 +1301,16 @@ class _MessageBubble extends ConsumerWidget {
                         timeString,
                         style: TextStyle(color: colors.textHint, fontSize: 11),
                       ),
+                      if (messageWasEdited(message)) ...[
+                        const SizedBox(width: 4),
+                        Text(
+                          '(edited)',
+                          style: TextStyle(
+                            color: colors.textHint,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
                       if (isSaved) ...[
                         const SizedBox(width: 4),
                         Tooltip(
