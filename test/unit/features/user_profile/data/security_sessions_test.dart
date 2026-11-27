@@ -58,6 +58,23 @@ void main() {
       expect(session.location, SecuritySessionModel.unknown);
     });
 
+    test('keeps the session id and whether it is live (Ziki #2797)', () {
+      final live = SecuritySessionModel.fromJson({'id': 's1', 'is_live': true});
+      expect(live.id, 's1');
+      expect(live.isLive, isTrue);
+      expect(live.canRevoke, isTrue);
+
+      final ended = SecuritySessionModel.fromJson({
+        'id': 's2',
+        'is_live': false,
+      });
+      expect(ended.canRevoke, isFalse);
+
+      final noId = SecuritySessionModel.fromJson({'is_live': true});
+      expect(noId.id, '');
+      expect(noId.canRevoke, isFalse);
+    });
+
     test('a session that is no longer live shows as signed out', () {
       final session = SecuritySessionModel.fromJson({'is_live': false});
       expect(session.status, 'Signed out');
@@ -139,6 +156,48 @@ void main() {
     });
   });
 
+  group('UserProfileRemoteDataSourceImpl.revokeSession (Ziki #2797)', () {
+    test('signs the session out with PUT /users/revoke-session', () async {
+      final api = _MockApi();
+      final datasource = UserProfileRemoteDataSourceImpl(
+        config: const AppConfig(apiBaseUrl: '', usesMockData: false),
+        apiBaseService: api,
+      );
+      when(
+        () => api.put<dynamic>(
+          path: any(named: 'path'),
+          data: any(named: 'data'),
+        ),
+      ).thenAnswer(
+        (_) async => const ApiResponseModel<dynamic>(
+          data: <String, dynamic>{},
+          statusCode: 200,
+        ),
+      );
+
+      await datasource.revokeSession(userId: 'u1', sessionId: 's1');
+
+      verify(
+        () => api.put<dynamic>(
+          path: '/users/revoke-session',
+          data: {'user_id': 'u1', 'access_token_id': 's1'},
+        ),
+      ).called(1);
+    });
+
+    test('does not call the API in mock mode', () async {
+      final api = _MockApi();
+      final datasource = UserProfileRemoteDataSourceImpl(
+        config: const AppConfig(apiBaseUrl: '', usesMockData: true),
+        apiBaseService: api,
+      );
+
+      await datasource.revokeSession(userId: 'u1', sessionId: 's1');
+
+      verifyZeroInteractions(api);
+    });
+  });
+
   group('UserProfileNotifier loads the signed-in user\'s sessions', () {
     late _MockRepo repo;
 
@@ -187,6 +246,97 @@ void main() {
       await pumpEventQueue();
 
       verify(() => repo.getSecuritySessions(userId: 'me')).called(1);
+    });
+
+    test('revoking a session marks it signed out (Ziki #2797)', () async {
+      when(
+        () => repo.getSecuritySessions(userId: any(named: 'userId')),
+      ).thenAnswer(
+        (_) async => const Success([
+          SecuritySession(
+            id: 's1',
+            device: 'Chrome',
+            location: 'Lagos',
+            date: 'd',
+            lastActive: 'l',
+            status: 'Active',
+            isLive: true,
+          ),
+          SecuritySession(
+            id: 's2',
+            device: 'Chrome',
+            location: 'Lagos',
+            date: 'd',
+            lastActive: 'l',
+            status: 'Active',
+            isLive: true,
+          ),
+        ]),
+      );
+      when(
+        () => repo.revokeSession(
+          userId: any(named: 'userId'),
+          sessionId: any(named: 'sessionId'),
+        ),
+      ).thenAnswer((_) async => const Success<void>(null));
+      when(
+        () => repo.getRolesAndPermissions(orgId: any(named: 'orgId')),
+      ).thenAnswer((_) async => const Success([]));
+      locator.registerSingleton<AppConfig>(
+        const AppConfig(apiBaseUrl: '', usesMockData: false),
+      );
+      final c = container(signedIn: true);
+      await pumpEventQueue();
+
+      await c.read(userProfileNotifierProvider.notifier).revokeSession('s1');
+
+      verify(() => repo.revokeSession(userId: 'me', sessionId: 's1')).called(1);
+      final state = c.read(userProfileNotifierProvider);
+      expect(state.securitySessions.first.status, 'Signed out');
+      expect(state.securitySessions.first.canRevoke, isFalse);
+      expect(state.securitySessions.last.canRevoke, isTrue);
+      expect(state.successMessage, 'Session signed out.');
+    });
+
+    test('a failed revoke keeps the session and shows the error', () async {
+      when(
+        () => repo.getSecuritySessions(userId: any(named: 'userId')),
+      ).thenAnswer(
+        (_) async => const Success([
+          SecuritySession(
+            id: 's1',
+            device: 'Chrome',
+            location: 'Lagos',
+            date: 'd',
+            lastActive: 'l',
+            status: 'Active',
+            isLive: true,
+          ),
+        ]),
+      );
+      when(
+        () => repo.revokeSession(
+          userId: any(named: 'userId'),
+          sessionId: any(named: 'sessionId'),
+        ),
+      ).thenAnswer(
+        (_) async => const Failure<void>(ApiFailure(message: 'Nope')),
+      );
+      when(
+        () => repo.getRolesAndPermissions(orgId: any(named: 'orgId')),
+      ).thenAnswer((_) async => const Success([]));
+      locator.registerSingleton<AppConfig>(
+        const AppConfig(apiBaseUrl: '', usesMockData: false),
+      );
+      final c = container(signedIn: true);
+      await pumpEventQueue();
+
+      await c.read(userProfileNotifierProvider.notifier).revokeSession('s1');
+
+      final state = c.read(userProfileNotifierProvider);
+      expect(state.securitySessions.single.canRevoke, isTrue);
+      expect(state.error, isNotNull);
+      expect(state.isSaving, isFalse);
     });
 
     test('asks for none while nobody is signed in', () async {

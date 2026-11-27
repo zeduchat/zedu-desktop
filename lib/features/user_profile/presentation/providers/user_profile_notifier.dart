@@ -138,6 +138,51 @@ class UserProfileNotifier extends Notifier<UserProfileState> {
     }
   }
 
+  /// Signs out the session [sessionId]; on success its row shows as signed
+  /// out.
+  Future<void> revokeSession(String sessionId) async {
+    final userId = ref.exists(authNotifierProvider)
+        ? ref.read(authNotifierProvider).user?.id
+        : null;
+    if (userId == null || userId.isEmpty) return;
+    state = state.copyWith(
+      isSaving: true,
+      clearError: true,
+      clearSuccess: true,
+    );
+    final result = await _repository.revokeSession(
+      userId: userId,
+      sessionId: sessionId,
+    );
+    if (!ref.mounted) return;
+    switch (result) {
+      case Success<void>():
+        state = state.copyWith(
+          isSaving: false,
+          securitySessions: [
+            for (final session in state.securitySessions)
+              if (session.id == sessionId)
+                SecuritySession(
+                  id: session.id,
+                  device: session.device,
+                  location: session.location,
+                  date: session.date,
+                  lastActive: session.lastActive,
+                  status: 'Signed out',
+                )
+              else
+                session,
+          ],
+          successMessage: 'Session signed out.',
+        );
+      case Failure<void>():
+        state = state.copyWith(
+          isSaving: false,
+          error: result.error.friendlyMessage,
+        );
+    }
+  }
+
   /// Saves [preferences] and makes them the new saved baseline on success.
   /// A failed save leaves the baseline alone, so the screen keeps the edits.
   Future<void> updateNotificationPreferences(
