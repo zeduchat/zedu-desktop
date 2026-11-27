@@ -74,7 +74,13 @@ void main() {
     await tester.pump();
   }
 
-  const personalTiles = ['Account', 'Notifications', 'Desktop', 'Security'];
+  const personalTiles = [
+    'Account',
+    'Notifications',
+    'Appearance',
+    'Desktop',
+    'Security',
+  ];
   const organizationTiles = [
     'General',
     'User management',
@@ -87,6 +93,24 @@ void main() {
       expect(find.text(label), matcher, reason: label);
     }
   }
+
+  testWidgets('Appearance sits after Notifications and selects its section', (
+    tester,
+  ) async {
+    UserProfileSection? selected;
+    await pumpShell(tester, onSectionSelected: (s) => selected = s);
+
+    final notifications = tester.getTopLeft(find.text('Notifications')).dy;
+    final appearance = tester.getTopLeft(find.text('Appearance')).dy;
+    final security = tester.getTopLeft(find.text('Security')).dy;
+    expect(appearance, greaterThan(notifications));
+    expect(appearance, lessThan(security));
+
+    await tester.tap(find.text('Appearance'));
+    await tester.pump();
+
+    expect(selected, UserProfileSection.appearance);
+  });
 
   group('Settings navigation groups', () {
     testWidgets('both groups start expanded', (tester) async {
