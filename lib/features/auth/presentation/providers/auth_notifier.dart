@@ -395,6 +395,46 @@ class AuthNotifier extends Notifier<AuthState> {
     }
   }
 
+  /// Storage key for the Remember-me choice made when a magic link was
+  /// requested. Not a secret: it only says whether to keep the session.
+  static const magicLinkRememberMeKey = 'magic_link_remember_me';
+
+  /// The Remember-me choice for the magic link requested in this run.
+  bool? _magicLinkRememberMe;
+
+  /// Records the login form's Remember-me choice when a magic link is
+  /// requested. The link comes back later through a deep link, possibly after
+  /// a restart, so the choice is also kept in storage until it is used.
+  Future<void> rememberMagicLinkChoice(bool rememberMe) async {
+    _magicLinkRememberMe = rememberMe;
+    try {
+      await _storage.writeData(magicLinkRememberMeKey, rememberMe.toString());
+    } catch (error) {
+      AppLogger.w(
+        'Could not store the magic link Remember-me choice - $error',
+        tag: _tag,
+      );
+    }
+  }
+
+  /// Returns the Remember-me choice for the magic link being verified and
+  /// clears it. Without a recorded choice the token is persisted, as before.
+  Future<bool> _takeMagicLinkRememberMe() async {
+    var rememberMe = _magicLinkRememberMe;
+    _magicLinkRememberMe = null;
+    try {
+      final stored = await _storage.readData(magicLinkRememberMeKey);
+      rememberMe ??= stored == null ? null : stored != 'false';
+      await _storage.deleteValue(magicLinkRememberMeKey);
+    } catch (error) {
+      AppLogger.w(
+        'Could not read the magic link Remember-me choice - $error',
+        tag: _tag,
+      );
+    }
+    return rememberMe ?? true;
+  }
+
   Future<void> verifyMagicLink({required String token}) async {
     AppLogger.d('Magic link verification attempt', tag: _tag);
     state = state.copyWith(isLoading: true, clearError: true);
@@ -406,7 +446,10 @@ class AuthNotifier extends Notifier<AuthState> {
           'Magic link verification succeeded — saving token',
           tag: _tag,
         );
-        await _saveSessionToken(result.value.accessToken);
+        await _saveSessionToken(
+          result.value.accessToken,
+          persist: await _takeMagicLinkRememberMe(),
+        );
         _bumpSession();
         _adoptSessionUser(result.value.user);
       case Failure<AuthSession>():

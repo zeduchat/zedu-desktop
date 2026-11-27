@@ -10,13 +10,18 @@ class MagicLinkNotifier extends AsyncNotifier<void> {
     _repository = ref.read(authRepositoryProvider);
   }
 
-  Future<bool> send(String email) async {
+  /// Sends a magic link to [email]. With [rememberMe] false the session the
+  /// link opens lasts until the app closes.
+  Future<bool> send(String email, {bool rememberMe = true}) async {
     state = const AsyncLoading();
     bool success = false;
     state = await AsyncValue.guard(() async {
       final result = await _repository.sendMagicLink(email: email);
       switch (result) {
         case Success<void>():
+          await ref
+              .read(authNotifierProvider.notifier)
+              .rememberMagicLinkChoice(rememberMe);
           success = true;
         case Failure<void>():
           throw result.error;

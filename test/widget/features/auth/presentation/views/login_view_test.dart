@@ -539,6 +539,56 @@ void main() {
       });
     }
 
+    for (final ticked in [false, true]) {
+      testWidgets('passes Remember me = $ticked to the magic link page', (
+        tester,
+      ) async {
+        await tester.binding.setSurfaceSize(const Size(1440, 1024));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+
+        Object? magicLinkExtra;
+        final router = GoRouter(
+          initialLocation: AppRouter.login,
+          routes: [
+            GoRoute(
+              path: AppRouter.login,
+              builder: (context, state) => const LoginView(),
+            ),
+            GoRoute(
+              path: AppRouter.magicLinkRequest,
+              builder: (context, state) {
+                magicLinkExtra = state.extra;
+                return const Scaffold(body: Text('Magic link page'));
+              },
+            ),
+          ],
+        );
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              authNotifierProvider.overrideWith(FakeAuthNotifier.new),
+            ],
+            child: MaterialApp.router(routerConfig: router),
+          ),
+        );
+        await tester.pump();
+
+        if (ticked) {
+          await tester.ensureVisible(find.byType(Checkbox));
+          await tester.tap(find.byType(Checkbox));
+          await tester.pump();
+        }
+
+        final link = find.text('Login with magic link');
+        await tester.ensureVisible(link);
+        await tester.tap(link);
+        await tester.pumpAndSettle();
+
+        expect(find.text('Magic link page'), findsOneWidget);
+        expect(magicLinkExtra, ticked);
+      });
+    }
+
     testWidgets('centers the login with magic link link beneath the button', (
       tester,
     ) async {

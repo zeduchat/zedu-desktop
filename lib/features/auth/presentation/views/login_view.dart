@@ -246,7 +246,10 @@ class _LoginViewState extends ConsumerState<LoginView> {
                 Align(
                   alignment: Alignment.center,
                   child: InkWell(
-                    onTap: () => context.go(AppRouter.magicLinkRequest),
+                    onTap: () => context.go(
+                      AppRouter.magicLinkRequest,
+                      extra: _rememberMe,
+                    ),
                     child: Text(
                       'Login with magic link',
                       style: context.textTheme.bodyMedium?.copyWith(

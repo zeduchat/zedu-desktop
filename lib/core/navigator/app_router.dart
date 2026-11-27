@@ -103,7 +103,10 @@ class AppRouter {
       GoRoute(path: login, builder: (context, state) => const LoginView()),
       GoRoute(
         path: magicLinkRequest,
-        builder: (context, state) => const MagicLinkRequestView(),
+        // The login form passes its Remember-me choice as `extra`.
+        builder: (context, state) => MagicLinkRequestView(
+          rememberMe: state.extra is bool ? state.extra! as bool : true,
+        ),
       ),
       GoRoute(
         path: magicLinkSent,

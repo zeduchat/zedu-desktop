@@ -11,12 +11,14 @@ class FakeMagicLinkNotifier extends MagicLinkNotifier {
   final bool sendResult;
   final void Function(String email)? onSend;
   final Object? error;
+  bool? lastRememberMe;
 
   @override
   FutureOr<void> build() {}
 
   @override
-  Future<bool> send(String email) async {
+  Future<bool> send(String email, {bool rememberMe = true}) async {
+    lastRememberMe = rememberMe;
     onSend?.call(email);
     if (error != null) {
       state = AsyncError<void>(error!, StackTrace.current);
@@ -37,7 +39,7 @@ class _SlowMagicLinkNotifier extends MagicLinkNotifier {
   FutureOr<void> build() {}
 
   @override
-  Future<bool> send(String email) async {
+  Future<bool> send(String email, {bool rememberMe = true}) async {
     sendCalls++;
     state = const AsyncLoading<void>();
     final success = await completer.future;
@@ -46,13 +48,17 @@ class _SlowMagicLinkNotifier extends MagicLinkNotifier {
   }
 }
 
-Widget buildMagicLinkRouterUnderTest({MagicLinkNotifier? magicLinkNotifier}) {
+Widget buildMagicLinkRouterUnderTest({
+  MagicLinkNotifier? magicLinkNotifier,
+  bool rememberMe = true,
+}) {
   final router = GoRouter(
     initialLocation: AppRouter.magicLinkRequest,
     routes: [
       GoRoute(
         path: AppRouter.magicLinkRequest,
-        builder: (context, state) => const MagicLinkRequestView(),
+        builder: (context, state) =>
+            MagicLinkRequestView(rememberMe: rememberMe),
       ),
       GoRoute(
         path: AppRouter.magicLinkSent,
@@ -135,6 +141,30 @@ void main() {
       expect(capturedEmail, 'anonymoususer@gmail.com');
       expect(find.text('Check your email'), findsOneWidget);
     });
+
+    for (final rememberMe in [false, true]) {
+      testWidgets('passes Remember me = $rememberMe to the request', (
+        tester,
+      ) async {
+        await tester.binding.setSurfaceSize(const Size(1440, 1024));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+
+        final notifier = FakeMagicLinkNotifier();
+        await tester.pumpWidget(
+          buildMagicLinkRouterUnderTest(
+            magicLinkNotifier: notifier,
+            rememberMe: rememberMe,
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.enterText(find.byType(TextFormField), 'ada@example.com');
+        await tester.tap(find.text('Generate magic link'));
+        await tester.pumpAndSettle();
+
+        expect(notifier.lastRememberMe, rememberMe);
+      });
+    }
 
     testWidgets('pressing Enter with an empty email shows the error', (
       tester,
