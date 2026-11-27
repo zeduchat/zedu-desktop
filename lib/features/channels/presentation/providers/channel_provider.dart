@@ -136,8 +136,10 @@ class ChannelNotifier extends AsyncNotifier<List<Channel>> {
     return false;
   }
 
-  /// Leaves the channel and, on success, removes it from the list. A failure
-  /// leaves the list as it was and is returned for the caller to show.
+  /// Leaves the channel. On success a public channel stays in the list as
+  /// not joined, so the directory can offer to join it again, and a private
+  /// one is removed. A failure leaves the list as it was and is returned for
+  /// the caller to show.
   Future<Result<void>> leaveChannel(String channelId) async {
     final result = await ref
         .read(channelRepositoryProvider)
@@ -145,7 +147,10 @@ class ChannelNotifier extends AsyncNotifier<List<Channel>> {
     if (result is Success<void>) {
       state = AsyncData([
         for (final c in state.value ?? const <Channel>[])
-          if (c.id != channelId) c,
+          if (c.id != channelId)
+            c
+          else if (!c.isPrivate)
+            c.copyWith(hasAccess: false, unreadCount: 0),
       ]);
     }
     return result;
