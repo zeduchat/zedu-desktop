@@ -12,6 +12,21 @@ class _FakeAuthNotifier extends AuthNotifier {
 class _MockSecureStorageService extends Mock implements SecureStorageService {}
 
 void main() {
+  // The composer creates a real AudioRecorder, whose plugin has no
+  // implementation in tests. The test runs under runAsync, so the recorder's
+  // MissingPluginException could land inside it depending on timing, which
+  // made it fail at random on CI. Answer the channel as the other composer
+  // tests do.
+  const recordChannel = MethodChannel('com.llfbandit.record/messages');
+  setUp(() {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(recordChannel, (call) async => null);
+  });
+  tearDown(() {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(recordChannel, null);
+  });
+
   testWidgets('an unreadable file is rejected and the readable ones are kept', (
     tester,
   ) async {
