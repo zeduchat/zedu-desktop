@@ -377,7 +377,8 @@ class UserProfileNotifier extends Notifier<UserProfileState> {
   /// Matching order:
   /// 1. exact `id` (selection already carries an id),
   /// 2. case-insensitive `name` (the invite dialog passes a role label),
-  /// 3. the role stored in local state that shares the label.
+  /// 3. in mock mode only, the role stored in local state that shares the
+  ///    label (mock roles have no ids and the mock invite never sends one).
   ///
   /// Returns `null` when nothing matches so callers can surface a visible error
   /// instead of silently assigning an arbitrary role.
@@ -400,8 +401,12 @@ class UserProfileNotifier extends Notifier<UserProfileState> {
       }
     }
 
-    for (final role in state.rolesAndPermissions) {
-      if (role.role.toLowerCase() == lower) return role.role;
+    // Outside mock mode a label is never a role id: sending it as role_id
+    // fails or assigns nothing (Ziki #3056).
+    if (locator<AppConfig>().usesMockData) {
+      for (final role in state.rolesAndPermissions) {
+        if (role.role.toLowerCase() == lower) return role.role;
+      }
     }
 
     return null;
