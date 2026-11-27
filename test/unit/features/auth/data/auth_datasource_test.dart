@@ -218,6 +218,49 @@ void main() {
       });
     });
 
+    group('signInWithGoogle', () {
+      test(
+        'posts grant_code, application_type desktop and redirect_uri',
+        () async {
+          when(
+            () => mockApi.post<Map<String, dynamic>>(
+              path: '/auth/google',
+              data: any(named: 'data'),
+            ),
+          ).thenAnswer(
+            (_) async => ApiResponseModel<Map<String, dynamic>>(
+              data: {'data': LoginResponseModel.mockLoginResponse},
+              statusCode: 200,
+            ),
+          );
+
+          final datasource = AuthRemoteDataSourceImpl(
+            config: const AppConfig(
+              apiBaseUrl: 'https://api.example.com',
+              usesMockData: false,
+            ),
+            apiBaseService: mockApi,
+          );
+
+          await datasource.signInWithGoogle(
+            grantCode: 'code-123',
+            redirectUri: 'http://127.0.0.1:8000',
+          );
+
+          verify(
+            () => mockApi.post<Map<String, dynamic>>(
+              path: '/auth/google',
+              data: {
+                'grant_code': 'code-123',
+                'application_type': 'desktop',
+                'redirect_uri': 'http://127.0.0.1:8000',
+              },
+            ),
+          ).called(1);
+        },
+      );
+    });
+
     group('resetPassword', () {
       test(
         'calls POST /auth/password-reset/verify with email, token and new password',
