@@ -81,7 +81,16 @@ class AccountSection extends StatelessWidget {
                   children: [
                     const ProfileFieldLabel('Email Address'),
                     const SizedBox(height: 8),
-                    Text(account.email, style: context.textTheme.bodyMedium),
+                    Tooltip(
+                      message: account.email,
+                      child: Text(
+                        account.email,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        softWrap: false,
+                        style: context.textTheme.bodyMedium,
+                      ),
+                    ),
                   ],
                 ),
               ),
