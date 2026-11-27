@@ -11,6 +11,8 @@ class _FakeRegistrar implements SystemHotkeyRegistrar {
   final registered = <HotKey>[];
   final pressed = <void Function()>[];
   var failNextRegister = false;
+  var failRegisterCount = 0;
+  var failNextUnregister = false;
   var unregisterCount = 0;
 
   @override
@@ -22,6 +24,10 @@ class _FakeRegistrar implements SystemHotkeyRegistrar {
       failNextRegister = false;
       throw Exception('already registered');
     }
+    if (failRegisterCount > 0) {
+      failRegisterCount--;
+      throw Exception('already registered');
+    }
     registered.removeWhere((key) => key.identifier == hotKey.identifier);
     registered.add(hotKey);
     pressed.add(onPressed);
@@ -29,6 +35,10 @@ class _FakeRegistrar implements SystemHotkeyRegistrar {
 
   @override
   Future<void> unregister(HotKey hotKey) async {
+    if (failNextUnregister) {
+      failNextUnregister = false;
+      throw Exception('could not unregister');
+    }
     unregisterCount++;
     registered.removeWhere((key) => key.identifier == hotKey.identifier);
   }
@@ -266,6 +276,77 @@ void main() {
       expect(state.error, 'That shortcut is already used by another app.');
       verifyNever(() => storage.writeData(any(), any()));
     });
+
+    test(
+      'keeps showing the previous shortcut when it cannot be restored',
+      () async {
+        final previous = HotkeyBinding(
+          modifiers: const {HotKeyModifier.control, HotKeyModifier.alt},
+          key: LogicalKeyboardKey.keyJ,
+        );
+        final state = controller();
+        await state.start();
+        await state.update(previous);
+        clearInteractions(storage);
+        registrar.failRegisterCount = 2;
+
+        final applied = await state.update(
+          HotkeyBinding(
+            modifiers: const {HotKeyModifier.control},
+            key: LogicalKeyboardKey.keyK,
+          ),
+        );
+
+        expect(applied, isFalse);
+        expect(state.binding, previous);
+        expect(state.isRegistered, isFalse);
+        expect(
+          state.error,
+          "That shortcut is already used by another app. Couldn't restore "
+          'the previous shortcut.',
+        );
+        verifyNever(() => storage.writeData(any(), any()));
+      },
+    );
+
+    test(
+      'keeps the current shortcut in force when it cannot be released',
+      () async {
+        final previous = HotkeyBinding(
+          modifiers: const {HotKeyModifier.control, HotKeyModifier.alt},
+          key: LogicalKeyboardKey.keyJ,
+        );
+        final state = controller();
+        await state.start();
+        await state.update(previous);
+        clearInteractions(storage);
+        registrar.failNextUnregister = true;
+
+        final applied = await state.update(
+          HotkeyBinding(
+            modifiers: const {HotKeyModifier.control},
+            key: LogicalKeyboardKey.keyK,
+          ),
+        );
+
+        expect(applied, isFalse);
+        expect(state.binding, previous);
+        expect(state.isRegistered, isTrue);
+        expect(state.error, isNotNull);
+        expect(registrar.registered.single.key, LogicalKeyboardKey.keyJ);
+        verifyNever(() => storage.writeData(any(), any()));
+
+        // Once the system lets go, the change goes through.
+        final retried = await state.update(
+          HotkeyBinding(
+            modifiers: const {HotKeyModifier.control},
+            key: LogicalKeyboardKey.keyK,
+          ),
+        );
+        expect(retried, isTrue);
+        expect(registrar.registered.single.key, LogicalKeyboardKey.keyK);
+      },
+    );
 
     test('reset goes back to the default shortcut', () async {
       final other = HotkeyBinding(
