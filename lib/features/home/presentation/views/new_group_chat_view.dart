@@ -118,7 +118,11 @@ class _NewGroupChatViewState extends ConsumerState<NewGroupChatView> {
   }
 
   Future<void> _handleCreate() async {
-    if (_selectedMembers.length < 2) return;
+    if (_selectedMembers.isEmpty) return;
+    if (_selectedMembers.length == 1) {
+      await _openDirectMessage(_selectedMembers.single);
+      return;
+    }
 
     setState(() {
       _isLoading = true;
@@ -186,6 +190,34 @@ class _NewGroupChatViewState extends ConsumerState<NewGroupChatView> {
           _errorMessage = result.error.friendlyMessage;
         });
     }
+  }
+
+  /// One recipient is a 1:1 DM, opened the same way as from People.
+  /// Selecting it in the DMs tab closes this page.
+  Future<void> _openDirectMessage(TeamMember member) async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    final opened = await ref
+        .read(peopleActionsProvider.notifier)
+        .openChat(
+          OrgMember(
+            id: member.id,
+            name: member.name?.trim() ?? '',
+            email: member.email,
+            avatarUrl: member.avatarUrl ?? '',
+          ),
+        );
+
+    if (!mounted) return;
+    setState(() {
+      _isLoading = false;
+      if (!opened) {
+        _errorMessage = "Couldn't open chat. Please try again.";
+      }
+    });
   }
 
   @override
@@ -408,7 +440,9 @@ class _NewGroupChatViewState extends ConsumerState<NewGroupChatView> {
                     CircularProgressIndicator(color: colors.primary),
                     const SizedBox(height: 16),
                     Text(
-                      'Creating private group conversation...',
+                      _selectedMembers.length == 1
+                          ? 'Opening conversation...'
+                          : 'Creating private group conversation...',
                       style: TextStyle(
                         color: colors.textPrimary,
                         fontWeight: FontWeight.bold,
@@ -563,7 +597,7 @@ class _NewGroupChatViewState extends ConsumerState<NewGroupChatView> {
           ),
           const SizedBox(width: 12),
           ElevatedButton(
-            onPressed: _selectedMembers.length >= 2 ? _handleCreate : null,
+            onPressed: _selectedMembers.isNotEmpty ? _handleCreate : null,
             style: ElevatedButton.styleFrom(
               backgroundColor: colors.primary,
               foregroundColor: Colors.white,
@@ -583,23 +617,26 @@ class _NewGroupChatViewState extends ConsumerState<NewGroupChatView> {
 
   Widget _buildValidationHelper(AppPalette colors) {
     final count = _selectedMembers.length;
-    final isReady = count >= 2;
-
     final IconData icon;
     final Color color;
     final String text;
 
-    if (isReady) {
+    if (count >= 2) {
       icon = Icons.check_circle;
       color = colors.success;
       text = 'Ready to create conversation! (Selected: $count members)';
+    } else if (count == 1) {
+      icon = Icons.check_circle;
+      color = colors.success;
+      text =
+          'Ready to message ${_getMemberDisplayName(_selectedMembers.first)}. '
+          'Add more people to start a group DM.';
     } else {
       icon = Icons.info_outline;
       color = (_touched || _errorMessage != null)
           ? colors.error
           : colors.textSecondary;
-      text =
-          'Select at least 2 members to start a group DM (Selected: $count/2)';
+      text = 'Select a person to message, or 2 or more for a group DM';
     }
 
     return Row(

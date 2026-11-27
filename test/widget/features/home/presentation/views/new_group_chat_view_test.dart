@@ -192,7 +192,7 @@ void main() {
     await tester.pumpAndSettle();
 
     final helperText = tester.widget<Text>(
-      find.textContaining('Select at least 2 members'),
+      find.textContaining('Select a person to message'),
     );
     expect(helperText.style?.color, isNot(equals(AppPalette.light.error)));
     expect(helperText.style?.color, equals(AppPalette.light.textSecondary));
@@ -292,7 +292,7 @@ void main() {
 
       expect(find.byType(Chip), findsOneWidget);
       expect(find.widgetWithText(Chip, 'Alice'), findsOneWidget);
-      expect(find.textContaining('Selected: 1/2'), findsOneWidget);
+      expect(find.textContaining('Ready to message Alice'), findsOneWidget);
     }, variant: _desktopPointer);
 
     testWidgets('tapping elsewhere closes the list', (tester) async {
