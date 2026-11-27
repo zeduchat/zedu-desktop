@@ -33,16 +33,22 @@ class NotificationSettingsNotifier extends Notifier<NotificationSettings> {
   /// Where this user's mutes are remembered (null while signed out).
   String? _mutedKey;
 
+  /// Where this user's Do Not Disturb end time is remembered.
+  String? _dndKey;
+
   @override
   NotificationSettings build() {
     ref.onDispose(() => _dndExpiry?.cancel());
-    // Rebuilt for each signed-in user, so one account never sees another's mutes.
+    // Rebuilt for each signed-in user, so one account never sees another's
+    // mutes or Do Not Disturb pause.
     final userId = dmPreferencesUserId(ref);
-    _mutedKey = userId == null || userId.isEmpty
-        ? null
-        : DmPreferencesStore.mutedKey(userId);
+    final signedIn = userId != null && userId.isNotEmpty;
+    _mutedKey = signedIn ? DmPreferencesStore.mutedKey(userId) : null;
+    _dndKey = signedIn ? DmPreferencesStore.dndKey(userId) : null;
     final key = _mutedKey;
     if (key != null) _restoreMuted(key);
+    final dndKey = _dndKey;
+    if (dndKey != null) _restoreDnd(dndKey);
     return const NotificationSettings();
   }
 
@@ -53,6 +59,32 @@ class NotificationSettingsNotifier extends Notifier<NotificationSettings> {
     state = state.copyWith(
       mutedParticipantIds: {...saved, ...state.mutedParticipantIds},
     );
+  }
+
+  Future<void> _restoreDnd(String key) async {
+    final saved = await ref.read(dmPreferencesStoreProvider).readTime(key);
+    if (!ref.mounted || _dndKey != key || saved == null) return;
+    // A pause chosen while the saved one was loading wins.
+    if (state.dndUntil != null) return;
+    final remaining = saved.difference(DateTime.now());
+    if (remaining <= Duration.zero) {
+      // The pause ran out while the app was closed.
+      _saveDnd(null);
+      return;
+    }
+    state = state.copyWith(dndUntil: saved);
+    _armDndExpiry(remaining);
+  }
+
+  void _saveDnd(DateTime? until) {
+    final key = _dndKey;
+    if (key == null) return;
+    unawaited(ref.read(dmPreferencesStoreProvider).writeTime(key, until));
+  }
+
+  void _armDndExpiry(Duration remaining) {
+    _dndExpiry?.cancel();
+    _dndExpiry = Timer(remaining, clearDndMode);
   }
 
   void _saveMuted() {
@@ -67,9 +99,10 @@ class NotificationSettingsNotifier extends Notifier<NotificationSettings> {
 
   /// Pauses notifications; the pause ends by itself when it runs out.
   void setDndMode(Duration duration) {
-    state = state.copyWith(dndUntil: DateTime.now().add(duration));
-    _dndExpiry?.cancel();
-    _dndExpiry = Timer(duration, clearDndMode);
+    final until = DateTime.now().add(duration);
+    state = state.copyWith(dndUntil: until);
+    _armDndExpiry(duration);
+    _saveDnd(until);
   }
 
   void clearDndMode() {
@@ -79,6 +112,7 @@ class NotificationSettingsNotifier extends Notifier<NotificationSettings> {
       dndUntil: null,
       mutedParticipantIds: state.mutedParticipantIds,
     );
+    _saveDnd(null);
   }
 
   void muteParticipant(String participantId) {
