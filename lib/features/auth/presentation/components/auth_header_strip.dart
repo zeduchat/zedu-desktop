@@ -32,8 +32,15 @@ class AuthHeaderStrip extends StatelessWidget {
                       fontFamily: FontFamily.roboto,
                     ),
                   ),
-                  InkWell(
-                    onTap: onActionTap,
+                  // A button, not a bare InkWell, so keyboard and screen
+                  // reader users can find and activate it.
+                  TextButton(
+                    onPressed: onActionTap,
+                    style: TextButton.styleFrom(
+                      padding: EdgeInsets.zero,
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
                     child: Text(
                       actionText!,
                       style: context.textTheme.bodyLarge?.copyWith(
