@@ -207,6 +207,14 @@ class ChatHistoryNotifier extends ChangeNotifier {
         _seenIds.add(id);
         hadNew = true;
 
+        // Keep the conversation list's order in step with what arrived. The
+        // list is only touched when it is loaded, never started from here.
+        if (ref.exists(dmListProvider)) {
+          ref
+              .read(dmListProvider.notifier)
+              .recordIncomingMessage(channelId, msg);
+        }
+
         // Only notify for messages from other users.
         if (!isMyMessage(msg)) {
           final senderName =
