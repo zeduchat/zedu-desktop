@@ -789,12 +789,15 @@ class ChatHistoryNotifier extends ChangeNotifier {
     _editsInFlight.add(messageId);
     try {
       final repository = ref.read(dmRepositoryProvider);
+      // zedu-be routes DM edits as PUT /dms/messages/:channelId and finds the
+      // message by the thread_id in the body (EditThreadDm), so the path takes
+      // the channel id, as on web and mobile (ziki-2400).
       await repository.editMessage(
         channelId,
         content: newContent,
         threadId: threadId,
       );
-      // Only clear editing state after successful save
+      // Only clear editing state once the request has finished.
       if (editingMessageId == messageId) {
         editingMessageId = null;
       }
@@ -805,6 +808,11 @@ class ChatHistoryNotifier extends ChangeNotifier {
         error: e,
         stackTrace: st,
       );
+      // The edit is over either way. Left set, it would stop polling from
+      // ever refreshing this message again.
+      if (editingMessageId == messageId) {
+        editingMessageId = null;
+      }
       if (_isDisposed) return;
       messages = messages.map((m) {
         if (m['id'] == messageId && m['content'] == newContent) {

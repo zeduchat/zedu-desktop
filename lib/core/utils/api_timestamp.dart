@@ -38,5 +38,18 @@ DateTime parseApiTimestamp(Object? value, {String field = 'timestamp'}) {
   throw FormatException('Unrecognised $field: $raw');
 }
 
+/// Like [parseApiTimestamp], but returns the Unix epoch (UTC) instead of
+/// throwing when [value] is missing or not a recognisable timestamp.
+///
+/// Use it for timestamps that are informational only, so a single bad field
+/// in a payload (for example a sign-in response) does not fail the whole parse.
+DateTime parseApiTimestampOrEpoch(Object? value) {
+  try {
+    return parseApiTimestamp(value);
+  } on FormatException {
+    return DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
+  }
+}
+
 DateTime _fromEpochSeconds(int seconds) =>
     DateTime.fromMillisecondsSinceEpoch(seconds * 1000, isUtc: true);

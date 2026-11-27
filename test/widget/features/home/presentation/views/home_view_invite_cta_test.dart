@@ -239,6 +239,14 @@ void main() {
   setUpAll(_loadAppFonts);
 
   setUp(() {
+    // The channel composer creates an AudioRecorder, whose plugin is missing
+    // in tests. Its unanswered create call otherwise fails whichever test is
+    // waiting on real async work, such as a golden comparison.
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          const MethodChannel('com.llfbandit.record/messages'),
+          (call) async => null,
+        );
     locator.registerSingleton<SecureStorageService>(
       _FakeSecureStorageService(),
     );

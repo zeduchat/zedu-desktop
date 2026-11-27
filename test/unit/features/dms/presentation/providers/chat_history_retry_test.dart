@@ -68,6 +68,9 @@ void main() {
   }
 
   Future<void> finish(List<Future<void>> operations) async {
+    // A retry after a failed attempt first looks for a copy that reached the
+    // server, so its request starts only after that lookup.
+    await pumpEventQueue();
     for (final request in requests) {
       if (!request.isCompleted) request.complete('server-thread');
     }
@@ -118,6 +121,8 @@ void main() {
     expect(history.messages.single['status'], 'failed');
 
     final next = history.retryMessage('failed-1');
+    // The delivered-copy lookup runs before the message goes back to sending.
+    await pumpEventQueue();
     expect(history.messages.single['status'], 'sending');
     await finish([next]);
 

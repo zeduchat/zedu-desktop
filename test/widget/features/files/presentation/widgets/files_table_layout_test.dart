@@ -26,26 +26,34 @@ Future<void> _pumpTable(WidgetTester tester, double width) async {
   addTearDown(tester.view.reset);
 
   await tester.pumpWidget(
-    MaterialApp(
-      theme: AppTheme.light,
-      home: Scaffold(
-        body: Align(
-          alignment: Alignment.topLeft,
-          child: SizedBox(
-            width: width,
-            child: FilesTable(
-              files: [
-                WorkspaceFile(
-                  id: 'f-1',
-                  name: 'screenshot.png',
-                  fileType: 'png',
-                  size: 120 * 1024,
-                  updatedAt: DateTime(2026, 11, 30),
-                ),
-              ],
-              ownerNameOf: (_) => 'Ada Lovelace',
-              onOpen: (_) {},
-              onDelete: (_) {},
+    // The Shared in cell loads each file's info; this file is shared nowhere.
+    ProviderScope(
+      overrides: [
+        fileInfoProvider.overrideWith(
+          (ref, fileId) async => const WorkspaceFileInfo(),
+        ),
+      ],
+      child: MaterialApp(
+        theme: AppTheme.light,
+        home: Scaffold(
+          body: Align(
+            alignment: Alignment.topLeft,
+            child: SizedBox(
+              width: width,
+              child: FilesTable(
+                files: [
+                  WorkspaceFile(
+                    id: 'f-1',
+                    name: 'screenshot.png',
+                    fileType: 'png',
+                    size: 120 * 1024,
+                    updatedAt: DateTime(2026, 11, 30),
+                  ),
+                ],
+                ownerNameOf: (_) => 'Ada Lovelace',
+                onOpen: (_) {},
+                onDelete: (_) {},
+              ),
             ),
           ),
         ),

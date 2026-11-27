@@ -359,6 +359,11 @@ void main() {
           ),
         );
 
+        // The footer shows the page number and " of N" as separate texts.
+        String? currentPage() => tester
+            .widget<Text>(find.byKey(const Key('user_management_page_number')))
+            .data;
+
         await tester.pumpWidget(buildUnderTest(members));
         await tester.pumpAndSettle();
 
@@ -381,13 +386,16 @@ void main() {
         final jumpInput = find.byKey(
           const Key('user_management_page_jump_input'),
         );
+        // The footer sits below the fold of the 800x600 test window.
+        await tester.ensureVisible(jumpInput);
         await tester.enterText(jumpInput, '3');
         await tester.tap(
           find.byKey(const Key('user_management_page_jump_button')),
         );
         await tester.pumpAndSettle();
 
-        expect(find.text('3 of 3'), findsOneWidget);
+        expect(currentPage(), '3');
+        expect(find.text(' of 3'), findsOneWidget);
         expect(find.text('member20@example.com'), findsOneWidget);
         expect(find.text('member0@example.com'), findsNothing);
 
@@ -396,7 +404,8 @@ void main() {
         await tester.testTextInput.receiveAction(TextInputAction.done);
         await tester.pumpAndSettle();
 
-        expect(find.text('2 of 3'), findsOneWidget);
+        expect(currentPage(), '2');
+        expect(find.text(' of 3'), findsOneWidget);
         expect(find.text('member10@example.com'), findsOneWidget);
 
         // Out of bounds input clamps to valid range
@@ -406,7 +415,8 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        expect(find.text('3 of 3'), findsOneWidget);
+        expect(currentPage(), '3');
+        expect(find.text(' of 3'), findsOneWidget);
         expect(find.text('member20@example.com'), findsOneWidget);
       },
     );

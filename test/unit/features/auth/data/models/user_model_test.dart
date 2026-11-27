@@ -12,7 +12,7 @@ void main() {
 
       expect(
         user.createdAt,
-        DateTime.fromMillisecondsSinceEpoch(1778373782 * 1000),
+        DateTime.fromMillisecondsSinceEpoch(1778373782 * 1000, isUtc: true),
       );
       expect(user.username, 'aloaderemi');
     });
@@ -50,12 +50,12 @@ void main() {
 
       expect(
         user.createdAt,
-        DateTime.fromMillisecondsSinceEpoch(1778373782 * 1000),
+        DateTime.fromMillisecondsSinceEpoch(1778373782 * 1000, isUtc: true),
       );
       expect(user.updatedAt, DateTime.utc(2026, 5, 10, 2, 43, 2));
       expect(
         user.expiresIn,
-        DateTime.fromMillisecondsSinceEpoch(1778991491 * 1000),
+        DateTime.fromMillisecondsSinceEpoch(1778991491 * 1000, isUtc: true),
       );
     });
 
@@ -66,8 +66,14 @@ void main() {
 
       final user = UserModel.fromJson(json);
 
-      expect(user.createdAt, DateTime.fromMillisecondsSinceEpoch(0));
-      expect(user.updatedAt, DateTime.fromMillisecondsSinceEpoch(0));
+      expect(
+        user.createdAt,
+        DateTime.fromMillisecondsSinceEpoch(0, isUtc: true),
+      );
+      expect(
+        user.updatedAt,
+        DateTime.fromMillisecondsSinceEpoch(0, isUtc: true),
+      );
     });
 
     test('falls back to id when user_id is missing', () {
