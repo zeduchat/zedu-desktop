@@ -701,6 +701,37 @@ void main() {
       expect(opened, [Uri.parse('https://example.com/bold')]);
     });
 
+    testWidgets('the conversation menu says Unmute and Unpin once applied', (
+      tester,
+    ) async {
+      await pumpChat(tester, [message('m1', 'hello')]);
+
+      await tester.tap(find.byTooltip('More options'));
+      await tester.pumpAndSettle();
+      expect(find.text('Unmute notifications'), findsNothing);
+      expect(find.text('Unpin conversation'), findsNothing);
+      await tester.tap(find.text('Mute notifications'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byTooltip('More options'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Pin conversation'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byTooltip('More options'));
+      await tester.pumpAndSettle();
+      expect(find.text('Unmute notifications'), findsOneWidget);
+      expect(find.text('Mute notifications'), findsNothing);
+      expect(find.text('Unpin conversation'), findsOneWidget);
+      expect(find.text('Pin conversation'), findsNothing);
+
+      await tester.tap(find.text('Unmute notifications'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('More options'));
+      await tester.pumpAndSettle();
+      expect(find.text('Mute notifications'), findsOneWidget);
+    });
+
     testWidgets('the conversation menu opens its shared links view', (
       tester,
     ) async {
