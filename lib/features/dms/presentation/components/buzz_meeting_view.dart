@@ -9,8 +9,6 @@ class BuzzMeetingView extends ConsumerStatefulWidget {
 }
 
 class _BuzzMeetingViewState extends ConsumerState<BuzzMeetingView> {
-  bool _isMuted = false;
-  bool _isVideoOff = false;
   bool _isHandRaised = false;
 
   @override
@@ -24,6 +22,8 @@ class _BuzzMeetingViewState extends ConsumerState<BuzzMeetingView> {
 
     final bool isFullPage = activeCall.state.isFullPage;
     final remoteName = activeCall.state.remoteUserName ?? 'Unknown';
+    final isMuted = activeCall.state.isMicMuted;
+    final isVideoOff = !activeCall.state.isCameraOn;
 
     if (!isFullPage) {
       return Positioned(
@@ -123,24 +123,28 @@ class _BuzzMeetingViewState extends ConsumerState<BuzzMeetingView> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       _buildControlButton(
-                        icon: _isMuted ? Icons.mic_off : Icons.mic,
-                        tooltip: _isMuted ? 'Unmute' : 'Mute',
-                        color: _isMuted
+                        icon: isMuted ? Icons.mic_off : Icons.mic,
+                        tooltip: isMuted ? 'Unmute' : 'Mute',
+                        color: isMuted
                             ? Colors.red
                             : colors.primary.withValues(alpha: 0.2),
-                        onTap: () => setState(() => _isMuted = !_isMuted),
+                        onTap: () => ref
+                            .read(activeCallProvider.notifier)
+                            .toggleMicrophone(),
                         small: true,
                       ),
                       const SizedBox(width: 8),
                       _buildControlButton(
-                        icon: _isVideoOff ? Icons.videocam_off : Icons.videocam,
-                        tooltip: _isVideoOff
+                        icon: isVideoOff ? Icons.videocam_off : Icons.videocam,
+                        tooltip: isVideoOff
                             ? 'Turn camera on'
                             : 'Turn camera off',
-                        color: _isVideoOff
+                        color: isVideoOff
                             ? Colors.red
                             : colors.primary.withValues(alpha: 0.2),
-                        onTap: () => setState(() => _isVideoOff = !_isVideoOff),
+                        onTap: () => ref
+                            .read(activeCallProvider.notifier)
+                            .toggleCamera(),
                         small: true,
                       ),
                       const SizedBox(width: 8),
@@ -251,12 +255,13 @@ class _BuzzMeetingViewState extends ConsumerState<BuzzMeetingView> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 _buildControlButton(
-                  icon: _isMuted ? Icons.mic_off : Icons.mic,
-                  tooltip: _isMuted ? 'Unmute' : 'Mute',
-                  color: _isMuted
+                  icon: isMuted ? Icons.mic_off : Icons.mic,
+                  tooltip: isMuted ? 'Unmute' : 'Mute',
+                  color: isMuted
                       ? Colors.red
                       : colors.primary.withValues(alpha: 0.2),
-                  onTap: () => setState(() => _isMuted = !_isMuted),
+                  onTap: () =>
+                      ref.read(activeCallProvider.notifier).toggleMicrophone(),
                   small: false,
                 ),
                 const SizedBox(width: 16),
@@ -273,12 +278,13 @@ class _BuzzMeetingViewState extends ConsumerState<BuzzMeetingView> {
                 ),
                 const SizedBox(width: 16),
                 _buildControlButton(
-                  icon: _isVideoOff ? Icons.videocam_off : Icons.videocam,
-                  tooltip: _isVideoOff ? 'Turn camera on' : 'Turn camera off',
-                  color: _isVideoOff
+                  icon: isVideoOff ? Icons.videocam_off : Icons.videocam,
+                  tooltip: isVideoOff ? 'Turn camera on' : 'Turn camera off',
+                  color: isVideoOff
                       ? Colors.red
                       : colors.primary.withValues(alpha: 0.2),
-                  onTap: () => setState(() => _isVideoOff = !_isVideoOff),
+                  onTap: () =>
+                      ref.read(activeCallProvider.notifier).toggleCamera(),
                   small: false,
                 ),
                 const SizedBox(width: 16),
