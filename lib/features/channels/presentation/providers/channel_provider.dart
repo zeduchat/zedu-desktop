@@ -20,14 +20,44 @@ class ChannelNotifier extends AsyncNotifier<List<Channel>> {
     );
     if (orgId == null) return const [];
 
+    // Opening a channel loads its history, which the server counts as read,
+    // so its unread badge goes as soon as it is opened.
+    ref.listen(activeChatProvider, (_, next) {
+      if (next.type == ActiveChatType.channel) _clearUnread(next);
+    });
+
     final result = await ref
         .read(channelRepositoryProvider)
         .fetchChannels(orgId);
 
     return switch (result) {
-      Success<List<Channel>>(:final value) => value,
+      // The channel on screen has been read already.
+      Success<List<Channel>>(:final value) => [
+        for (final channel in value)
+          _isOpen(channel, ref.read(activeChatProvider))
+              ? channel.copyWith(unreadCount: 0)
+              : channel,
+      ],
       Failure<List<Channel>>(:final error) => throw error,
     };
+  }
+
+  static bool _isOpen(Channel channel, ActiveChatState active) =>
+      active.type == ActiveChatType.channel &&
+      (active.channelId != null
+          ? active.channelId == channel.id
+          : active.id == channel.name);
+
+  void _clearUnread(ActiveChatState active) {
+    final channels = state.value;
+    if (channels == null ||
+        !channels.any((c) => c.unreadCount > 0 && _isOpen(c, active))) {
+      return;
+    }
+    state = AsyncData([
+      for (final c in channels)
+        _isOpen(c, active) ? c.copyWith(unreadCount: 0) : c,
+    ]);
   }
 
   bool _isCreating = false;
