@@ -50,4 +50,42 @@ void main() {
       expect(conversation.hasActivity, isTrue);
     });
   });
+
+  group('DmPreviewThread.created_at', () {
+    Map<String, dynamic> withCreatedAt(Object? createdAt) => {
+      ..._json(),
+      'preview_thread': [
+        {
+          'thread_id': 't-1',
+          'message': 'hi',
+          'user_id': 'user-1',
+          'username': 'Ada',
+          'created_at': createdAt,
+        },
+      ],
+    };
+
+    for (final bad in <Object?>['', 'not-a-date', 12345]) {
+      test('falls back to now for ${bad.runtimeType} "$bad"', () {
+        final before = DateTime.now();
+        final conversation = DmConversation.fromJson(withCreatedAt(bad));
+        final after = DateTime.now();
+
+        final createdAt = conversation.previewThreads.single.createdAt;
+        expect(createdAt.isBefore(before), isFalse);
+        expect(createdAt.isAfter(after), isFalse);
+      });
+    }
+
+    test('keeps a valid timestamp', () {
+      final conversation = DmConversation.fromJson(
+        withCreatedAt('2026-11-05T08:00:00Z'),
+      );
+
+      expect(
+        conversation.previewThreads.single.createdAt.toUtc(),
+        DateTime.utc(2026, 11, 5, 8),
+      );
+    });
+  });
 }
