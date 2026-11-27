@@ -48,6 +48,17 @@ class UserProfileRepositoryImpl implements UserProfileRepository {
   }
 
   @override
+  Future<Result<LoginAuditPage>> getLoginAudit({
+    required String userId,
+    int page = 1,
+    int limit = 10,
+  }) {
+    return _guard(
+      () => _remote.getLoginAudit(userId: userId, page: page, limit: limit),
+    );
+  }
+
+  @override
   Future<Result<void>> changePassword({
     required String currentPassword,
     required String newPassword,

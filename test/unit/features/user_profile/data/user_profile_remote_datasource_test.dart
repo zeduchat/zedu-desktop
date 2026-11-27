@@ -184,4 +184,102 @@ void main() {
       },
     );
   });
+
+  group('UserProfileRemoteDataSourceImpl.getLoginAudit (Ziki #2725)', () {
+    const userId = '019700db-4e22-7f90-a20e-f9116291ef24';
+
+    test('reads a page from GET /users/{id}/login-audit', () async {
+      final mockApi = MockApiBaseService();
+      final datasource = UserProfileRemoteDataSourceImpl(
+        config: const AppConfig(apiBaseUrl: '', usesMockData: false),
+        apiBaseService: mockApi,
+      );
+      when(
+        () => mockApi.get<Map<String, dynamic>>(
+          path: any(named: 'path'),
+          queryParameters: any(named: 'queryParameters'),
+        ),
+      ).thenAnswer(
+        (_) async => const ApiResponseModel<Map<String, dynamic>>(
+          statusCode: 200,
+          data: {
+            'data': [
+              {'id': 'a1', 'device': 'Chrome', 'is_live': true},
+              {'id': 'a2', 'device': 'Firefox', 'is_live': false},
+            ],
+            'pagination': {
+              'current_page': 2,
+              'page_count': 2,
+              'total_pages_count': 3,
+              'total_items': 22,
+            },
+          },
+        ),
+      );
+
+      final page = await datasource.getLoginAudit(
+        userId: userId,
+        page: 2,
+        limit: 10,
+      );
+
+      verify(
+        () => mockApi.get<Map<String, dynamic>>(
+          path: '/users/$userId/login-audit',
+          queryParameters: {'page': 2, 'limit': 10},
+        ),
+      ).called(1);
+      expect(page.entries.map((e) => e.id), ['a1', 'a2']);
+      expect(page.entries.first.isLive, isTrue);
+      expect(page.currentPage, 2);
+      expect(page.totalPages, 3);
+      expect(page.hasMore, isTrue);
+    });
+
+    test('returns an empty page when the server sends no data', () async {
+      final mockApi = MockApiBaseService();
+      final datasource = UserProfileRemoteDataSourceImpl(
+        config: const AppConfig(apiBaseUrl: '', usesMockData: false),
+        apiBaseService: mockApi,
+      );
+      when(
+        () => mockApi.get<Map<String, dynamic>>(
+          path: any(named: 'path'),
+          queryParameters: any(named: 'queryParameters'),
+        ),
+      ).thenAnswer(
+        (_) async => const ApiResponseModel<Map<String, dynamic>>(
+          statusCode: 200,
+          data: {'status': 'success'},
+        ),
+      );
+
+      final page = await datasource.getLoginAudit(userId: userId);
+
+      verify(
+        () => mockApi.get<Map<String, dynamic>>(
+          path: '/users/$userId/login-audit',
+          queryParameters: {'page': 1, 'limit': 10},
+        ),
+      ).called(1);
+      expect(page.entries, isEmpty);
+      expect(page.hasMore, isFalse);
+    });
+
+    test(
+      'returns an empty page in mock mode without calling the API',
+      () async {
+        final mockApi = MockApiBaseService();
+        final datasource = UserProfileRemoteDataSourceImpl(
+          config: const AppConfig(apiBaseUrl: '', usesMockData: true),
+          apiBaseService: mockApi,
+        );
+
+        final page = await datasource.getLoginAudit(userId: userId);
+
+        expect(page.entries, isEmpty);
+        verifyZeroInteractions(mockApi);
+      },
+    );
+  });
 }

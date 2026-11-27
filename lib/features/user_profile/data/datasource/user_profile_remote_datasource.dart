@@ -17,6 +17,11 @@ abstract interface class UserProfileRemoteDataSource {
   Future<List<SecuritySessionModel>> getSecuritySessions({
     required String userId,
   });
+  Future<LoginAuditPage> getLoginAudit({
+    required String userId,
+    int page = 1,
+    int limit = 10,
+  });
   Future<void> changePassword({
     required String currentPassword,
     required String newPassword,
@@ -291,6 +296,44 @@ class UserProfileRemoteDataSourceImpl implements UserProfileRemoteDataSource {
         .cast<Map<String, dynamic>>()
         .map(SecuritySessionModel.fromJson)
         .toList();
+  }
+
+  @override
+  Future<LoginAuditPage> getLoginAudit({
+    required String userId,
+    int page = 1,
+    int limit = 10,
+  }) async {
+    if (_config.usesMockData) return const LoginAuditPage.empty();
+    final response = await _apiBaseService.get<Map<String, dynamic>>(
+      path: '/users/$userId/login-audit',
+      queryParameters: {'page': page, 'limit': limit},
+    );
+    final body = response.data;
+    final data = body['data'];
+    final entries = data is List
+        ? data
+              .whereType<Map<dynamic, dynamic>>()
+              .map(
+                (entry) => LoginAuditEntryModel.fromJson(
+                  entry.cast<String, dynamic>(),
+                ),
+              )
+              .toList()
+        : const <LoginAuditEntry>[];
+    final pagination = body['pagination'];
+    int? readInt(String key) {
+      if (pagination is! Map) return null;
+      final value = pagination[key];
+      if (value is num) return value.toInt();
+      return value is String ? int.tryParse(value) : null;
+    }
+
+    return LoginAuditPage(
+      entries: entries,
+      currentPage: readInt('current_page') ?? page,
+      totalPages: readInt('total_pages_count') ?? (entries.isEmpty ? 0 : page),
+    );
   }
 
   @override

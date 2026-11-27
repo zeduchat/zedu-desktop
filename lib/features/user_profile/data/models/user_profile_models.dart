@@ -271,6 +271,52 @@ class SecuritySessionModel extends SecuritySession {
   }
 }
 
+class LoginAuditEntryModel extends LoginAuditEntry {
+  const LoginAuditEntryModel({
+    required super.id,
+    required super.device,
+    required super.location,
+    required super.ipAddress,
+    required super.loginAt,
+    required super.createdAt,
+    required super.isLive,
+  });
+
+  /// Reads a `LoginActivity` row from `GET /users/{id}/login-audit`. Missing
+  /// or oddly typed values become empty strings, null times or `false`.
+  factory LoginAuditEntryModel.fromJson(Map<String, dynamic> json) {
+    return LoginAuditEntryModel(
+      id: _text(json['id']),
+      device: _text(json['device']),
+      location: _text(json['location']),
+      ipAddress: _text(json['ip_address']),
+      loginAt: _time(json['login_at']),
+      createdAt: _time(json['created_at']),
+      isLive: _bool(json['is_live']),
+    );
+  }
+
+  static String _text(Object? value) {
+    if (value is String) return value.trim();
+    if (value is num) return '$value';
+    return '';
+  }
+
+  static DateTime? _time(Object? value) {
+    final parsed = value is String ? DateTime.tryParse(value) : null;
+    // Go sends its zero time (0001-01-01) for a login time it never set.
+    if (parsed == null || parsed.year <= 1) return null;
+    return parsed;
+  }
+
+  static bool _bool(Object? value) {
+    if (value is bool) return value;
+    if (value is num) return value != 0;
+    if (value is String) return value.toLowerCase() == 'true' || value == '1';
+    return false;
+  }
+}
+
 class TeamMemberModel extends TeamMember {
   const TeamMemberModel({
     required super.id,
