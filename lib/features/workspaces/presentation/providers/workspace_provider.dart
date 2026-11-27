@@ -34,39 +34,9 @@ class WorkspaceNotifier extends Notifier<WorkspaceState> {
       isLoading: true,
     );
     try {
-      final api = locator<ApiBaseService>();
-      final response = await api.get<Map<String, dynamic>>(
-        path: '/users/organisations',
-      );
-      final data = response.data['data'] as List<dynamic>? ?? [];
-
-      final List<Workspace> workspaces = [];
-      for (var item in data) {
-        if (item is Map<String, dynamic>) {
-          final rawId = item['id'];
-          final id = rawId is String
-              ? rawId.trim()
-              : (rawId?.toString().trim() ?? '');
-          if (id.isEmpty) {
-            // Without an id the workspace cannot be selected or addressed.
-            // Skipping it is better than collapsing every id-less
-            // organisation onto one shared workspace id.
-            AppLogger.w(
-              'Skipping organisation without an id',
-              tag: 'WorkspaceNotifier',
-            );
-            continue;
-          }
-          workspaces.add(
-            Workspace(
-              id: id,
-              name: item['name'] as String? ?? 'Workspace',
-              avatar: item['logo_url'] as String? ?? '',
-              membersCount: (item['Users'] as List<dynamic>?)?.length ?? 0,
-            ),
-          );
-        }
-      }
+      final workspaces = await ref
+          .read(workspaceRemoteDataSourceProvider)
+          .getOrganisations();
 
       // Keep the current selection if it's still in the list (e.g. an org
       // created while this request was in flight).
