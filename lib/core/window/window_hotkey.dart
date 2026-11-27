@@ -137,12 +137,16 @@ class WindowHotkeyController extends ChangeNotifier {
 
   HotkeyBinding? _registered;
   HotKey? _hotKey;
+
+  /// The previous shortcut when a failed change could not put it back, so
+  /// settings keep showing what the user had instead of the default.
+  HotkeyBinding? _unrestored;
   String? _error;
 
   HotkeyBinding get defaultBinding => _defaultBinding;
 
   /// The shortcut in force, or the default while the saved one is loading.
-  HotkeyBinding get binding => _registered ?? _defaultBinding;
+  HotkeyBinding get binding => _registered ?? _unrestored ?? _defaultBinding;
 
   String? get error => _error;
 
@@ -174,12 +178,21 @@ class WindowHotkeyController extends ChangeNotifier {
       return true;
     }
     final previous = _registered;
-    await _unregister();
+    if (!await _unregister()) {
+      // The current shortcut is still held, so leave it in force.
+      _error = "Couldn't release the current shortcut. Try again.";
+      notifyListeners();
+      return false;
+    }
     if (!await _register(next)) {
       final message = _error;
       if (previous != null) {
-        await _register(previous);
-        _error = message;
+        if (await _register(previous)) {
+          _error = message;
+        } else {
+          _unrestored = previous;
+          _error = "$message Couldn't restore the previous shortcut.";
+        }
         notifyListeners();
       }
       return false;
@@ -211,21 +224,29 @@ class WindowHotkeyController extends ChangeNotifier {
     }
     _hotKey = hotKey;
     _registered = binding;
+    _unrestored = null;
     _error = null;
     notifyListeners();
     return true;
   }
 
-  Future<void> _unregister() async {
+  /// Releases the current shortcut. Its state is only cleared once the system
+  /// confirms, so a failed release leaves it recorded as still in force.
+  Future<bool> _unregister() async {
     final hotKey = _hotKey;
-    _hotKey = null;
-    _registered = null;
-    if (hotKey == null) return;
+    if (hotKey == null) {
+      _registered = null;
+      return true;
+    }
     try {
       await _registrar.unregister(hotKey);
     } catch (error) {
       debugPrint('Failed to unregister the show/hide shortcut: $error');
+      return false;
     }
+    _hotKey = null;
+    _registered = null;
+    return true;
   }
 
   /// Shows and focuses the window when it is hidden, minimized or covered,
