@@ -1,8 +1,9 @@
 import '../../../../../helpers/helpers.dart';
+import 'package:zedu/core/mock/mock.dart';
 import 'package:zedu/features/features.dart';
 
 Map<String, dynamic> _userJson() => Map<String, dynamic>.from(
-  LoginResponseModel.mockLoginResponse['user'] as Map<String, dynamic>,
+  mockLoginResponse['user'] as Map<String, dynamic>,
 );
 
 void main() {
@@ -14,7 +15,7 @@ void main() {
         user.createdAt,
         DateTime.fromMillisecondsSinceEpoch(1778373782 * 1000, isUtc: true),
       );
-      expect(user.username, 'aloaderemi');
+      expect(user.username, 'mockuser');
     });
 
     test('defaults null optional strings to empty', () {

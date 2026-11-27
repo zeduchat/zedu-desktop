@@ -67,9 +67,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
             kind: ApiFailureKind.client,
           );
         }
-        return LoginResponseModel.fromJson(
-          LoginResponseModel.mockLoginResponse,
-        );
+        return LoginResponseModel.fromJson(mockLoginResponse);
       }
 
       AppLogger.d('POST /auth/login — $email', tag: _tag);
@@ -98,7 +96,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       if (_config.usesMockData) {
         AppLogger.d('Using mock data for GET /profile', tag: _tag);
         return ProfileModel.fromJson(
-          LoginResponseModel.mockLoginResponse['user'] as Map<String, dynamic>,
+          mockLoginResponse['user'] as Map<String, dynamic>,
         );
       }
 
@@ -256,9 +254,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
           'Using mock data for POST /auth/magick-link/verify',
           tag: _tag,
         );
-        return LoginResponseModel.fromJson(
-          LoginResponseModel.mockLoginResponse,
-        );
+        return LoginResponseModel.fromJson(mockLoginResponse);
       }
 
       AppLogger.d('POST /auth/magick-link/verify', tag: _tag);
@@ -288,9 +284,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     try {
       if (_config.usesMockData) {
         AppLogger.d('Using mock data for POST /auth/google', tag: _tag);
-        return LoginResponseModel.fromJson(
-          LoginResponseModel.mockLoginResponse,
-        );
+        return LoginResponseModel.fromJson(mockLoginResponse);
       }
 
       AppLogger.d('POST /auth/google', tag: _tag);

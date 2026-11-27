@@ -1,4 +1,5 @@
 import '../../../../helpers/helpers.dart';
+import 'package:zedu/core/mock/mock.dart';
 import 'package:zedu/core/core.dart';
 import 'package:zedu/features/features.dart';
 
@@ -46,7 +47,7 @@ void main() {
           ),
         ).thenAnswer(
           (_) async => ApiResponseModel<Map<String, dynamic>>(
-            data: {'data': LoginResponseModel.mockLoginResponse},
+            data: {'data': mockLoginResponse},
             statusCode: 200,
           ),
         );
@@ -273,7 +274,7 @@ void main() {
           ),
         ).thenAnswer(
           (_) async => ApiResponseModel<Map<String, dynamic>>(
-            data: {'data': LoginResponseModel.mockLoginResponse},
+            data: {'data': mockLoginResponse},
             statusCode: 200,
           ),
         );

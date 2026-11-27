@@ -1,4 +1,5 @@
 import '../../../../helpers/helpers.dart';
+import 'package:zedu/core/mock/mock.dart';
 import 'package:zedu/core/core.dart';
 import 'package:zedu/features/features.dart';
 
@@ -19,9 +20,7 @@ void main() {
 
     group('login', () {
       test('returns Success<AuthSession> when datasource succeeds', () async {
-        final mockResponse = LoginResponseModel.fromJson(
-          LoginResponseModel.mockLoginResponse,
-        );
+        final mockResponse = LoginResponseModel.fromJson(mockLoginResponse);
 
         when(
           () => mockDatasource.login(
@@ -209,7 +208,7 @@ void main() {
     group('getCurrentUser', () {
       test('returns Success<User> when datasource succeeds', () async {
         final mockUser = ProfileModel.fromJson(
-          LoginResponseModel.mockLoginResponse['user'] as Map<String, dynamic>,
+          mockLoginResponse['user'] as Map<String, dynamic>,
         );
 
         when(() => mockDatasource.me()).thenAnswer((_) async => mockUser);
@@ -223,8 +222,7 @@ void main() {
 
       test('keeps the status from /profile on the restored user', () async {
         final profile = ProfileModel.fromJson({
-          ...LoginResponseModel.mockLoginResponse['user']
-              as Map<String, dynamic>,
+          ...mockLoginResponse['user'] as Map<String, dynamic>,
           'icon': '🌴',
           'text': 'Vacationing',
           'status_timeout': 'dont-clear',
