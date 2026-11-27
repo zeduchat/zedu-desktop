@@ -439,6 +439,47 @@ class ChatHistoryNotifier extends ChangeNotifier {
     return !_isDisposed && isLoaded();
   }
 
+  /// Loads older pages until a message sent at or before [lastReadAt] is
+  /// loaded, then returns the id of the oldest message someone else sent after
+  /// it: the first unread one. Returns null when there is none, when a page
+  /// fails, or once this notifier is disposed. Stops after [maxPages] pages.
+  Future<String?> loadUntilFirstUnread(
+    DateTime lastReadAt, {
+    int maxPages = 50,
+  }) async {
+    DateTime? sentAt(Map<String, dynamic> message) =>
+        DateTime.tryParse(message['created_at']?.toString() ?? '');
+    bool reachedRead() => messages.any((message) {
+      final time = sentAt(message);
+      return time != null && !time.isAfter(lastReadAt);
+    });
+
+    for (var i = 0; i < maxPages && !reachedRead() && hasMore; i++) {
+      while (isLoading) {
+        if (_isDisposed) return null;
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+      }
+      if (_isDisposed || !hasMore) break;
+      final before = page;
+      await loadMore();
+      if (_isDisposed || page == before) return null;
+    }
+    if (_isDisposed) return null;
+
+    String? firstUnreadId;
+    DateTime? firstUnreadAt;
+    for (final message in messages) {
+      final time = sentAt(message);
+      if (time == null || !time.isAfter(lastReadAt)) continue;
+      if (isMyMessage(message) || message['status'] != null) continue;
+      if (firstUnreadAt == null || time.isBefore(firstUnreadAt)) {
+        firstUnreadAt = time;
+        firstUnreadId = message['id']?.toString();
+      }
+    }
+    return firstUnreadId;
+  }
+
   // What each message was sent with, so a retry sends it the same way.
   final Map<
     String,
