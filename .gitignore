@@ -75,3 +75,6 @@ cmake-build-release/
 public/fonts/
 .gitignore
 branch_structure.json
+
+# Editor workspace config: keep it out of the repo (see the Oct 2026 dropper)
+.vscode/
