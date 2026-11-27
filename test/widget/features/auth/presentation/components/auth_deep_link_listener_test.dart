@@ -283,6 +283,58 @@ void main() {
         expect(find.text('Home screen'), findsOneWidget);
       });
 
+      testWidgets('after Cancel, a later link is still handled (Ziki #3383)', (
+        tester,
+      ) async {
+        final verified = <String>[];
+        await _pumpRoutedListener(
+          tester,
+          appLinks: mockAppLinks,
+          notifier: FakeDeepLinkAuthNotifier(
+            initialState: _signedIn,
+            onVerify: verified.add,
+          ),
+        );
+
+        linkController.add(
+          Uri.parse('zedu://auth/magick-link/verify?token=t-a'),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Cancel'));
+        await tester.pumpAndSettle();
+
+        linkController.add(
+          Uri.parse('zedu://auth/magick-link/verify?token=t-b'),
+        );
+        await tester.pumpAndSettle();
+        expect(find.text('Switch accounts?'), findsOneWidget);
+        await tester.tap(find.text('Sign out and continue'));
+        await tester.pumpAndSettle();
+
+        expect(verified, ['t-b']);
+      });
+
+      testWidgets('after Cancel, the same link can be opened again', (
+        tester,
+      ) async {
+        await _pumpRoutedListener(
+          tester,
+          appLinks: mockAppLinks,
+          notifier: FakeDeepLinkAuthNotifier(initialState: _signedIn),
+        );
+        final link = Uri.parse('zedu://auth/magick-link/verify?token=t-a');
+
+        linkController.add(link);
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Cancel'));
+        await tester.pumpAndSettle();
+
+        linkController.add(link);
+        await tester.pumpAndSettle();
+
+        expect(find.text('Switch accounts?'), findsOneWidget);
+      });
+
       testWidgets('confirming signs out, then uses the link', (tester) async {
         final calls = <String>[];
         await _pumpRoutedListener(
