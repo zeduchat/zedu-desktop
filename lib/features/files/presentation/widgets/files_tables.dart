@@ -258,17 +258,21 @@ class FoldersTable extends StatelessWidget {
     required this.folders,
     required this.ownerNameOf,
     required this.onOpen,
+    this.onRename,
     this.onDelete,
   });
 
   final List<FileFolder> folders;
   final String Function(String userId) ownerNameOf;
   final ValueChanged<FileFolder> onOpen;
+  final ValueChanged<FileFolder>? onRename;
   final ValueChanged<FileFolder>? onDelete;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
+    final hasActions = onRename != null || onDelete != null;
+    const actionSize = BoxConstraints.tightFor(width: 32, height: 32);
 
     return _Table(
       columns: [
@@ -276,7 +280,7 @@ class FoldersTable extends StatelessWidget {
         const _Column('Owner', 2, compact: false),
         const _Column('Date Created', 2),
         const _Column('Items', 1),
-        if (onDelete != null) const _Column('', 1),
+        if (hasActions) const _Column('', 1),
       ],
       rowCount: folders.length,
       onTapRow: (r) => onOpen(folders[r]),
@@ -291,20 +295,37 @@ class FoldersTable extends StatelessWidget {
           _cellText(context, ownerNameOf(folder.userId)),
           _cellText(context, formatFileDate(folder.createdAt)),
           _cellText(context, formatItemCount(folder.itemCount)),
-          if (onDelete != null)
-            Align(
-              alignment: Alignment.centerRight,
-              child: IconButton(
-                tooltip: 'Delete folder',
-                visualDensity: VisualDensity.compact,
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints.tightFor(
-                  width: 32,
-                  height: 32,
-                ),
-                icon: Icon(Icons.delete_outline, size: 18, color: colors.error),
-                onPressed: () => onDelete!(folder),
-              ),
+          if (hasActions)
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                if (onRename != null)
+                  IconButton(
+                    tooltip: 'Rename folder',
+                    visualDensity: VisualDensity.compact,
+                    padding: EdgeInsets.zero,
+                    constraints: actionSize,
+                    icon: Icon(
+                      Icons.drive_file_rename_outline,
+                      size: 18,
+                      color: colors.textSecondary,
+                    ),
+                    onPressed: () => onRename!(folder),
+                  ),
+                if (onDelete != null)
+                  IconButton(
+                    tooltip: 'Delete folder',
+                    visualDensity: VisualDensity.compact,
+                    padding: EdgeInsets.zero,
+                    constraints: actionSize,
+                    icon: Icon(
+                      Icons.delete_outline,
+                      size: 18,
+                      color: colors.error,
+                    ),
+                    onPressed: () => onDelete!(folder),
+                  ),
+              ],
             ),
         ];
       },

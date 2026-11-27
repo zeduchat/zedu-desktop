@@ -72,4 +72,7 @@ abstract class FilesRepository {
 
   /// Deletes the folder [id] and its contents.
   Future<Result<void>> deleteFolder(String id);
+
+  /// Renames the folder [id] to [name].
+  Future<Result<void>> renameFolder(String id, String name);
 }

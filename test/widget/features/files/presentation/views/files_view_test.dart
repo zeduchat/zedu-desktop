@@ -220,6 +220,19 @@ class _FakeFilesRepository extends Fake implements FilesRepository {
   @override
   Future<Result<void>> deleteFolder(String id) async => const Success(null);
 
+  final folderRenames = <(String, String)>[];
+  Result<void> folderRenameResult = const Success(null);
+
+  /// Folder names after a rename, by folder id.
+  final folderNames = <String, String>{};
+
+  @override
+  Future<Result<void>> renameFolder(String id, String name) async {
+    folderRenames.add((id, name));
+    if (folderRenameResult is Success) folderNames[id] = name;
+    return folderRenameResult;
+  }
+
   /// What a download returns; complete it to finish the download.
   Completer<Result<void>> download = Completer()..complete(const Success(null));
   void Function(double?)? reportProgress;
@@ -287,7 +300,7 @@ class _FakeFilesRepository extends Fake implements FilesRepository {
         folders: [
           FileFolder(
             id: 'docs',
-            name: 'docs',
+            name: folderNames['docs'] ?? 'docs',
             userId: 'u-1',
             itemCount: 1,
             createdAt: DateTime(2026, 11, 1),
@@ -846,6 +859,74 @@ void main() {
     expect(repository.queries.length, loads + 1);
     await tester.pump(const Duration(seconds: 5));
     await tester.pumpAndSettle();
+  });
+
+  group('renaming a folder (Ziki #2719)', () {
+    Finder folderNameField() => find.descendant(
+      of: find.byType(RenameFolderDialog),
+      matching: find.byType(TextField),
+    );
+
+    testWidgets('saves the new name and lists it', (tester) async {
+      final repository = _FakeFilesRepository();
+      await _pump(tester, repository);
+      final loads = repository.folderRequests.length;
+
+      await tester.tap(find.byTooltip('Rename folder'));
+      await tester.pumpAndSettle();
+      expect(find.text('Rename folder'), findsOneWidget);
+      expect(
+        tester.widget<TextField>(folderNameField()).controller!.text,
+        'docs',
+      );
+
+      await tester.enterText(folderNameField(), '  Reports ');
+      await tester.tap(find.widgetWithText(FilledButton, 'Rename'));
+      await tester.pumpAndSettle();
+
+      expect(repository.folderRenames, [('docs', 'Reports')]);
+      expect(find.byType(RenameFolderDialog), findsNothing);
+      expect(find.text('Renamed docs to Reports.'), findsOneWidget);
+      expect(repository.folderRequests.length, loads + 1);
+      expect(find.text('Reports'), findsOneWidget);
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets('keeping the same name renames nothing', (tester) async {
+      final repository = _FakeFilesRepository();
+      await _pump(tester, repository);
+
+      await tester.tap(find.byTooltip('Rename folder'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Rename'));
+      await tester.pumpAndSettle();
+
+      expect(repository.folderRenames, isEmpty);
+      expect(find.byType(RenameFolderDialog), findsNothing);
+    });
+
+    testWidgets('a failed rename keeps the dialog open with the reason', (
+      tester,
+    ) async {
+      final repository = _FakeFilesRepository()
+        ..folderRenameResult = const Failure(
+          ApiFailure(
+            message: 'Folder name already exists',
+            kind: ApiFailureKind.client,
+          ),
+        );
+      await _pump(tester, repository);
+
+      await tester.tap(find.byTooltip('Rename folder'));
+      await tester.pumpAndSettle();
+      await tester.enterText(folderNameField(), 'Reports');
+      await tester.tap(find.widgetWithText(FilledButton, 'Rename'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(RenameFolderDialog), findsOneWidget);
+      expect(find.textContaining('Could not rename docs.'), findsOneWidget);
+    });
   });
 
   testWidgets('keeping the same name renames nothing', (tester) async {

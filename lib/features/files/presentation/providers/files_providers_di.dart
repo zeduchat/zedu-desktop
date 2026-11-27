@@ -55,6 +55,11 @@ final fileRenamesProvider = NotifierProvider<FileRenamesNotifier, Set<String>>(
   FileRenamesNotifier.new,
 );
 
+final folderRenamesProvider =
+    NotifierProvider<FolderRenamesNotifier, Set<String>>(
+      FolderRenamesNotifier.new,
+    );
+
 final fileMovesProvider = NotifierProvider<FileMovesNotifier, Set<String>>(
   FileMovesNotifier.new,
 );
