@@ -6,7 +6,7 @@ void main() {
   group('UserProfileRemoteDataSourceImpl.inviteMember role payload', () {
     test('sends the resolved role id as role_id and the org id', () async {
       final captured = await _captureInvite(
-        invitations: const [],
+        invitations: _confirmedInvite,
         roleName: null,
       );
 
@@ -61,7 +61,7 @@ void main() {
         'sends the web app address so the emailed link has a host',
         () async {
           final captured = await _captureInvite(
-            invitations: const [],
+            invitations: _confirmedInvite,
             roleName: null,
           );
 
@@ -72,7 +72,7 @@ void main() {
 
       test('uses WEB_APP_URL when it is set', () async {
         final captured = await _captureInvite(
-          invitations: const [],
+          invitations: _confirmedInvite,
           roleName: null,
           webAppUrl: 'https://app.zedu.chat',
         );
@@ -82,6 +82,11 @@ void main() {
     },
   );
 }
+
+/// The server confirms the invitation; without one, inviteMember throws.
+const _confirmedInvite = [
+  {'id': 'invite-1', 'email': 'invitee@example.com'},
+];
 
 Future<RequestOptions> _captureInvite({
   required List<dynamic> invitations,

@@ -78,7 +78,7 @@ void main() {
     _composerTest('keeps emoji and mention visible and hides the rest', (
       tester,
     ) async {
-      expect(find.byTooltip('Emoji'), findsOneWidget);
+      expect(find.byTooltip('Emoji (Ctrl/Cmd+Shift+E)'), findsOneWidget);
       expect(find.byTooltip('Mention someone'), findsOneWidget);
       expect(find.byTooltip('More actions'), findsOneWidget);
       for (final action in _grouped) {
@@ -102,7 +102,7 @@ void main() {
         ),
         findsOneWidget,
       );
-      expect(find.byTooltip('Emoji'), findsOneWidget);
+      expect(find.byTooltip('Emoji (Ctrl/Cmd+Shift+E)'), findsOneWidget);
       expect(find.byTooltip('Mention someone'), findsOneWidget);
     });
 

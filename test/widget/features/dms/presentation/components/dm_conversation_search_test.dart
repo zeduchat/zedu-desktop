@@ -52,6 +52,9 @@ Future<_FakeDmRepository> _openSearch(WidgetTester tester) async {
   when(() => history.isMyMessage(any())).thenReturn(false);
   final drafts = MockDraftStore();
   when(() => drafts.load(any())).thenAnswer((_) async => null);
+  // Closing the panel puts the cursor back in the message box, and the
+  // composer saves its draft whenever the field changes.
+  when(() => drafts.save(any(), any())).thenAnswer((_) async {});
   final repository = _FakeDmRepository();
 
   await tester.pumpWidget(

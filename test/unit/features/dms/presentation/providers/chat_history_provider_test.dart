@@ -247,7 +247,7 @@ void main() {
       container.dispose();
     });
 
-    test('names the edited message with its thread id', () async {
+    test('sends the edit to the channel route with the thread id', () async {
       notifier.messages = [
         {'id': 'local-1', 'thread_id': 't-1', 'content': 'hello'},
       ];
@@ -263,7 +263,7 @@ void main() {
 
       verify(
         () => mockRepository.editMessage(
-          'local-1',
+          'ch-1',
           content: 'edited',
           threadId: 't-1',
         ),

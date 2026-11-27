@@ -69,6 +69,9 @@ void main() {
       storage = MockSecureStorageService();
       organizationCalls = 0;
       locator.registerSingleton<SecureStorageService>(storage);
+      locator.registerSingleton<AppConfig>(
+        const AppConfig(apiBaseUrl: 'https://api.test', usesMockData: false),
+      );
 
       when(() => repo.getAccount()).thenAnswer((_) => _failed());
       when(
@@ -304,6 +307,9 @@ void main() {
       repo = MockUserProfileRepository();
       storage = MockSecureStorageService();
       locator.registerSingleton<SecureStorageService>(storage);
+      locator.registerSingleton<AppConfig>(
+        const AppConfig(apiBaseUrl: 'https://api.test', usesMockData: false),
+      );
 
       when(() => storage.readData(any())).thenAnswer((_) async => null);
       when(() => repo.getAccount()).thenAnswer((_) => _failed());

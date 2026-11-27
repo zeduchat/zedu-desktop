@@ -82,52 +82,62 @@ class _AppSidebarRailState extends ConsumerState<AppSidebarRail> {
       ),
       child: Column(
         children: [
-          const SizedBox(height: 10),
-          _RailNavItem(
-            icon: Icons.home_filled,
-            label: 'Home',
-            isActive: activeType == HomeSidebarType.home,
-            onTap: () => select(HomeSidebarType.home),
+          // The nav items scroll when the window is too short for the
+          // whole rail, so the bottom icons stay pinned and nothing
+          // overflows.
+          Expanded(
+            child: SingleChildScrollView(
+              child: Column(
+                children: [
+                  const SizedBox(height: 10),
+                  _RailNavItem(
+                    icon: Icons.home_filled,
+                    label: 'Home',
+                    isActive: activeType == HomeSidebarType.home,
+                    onTap: () => select(HomeSidebarType.home),
+                  ),
+                  _RailNavItem(
+                    icon: Icons.chat_bubble_outline,
+                    label: 'DMs',
+                    popoutType: HomeSidebarType.dms,
+                    positionKey: dmsTargetKey,
+                    isActive: activeType == HomeSidebarType.dms,
+                    onTap: () => select(HomeSidebarType.dms),
+                  ),
+                  _RailNavItem(
+                    icon: Icons.people_outline,
+                    label: 'People',
+                    popoutType: HomeSidebarType.people,
+                    positionKey: peopleTargetKey,
+                    isActive: activeType == HomeSidebarType.people,
+                    onTap: () => select(HomeSidebarType.people),
+                  ),
+                  _RailNavItem(
+                    icon: Icons.forum_outlined,
+                    label: 'Threads',
+                    isActive: widget.threadsSelected,
+                    onTap: () => context.go(AppRouter.threads),
+                  ),
+                  _RailNavItem(
+                    icon: Icons.bookmark_border,
+                    label: 'Later',
+                    isActive: widget.laterSelected,
+                    onTap: () => context.go(AppRouter.later),
+                  ),
+                  _RailNavItem(
+                    icon: Icons.folder_open_outlined,
+                    label: 'Files',
+                    isActive: activeType == HomeSidebarType.files,
+                    onTap: () => select(HomeSidebarType.files),
+                  ),
+                  _BuzzRailItem(
+                    isActive: activeType == HomeSidebarType.buzz,
+                    onTap: () => select(HomeSidebarType.buzz),
+                  ),
+                ],
+              ),
+            ),
           ),
-          _RailNavItem(
-            icon: Icons.chat_bubble_outline,
-            label: 'DMs',
-            popoutType: HomeSidebarType.dms,
-            positionKey: dmsTargetKey,
-            isActive: activeType == HomeSidebarType.dms,
-            onTap: () => select(HomeSidebarType.dms),
-          ),
-          _RailNavItem(
-            icon: Icons.people_outline,
-            label: 'People',
-            popoutType: HomeSidebarType.people,
-            positionKey: peopleTargetKey,
-            isActive: activeType == HomeSidebarType.people,
-            onTap: () => select(HomeSidebarType.people),
-          ),
-          _RailNavItem(
-            icon: Icons.forum_outlined,
-            label: 'Threads',
-            isActive: widget.threadsSelected,
-            onTap: () => context.go(AppRouter.threads),
-          ),
-          _RailNavItem(
-            icon: Icons.bookmark_border,
-            label: 'Later',
-            isActive: widget.laterSelected,
-            onTap: () => context.go(AppRouter.later),
-          ),
-          _RailNavItem(
-            icon: Icons.folder_open_outlined,
-            label: 'Files',
-            isActive: activeType == HomeSidebarType.files,
-            onTap: () => select(HomeSidebarType.files),
-          ),
-          _BuzzRailItem(
-            isActive: activeType == HomeSidebarType.buzz,
-            onTap: () => select(HomeSidebarType.buzz),
-          ),
-          const Spacer(),
           _RailBottomIcon(
             icon: Icons.inbox_outlined,
             tooltip: 'Inbox',

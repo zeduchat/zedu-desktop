@@ -716,6 +716,8 @@ void main() {
         AppPalette.light.textHint.withValues(alpha: 0.55),
       );
 
+      await tester.tap(find.byTooltip('More actions'));
+      await tester.pump();
       await tester.tap(find.byTooltip('Voice message'));
       await tester.pump();
       await tester.tap(find.byTooltip('Stop recording').first);

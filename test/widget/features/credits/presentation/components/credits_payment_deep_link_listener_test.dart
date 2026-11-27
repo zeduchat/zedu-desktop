@@ -219,6 +219,7 @@ void main() {
               authNotifierProvider.overrideWith(
                 () => FakeDeepLinkAuthNotifier(user: _user()),
               ),
+              currentOrgIdProvider.overrideWithValue(''),
             ],
             child: MaterialApp(
               home: CreditsPaymentDeepLinkListener(

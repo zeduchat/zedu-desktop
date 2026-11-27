@@ -41,6 +41,8 @@ void main() {
           authNotifierProvider.overrideWith(FakeAuthNotifier.new),
           dmRepositoryProvider.overrideWithValue(repository),
           dmDraftStoreProvider.overrideWith((ref) => drafts),
+          // Each bubble's Later button reads the server's saved list.
+          savedMessagesProvider.overrideWith((ref) async => []),
         ],
         child: buildTestMaterialApp(
           Scaffold(

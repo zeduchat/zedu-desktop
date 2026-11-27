@@ -7,6 +7,9 @@ class _FakeDmRepository extends Fake implements DmRepository {
   List<DmConversation> Function(String orgId, int page, String? search)?
   handler;
 
+  /// How many result pages the server reports for every search.
+  int totalPages = 1;
+
   @override
   Future<DmConversationsPage> getConversations({
     required String orgId,
@@ -21,7 +24,7 @@ class _FakeDmRepository extends Fake implements DmRepository {
     return DmConversationsPage(
       conversations: list,
       currentPage: page,
-      totalPages: 1,
+      totalPages: totalPages,
     );
   }
 }
@@ -91,6 +94,7 @@ void main() {
     test(
       'loadMore fetches next page with search query and appends results',
       () async {
+        repo.totalPages = 2;
         repo.handler = (orgId, page, search) {
           if (page == 1) {
             return List.generate(

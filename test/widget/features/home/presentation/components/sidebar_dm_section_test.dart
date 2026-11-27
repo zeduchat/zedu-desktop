@@ -87,6 +87,8 @@ Future<ProviderContainer> _pump(
       overrides: [
         authNotifierProvider.overrideWith(_FakeAuthNotifier.new),
         activeChatProvider.overrideWith(_FakeActiveChatNotifier.new),
+        // The selected DM follows the workspace, which loads from the API.
+        currentOrgIdProvider.overrideWithValue('org-1'),
         dmListProvider.overrideWith(dms ?? () => _FakeDmListNotifier(const [])),
         dmConversationActionsProvider.overrideWith(
           () => _FakeActionsNotifier(actions),

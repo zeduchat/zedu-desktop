@@ -105,6 +105,7 @@ void main() {
         overrides: [
           channelRepositoryProvider.overrideWithValue(repository),
           authNotifierProvider.overrideWith(_FakeAuthNotifier.new),
+          workspaceProvider.overrideWith(_FakeWorkspaceNotifier.new),
           chatHistoryProvider.overrideWith(
             (ref, channelId) => chatNotifier ?? fakeChatHistory,
           ),
