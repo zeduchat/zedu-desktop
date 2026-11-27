@@ -63,17 +63,20 @@ class CreditsNotifier extends Notifier<CreditsState> {
       case Failure<CreditUsage>():
         error ??= usageResult.error.friendlyMessage;
     }
+    // The billing page does not show the usage report or the transaction
+    // history, so their failures keep the previous value and raise no error
+    // toast. The repository already logs them.
     switch (reportResult) {
       case Success<CreditUsageReport>():
         report = reportResult.value;
       case Failure<CreditUsageReport>():
-        error ??= reportResult.error.friendlyMessage;
+        break;
     }
     switch (transactionsResult) {
       case Success<List<CreditTransaction>>():
         transactions = transactionsResult.value;
       case Failure<List<CreditTransaction>>():
-        error ??= transactionsResult.error.friendlyMessage;
+        break;
     }
 
     state = state.copyWith(
