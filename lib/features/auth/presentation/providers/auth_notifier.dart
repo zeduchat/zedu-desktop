@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 import 'package:zedu/core/core.dart';
 import 'package:zedu/features/features.dart';
 
@@ -650,6 +652,20 @@ class AuthNotifier extends Notifier<AuthState> {
     }
   }
 
+  static String _newOAuthState() {
+    final random = Random.secure();
+    final bytes = List<int>.generate(32, (_) => random.nextInt(256));
+    return base64UrlEncode(bytes).replaceAll('=', '');
+  }
+
+  /// Whether [request] is Google's redirect for the attempt that sent
+  /// [expectedState]: a GET to the root path carrying the same state.
+  static bool _isGoogleCallback(HttpRequest request, String expectedState) {
+    return request.method == 'GET' &&
+        request.uri.path == '/' &&
+        request.uri.queryParameters['state'] == expectedState;
+  }
+
   Future<void> loginWithGoogle({bool rememberMe = true}) async {
     AppLogger.d('Google Sign-In attempt', tag: _tag);
     state = state.copyWith(isLoading: true, clearError: true);
@@ -673,8 +689,12 @@ class AuthNotifier extends Notifier<AuthState> {
       AppLogger.d('Local loopback server listening on port $port', tag: _tag);
 
       final redirectUri = 'http://127.0.0.1:$port'; // Desktop Loopback URI
+      // A fresh, unguessable state per attempt ties the browser callback to
+      // this attempt; any other request to the loopback port is ignored.
+      final oauthState = _newOAuthState();
       final authUrl = Uri.https('accounts.google.com', '/o/oauth2/v2/auth', {
         'client_id': config.googleClientId,
+        'state': oauthState,
         'response_type': 'code',
         'redirect_uri': redirectUri,
         'scope': 'openid profile email',
@@ -702,6 +722,11 @@ class AuthNotifier extends Notifier<AuthState> {
           sink.addError(TimeoutException('Google Sign-In redirect timed out'));
         },
       )) {
+        if (!_isGoogleCallback(request, oauthState)) {
+          request.response.statusCode = HttpStatus.notFound;
+          await request.response.close();
+          continue;
+        }
         final oauthError = request.uri.queryParameters['error'];
         grantCode = request.uri.queryParameters['code'];
         if (oauthError != null ||
@@ -712,16 +737,18 @@ class AuthNotifier extends Notifier<AuthState> {
               ? 'Google sign-in was cancelled.'
               : 'Google sign-in failed. Please try again.';
         }
+        // The backend has not checked the code yet, so the page must not
+        // claim success; the app reports the outcome.
         final title = callbackError == null
-            ? 'Authentication Successful'
+            ? 'Return to Zedu'
             : 'Authentication Unsuccessful';
         final heading = callbackError == null
-            ? 'Sign In Successful!'
+            ? 'Return to Zedu'
             : oauthError == 'access_denied'
             ? 'Sign In Cancelled'
             : 'Sign In Failed';
         final message = callbackError == null
-            ? 'You have successfully authenticated with Zedu. You can now close this tab and return to the application.'
+            ? 'You can close this tab and return to Zedu to finish signing in.'
             : '$callbackError You can close this tab and return to Zedu to try again.';
 
         // Render fixed messages rather than reflecting OAuth query values.
@@ -736,7 +763,7 @@ class AuthNotifier extends Notifier<AuthState> {
               <style>
                 body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; text-align: center; padding: 50px; background-color: #f9f9f9; }
                 .card { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); display: inline-block; max-width: 400px; }
-                h1 { color: ${callbackError == null ? '#4CAF50' : 'inherit'}; margin-top: 0; }
+                h1 { margin-top: 0; }
                 p { color: #666; font-size: 16px; }
               </style>
             </head>

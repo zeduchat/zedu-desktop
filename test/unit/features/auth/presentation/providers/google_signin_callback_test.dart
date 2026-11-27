@@ -71,7 +71,24 @@ void main() {
     await locator.reset();
   });
 
-  Future<String> callback(Map<String, String> query) async {
+  /// States and redirect URIs of each launched attempt, in order.
+  final launchedStates = <String>[];
+  late Uri lastRedirect;
+
+  Future<HttpClientResponse> send(String method, Uri uri) async {
+    final request = await client.openUrl(method, uri);
+    request.persistentConnection = false;
+    return request.close();
+  }
+
+  /// Runs one sign-in attempt. Each of [ignored] is sent first, as a method
+  /// and a URI built from the redirect URI and the attempt's state, and must
+  /// get a 404. Then the callback with [query] plus the matching state is
+  /// sent and its page is returned.
+  Future<String> callback(
+    Map<String, String> query, {
+    List<(String, Uri Function(Uri redirect, String state))> ignored = const [],
+  }) async {
     final browserResponse = Completer<String>();
     messenger.setMockMethodCallHandler(channel, (call) async {
       if (call.method != 'launch') {
@@ -79,14 +96,21 @@ void main() {
       }
       final authUrl = Uri.parse((call.arguments as Map)['url'] as String);
       final redirect = Uri.parse(authUrl.queryParameters['redirect_uri']!);
+      final state = authUrl.queryParameters['state']!;
+      launchedStates.add(state);
+      lastRedirect = redirect;
       // Return from launch before waiting for the notifier's HTTP response.
       unawaited(() async {
         try {
-          final request = await client.getUrl(
-            redirect.replace(queryParameters: query),
+          for (final (method, build) in ignored) {
+            final response = await send(method, build(redirect, state));
+            expect(response.statusCode, HttpStatus.notFound);
+            await response.drain<void>();
+          }
+          final response = await send(
+            'GET',
+            redirect.replace(queryParameters: {...query, 'state': state}),
           );
-          request.persistentConnection = false;
-          final response = await request.close();
           expect(response.statusCode, HttpStatus.ok);
           browserResponse.complete(await utf8.decoder.bind(response).join());
         } catch (error, stack) {
@@ -100,6 +124,13 @@ void main() {
       container.read(authNotifierProvider.notifier).loginWithGoogle(),
     ]);
     return results.first! as String;
+  }
+
+  Future<void> expectListenerClosed() async {
+    await expectLater(
+      send('GET', lastRedirect),
+      throwsA(isA<SocketException>()),
+    );
   }
 
   void expectNoExchange() {
@@ -127,6 +158,7 @@ void main() {
       'Google sign-in was cancelled.',
     );
     expectNoExchange();
+    await expectListenerClosed();
   });
 
   final invalidCallbacks = <String, Map<String, String>>{
@@ -191,7 +223,8 @@ void main() {
 
     final html = await callback({'code': 'valid-code'});
 
-    expect(html, contains('Sign In Successful!'));
+    expect(html, contains('Return to Zedu'));
+    expect(html, isNot(contains('Successful')));
     final state = container.read(authNotifierProvider);
     expect(state.status, AuthStatus.authenticated);
     expect(state.user, same(user));
@@ -204,5 +237,76 @@ void main() {
         redirectUri: 'http://127.0.0.1:8000',
       ),
     ).called(1);
+  });
+
+  test('each attempt sends a fresh, unguessable state', () async {
+    launchedStates.clear();
+    await callback({'error': 'access_denied'});
+    await callback({'error': 'access_denied'});
+
+    expect(launchedStates, hasLength(2));
+    expect(launchedStates.first, isNot(launchedStates.last));
+    for (final state in launchedStates) {
+      expect(state.length, greaterThanOrEqualTo(43));
+    }
+  });
+
+  test('unrelated and mismatched requests do not end the attempt', () async {
+    when(
+      () => repository.signInWithGoogle(
+        grantCode: any(named: 'grantCode'),
+        redirectUri: any(named: 'redirectUri'),
+      ),
+    ).thenAnswer((_) async => Failure(ApiFailure.unknown(Exception('x'))));
+
+    final html = await callback(
+      {'code': 'valid-code'},
+      ignored: [
+        (
+          'GET',
+          (redirect, state) => redirect.replace(
+            path: '/unrelated',
+            queryParameters: {'code': 'stray', 'state': state},
+          ),
+        ),
+        (
+          'GET',
+          (redirect, _) => redirect.replace(
+            queryParameters: {'code': 'stray', 'state': 'wrong'},
+          ),
+        ),
+        (
+          'GET',
+          (redirect, _) => redirect.replace(queryParameters: {'code': 'stray'}),
+        ),
+        (
+          'GET',
+          (redirect, _) => redirect.replace(
+            queryParameters: {'error': 'access_denied', 'state': 'wrong'},
+          ),
+        ),
+        (
+          'POST',
+          (redirect, state) => redirect.replace(
+            queryParameters: {'code': 'stray', 'state': state},
+          ),
+        ),
+      ],
+    );
+
+    expect(html, contains('Return to Zedu'));
+    verify(
+      () => repository.signInWithGoogle(
+        grantCode: 'valid-code',
+        redirectUri: any(named: 'redirectUri'),
+      ),
+    ).called(1);
+    verifyNever(
+      () => repository.signInWithGoogle(
+        grantCode: 'stray',
+        redirectUri: any(named: 'redirectUri'),
+      ),
+    );
+    await expectListenerClosed();
   });
 }
