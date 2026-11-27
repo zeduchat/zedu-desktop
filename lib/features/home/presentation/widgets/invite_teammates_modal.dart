@@ -189,253 +189,266 @@ class _InviteTeammatesModalState extends ConsumerState<InviteTeammatesModal> {
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       backgroundColor: colors.background,
-      child: Container(
+      // A smaller margin than the default 40px, so the dialog still fits a
+      // narrow window; its content scrolls when the window is short.
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      child: SizedBox(
         width: 480,
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Text(
-                    'Add people to #$channelName',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: colors.textPrimary,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                IconButton(
-                  icon: Icon(Icons.close, color: colors.textHint),
-                  tooltip: 'Close invitation dialog',
-                  onPressed: () => Navigator.pop(context),
-                  splashRadius: 20,
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'Send to',
-              style: TextStyle(
-                fontSize: 14,
-                color: colors.textPrimary,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Container(
-              decoration: BoxDecoration(
-                border: Border.all(
-                  color: colors.primary.withValues(alpha: 0.5),
-                ),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              child: Wrap(
-                spacing: 8,
-                runSpacing: 4,
-                crossAxisAlignment: WrapCrossAlignment.center,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  ..._invites.map(
-                    (invite) => Chip(
-                      label: Text(invite['email']!),
-                      labelStyle: TextStyle(
-                        fontSize: 13,
+                  Expanded(
+                    child: Text(
+                      'Add people to #$channelName',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
                         color: colors.textPrimary,
                       ),
-                      backgroundColor: colors.background,
-                      deleteIcon: const Icon(Icons.close, size: 16),
-                      onDeleted: () => _removeInvite(invite['email']!),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(4),
-                        side: BorderSide(color: colors.divider),
-                      ),
                     ),
                   ),
-                  IntrinsicWidth(
-                    child: TextField(
-                      controller: _emailController,
-                      decoration: InputDecoration(
-                        hintText: _invites.isEmpty ? 'Enter name or email' : '',
-                        hintStyle: TextStyle(
-                          color: colors.textHint.withValues(alpha: 0.7),
-                        ),
-                        border: InputBorder.none,
-                        isDense: true,
-                        contentPadding: const EdgeInsets.symmetric(vertical: 8),
-                      ),
-                      onChanged: (value) {
-                        if (_emailError != null) {
-                          setState(() => _emailError = null);
-                        }
-                        _onSearchChanged(value);
-                      },
-                      onSubmitted: (_) => _addEmailFromInput(),
-                      onEditingComplete: _addEmailFromInput,
-                    ),
+                  const SizedBox(width: 12),
+                  IconButton(
+                    icon: Icon(Icons.close, color: colors.textHint),
+                    tooltip: 'Close invitation dialog',
+                    onPressed: () => Navigator.pop(context),
+                    splashRadius: 20,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
                   ),
                 ],
               ),
-            ),
-            if (_emailError != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 6),
-                child: Text(
-                  _emailError!,
-                  style: TextStyle(color: colors.error, fontSize: 12),
+              const SizedBox(height: 24),
+              Text(
+                'Send to',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: colors.textPrimary,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
-            if (_filteredUsers.isNotEmpty)
+              const SizedBox(height: 8),
               Container(
-                margin: const EdgeInsets.only(top: 4),
-                constraints: const BoxConstraints(maxHeight: 150),
-                child: Material(
-                  color: colors.background,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(6),
-                    side: BorderSide(color: colors.divider),
+                decoration: BoxDecoration(
+                  border: Border.all(
+                    color: colors.primary.withValues(alpha: 0.5),
                   ),
-                  clipBehavior: Clip.antiAlias,
-                  child: ListView.builder(
-                    shrinkWrap: true,
-                    itemCount: _filteredUsers.length,
-                    itemBuilder: (context, index) {
-                      final user = _filteredUsers[index];
-                      final email = user.email;
-                      final name = user.name ?? email.split('@').first;
-                      final userId = user.id.isEmpty ? null : user.id;
-                      return ListTile(
-                        title: Text(
-                          name,
-                          style: TextStyle(
-                            color: colors.textPrimary,
-                            fontSize: 13,
-                          ),
-                        ),
-                        subtitle: Text(
-                          email,
-                          style: TextStyle(
-                            color: colors.textHint,
-                            fontSize: 11,
-                          ),
-                        ),
-                        onTap: () {
-                          if (email.isNotEmpty) _addInvite(email, userId);
-                        },
-                      );
-                    },
-                  ),
+                  borderRadius: BorderRadius.circular(6),
                 ),
-              ),
-            const SizedBox(height: 8),
-            Text(
-              'Search for people in your organisation and add them to #$channelName.',
-              style: TextStyle(fontSize: 12, color: colors.textHint),
-            ),
-            const SizedBox(height: 24),
-            Divider(color: colors.divider.withValues(alpha: 0.5)),
-            const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 4,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    IconButton(
-                      icon: Icon(Icons.link, color: colors.textPrimary),
-                      tooltip: 'Copy Invite Link',
-                      onPressed: () async {
-                        final notifier = ref.read(
-                          userProfileNotifierProvider.notifier,
-                        );
-                        final link = await notifier.generateInviteLink();
-                        if (link != null && context.mounted) {
-                          await Clipboard.setData(ClipboardData(text: link));
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: const Text(
-                                  'Invite link copied to clipboard!',
-                                ),
-                                backgroundColor: colors.success,
-                              ),
-                            );
-                          }
-                        } else if (context.mounted) {
-                          AppToastService.show(
-                            context,
-                            type: AppToastType.error,
-                            message: 'Failed to generate link',
-                          );
-                        }
-                      },
-                    ),
-                    TextButton(
-                      onPressed: _isLoading || _isAddingEveryone
-                          ? null
-                          : _addEveryone,
-                      style: TextButton.styleFrom(
-                        backgroundColor: colors.background,
-                        foregroundColor: colors.textPrimary,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 12,
+                    ..._invites.map(
+                      (invite) => Chip(
+                        label: Text(invite['email']!),
+                        labelStyle: TextStyle(
+                          fontSize: 13,
+                          color: colors.textPrimary,
                         ),
+                        backgroundColor: colors.background,
+                        deleteIcon: const Icon(Icons.close, size: 16),
+                        onDeleted: () => _removeInvite(invite['email']!),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(6),
+                          borderRadius: BorderRadius.circular(4),
+                          side: BorderSide(color: colors.divider),
                         ),
                       ),
-                      child: Text(
-                        _isAddingEveryone ? 'Adding…' : 'Add everyone',
-                        style: const TextStyle(fontWeight: FontWeight.w500),
+                    ),
+                    IntrinsicWidth(
+                      child: TextField(
+                        controller: _emailController,
+                        decoration: InputDecoration(
+                          hintText: _invites.isEmpty
+                              ? 'Enter name or email'
+                              : '',
+                          hintStyle: TextStyle(
+                            color: colors.textHint.withValues(alpha: 0.7),
+                          ),
+                          border: InputBorder.none,
+                          isDense: true,
+                          contentPadding: const EdgeInsets.symmetric(
+                            vertical: 8,
+                          ),
+                        ),
+                        onChanged: (value) {
+                          if (_emailError != null) {
+                            setState(() => _emailError = null);
+                          }
+                          _onSearchChanged(value);
+                        },
+                        onSubmitted: (_) => _addEmailFromInput(),
+                        onEditingComplete: _addEmailFromInput,
                       ),
                     ),
                   ],
                 ),
-                ElevatedButton(
-                  onPressed: _isLoading ? null : _submit,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: colors.primary,
-                    foregroundColor: colors.onPrimary,
-                    disabledBackgroundColor: colors.primary.withValues(
-                      alpha: 0.5,
-                    ),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 24,
-                      vertical: 12,
-                    ),
+              ),
+              if (_emailError != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Text(
+                    _emailError!,
+                    style: TextStyle(color: colors.error, fontSize: 12),
+                  ),
+                ),
+              if (_filteredUsers.isNotEmpty)
+                Container(
+                  margin: const EdgeInsets.only(top: 4),
+                  constraints: const BoxConstraints(maxHeight: 150),
+                  child: Material(
+                    color: colors.background,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(6),
+                      side: BorderSide(color: colors.divider),
                     ),
-                    elevation: 0,
-                  ),
-                  child: _isLoading
-                      ? SizedBox(
-                          height: 16,
-                          width: 16,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                              colors.onPrimary,
+                    clipBehavior: Clip.antiAlias,
+                    child: ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: _filteredUsers.length,
+                      itemBuilder: (context, index) {
+                        final user = _filteredUsers[index];
+                        final email = user.email;
+                        final name = user.name ?? email.split('@').first;
+                        final userId = user.id.isEmpty ? null : user.id;
+                        return ListTile(
+                          title: Text(
+                            name,
+                            style: TextStyle(
+                              color: colors.textPrimary,
+                              fontSize: 13,
                             ),
                           ),
-                        )
-                      : const Text(
-                          'Add',
-                          style: TextStyle(fontWeight: FontWeight.w600),
-                        ),
+                          subtitle: Text(
+                            email,
+                            style: TextStyle(
+                              color: colors.textHint,
+                              fontSize: 11,
+                            ),
+                          ),
+                          onTap: () {
+                            if (email.isNotEmpty) _addInvite(email, userId);
+                          },
+                        );
+                      },
+                    ),
+                  ),
                 ),
-              ],
-            ),
-          ],
+              const SizedBox(height: 8),
+              Text(
+                'Search for people in your organisation and add them to #$channelName.',
+                style: TextStyle(fontSize: 12, color: colors.textHint),
+              ),
+              const SizedBox(height: 24),
+              Divider(color: colors.divider.withValues(alpha: 0.5)),
+              const SizedBox(height: 16),
+              // Stacks the actions when they don't fit side by side.
+              OverflowBar(
+                alignment: MainAxisAlignment.spaceBetween,
+                overflowSpacing: 8,
+                overflowAlignment: OverflowBarAlignment.end,
+                children: [
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: Icon(Icons.link, color: colors.textPrimary),
+                        tooltip: 'Copy Invite Link',
+                        onPressed: () async {
+                          final notifier = ref.read(
+                            userProfileNotifierProvider.notifier,
+                          );
+                          final link = await notifier.generateInviteLink();
+                          if (link != null && context.mounted) {
+                            await Clipboard.setData(ClipboardData(text: link));
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: const Text(
+                                    'Invite link copied to clipboard!',
+                                  ),
+                                  backgroundColor: colors.success,
+                                ),
+                              );
+                            }
+                          } else if (context.mounted) {
+                            AppToastService.show(
+                              context,
+                              type: AppToastType.error,
+                              message: 'Failed to generate link',
+                            );
+                          }
+                        },
+                      ),
+                      TextButton(
+                        onPressed: _isLoading || _isAddingEveryone
+                            ? null
+                            : _addEveryone,
+                        style: TextButton.styleFrom(
+                          backgroundColor: colors.background,
+                          foregroundColor: colors.textPrimary,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                        ),
+                        child: Text(
+                          _isAddingEveryone ? 'Adding…' : 'Add everyone',
+                          style: const TextStyle(fontWeight: FontWeight.w500),
+                        ),
+                      ),
+                    ],
+                  ),
+                  ElevatedButton(
+                    onPressed: _isLoading ? null : _submit,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: colors.primary,
+                      foregroundColor: colors.onPrimary,
+                      disabledBackgroundColor: colors.primary.withValues(
+                        alpha: 0.5,
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 12,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      elevation: 0,
+                    ),
+                    child: _isLoading
+                        ? SizedBox(
+                            height: 16,
+                            width: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                colors.onPrimary,
+                              ),
+                            ),
+                          )
+                        : const Text(
+                            'Add',
+                            style: TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );

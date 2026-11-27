@@ -78,6 +78,9 @@ class _CreateChannelModalState extends ConsumerState<CreateChannelModal> {
     return Dialog(
       backgroundColor: colors.background,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      // A smaller margin than the default 40px, so the dialog still fits a
+      // narrow window; its content scrolls when the window is short.
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       child: SizedBox(
         width: 400,
         child: ListView(
@@ -214,8 +217,11 @@ class _CreateChannelModalState extends ConsumerState<CreateChannelModal> {
               ),
             ],
             const SizedBox(height: 32),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
+            OverflowBar(
+              alignment: MainAxisAlignment.end,
+              spacing: 16,
+              overflowSpacing: 8,
+              overflowAlignment: OverflowBarAlignment.end,
               children: [
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(),
@@ -226,7 +232,6 @@ class _CreateChannelModalState extends ConsumerState<CreateChannelModal> {
                     ),
                   ),
                 ),
-                const SizedBox(width: 16),
                 ElevatedButton(
                   onPressed: isLoading ? null : _createChannel,
                   style: ElevatedButton.styleFrom(

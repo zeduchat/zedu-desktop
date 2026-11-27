@@ -37,8 +37,11 @@ void main() {
   group('CreateChannelModal', () {
     late _FakeChannelNotifier notifier;
 
-    Future<void> openModal(WidgetTester tester) async {
-      tester.view.physicalSize = const Size(1200, 1400);
+    Future<void> openModal(
+      WidgetTester tester, {
+      Size size = const Size(1200, 1400),
+    }) async {
+      tester.view.physicalSize = size;
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
@@ -71,6 +74,39 @@ void main() {
       await tester.tap(find.text('Create'));
       await tester.pumpAndSettle();
     }
+
+    testWidgets('fits a 360x640 window and scrolls to Create (Ziki #696)', (
+      tester,
+    ) async {
+      await openModal(tester, size: const Size(360, 640));
+
+      expect(tester.takeException(), isNull);
+      // The list builds lazily, so scroll the button in, then fully on screen.
+      await tester.scrollUntilVisible(
+        find.text('Create'),
+        50,
+        scrollable: find
+            .descendant(
+              of: find.byType(CreateChannelModal),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
+      await tester.ensureVisible(find.text('Create'));
+      await tester.pumpAndSettle();
+      expect(find.text('Create').hitTestable(), findsOneWidget);
+    });
+
+    testWidgets('keeps its 400px width on a wide window (Ziki #696)', (
+      tester,
+    ) async {
+      await openModal(tester);
+
+      final surface = find
+          .descendant(of: find.byType(Dialog), matching: find.byType(Material))
+          .first;
+      expect(tester.getSize(surface).width, 400);
+    });
 
     testWidgets('the channel name field is focused when the modal opens', (
       tester,
