@@ -26,7 +26,7 @@ class ProfileSettingsShell extends ConsumerWidget {
     }
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: context.colors.background,
       body: SafeArea(
         child: Column(
           children: [
