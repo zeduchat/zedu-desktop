@@ -32,8 +32,21 @@ Widget _composer({bool isChannel = false}) {
 }
 
 void main() {
-  TextEditingController controllerOf(WidgetTester tester) =>
-      tester.widget<EditableText>(find.byType(EditableText)).controller;
+  // The composer's field, not the emoji picker's search field.
+  TextEditingController controllerOf(WidgetTester tester) {
+    final pickerFields = tester
+        .widgetList<EditableText>(
+          find.descendant(
+            of: find.byType(DmEmojiPicker),
+            matching: find.byType(EditableText),
+          ),
+        )
+        .toSet();
+    return tester
+        .widgetList<EditableText>(find.byType(EditableText))
+        .firstWhere((field) => !pickerFields.contains(field))
+        .controller;
+  }
 
   Future<void> showComposer(
     WidgetTester tester, {
