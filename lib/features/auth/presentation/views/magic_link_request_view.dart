@@ -2,7 +2,11 @@ import 'package:zedu/core/core.dart';
 import 'package:zedu/features/features.dart';
 
 class MagicLinkRequestView extends ConsumerStatefulWidget {
-  const MagicLinkRequestView({super.key});
+  const MagicLinkRequestView({super.key, this.rememberMe = true});
+
+  /// The login form's Remember-me choice, applied to the session the link
+  /// opens.
+  final bool rememberMe;
 
   @override
   ConsumerState<MagicLinkRequestView> createState() =>
@@ -32,7 +36,7 @@ class _MagicLinkRequestViewState extends ConsumerState<MagicLinkRequestView> {
     final email = _emailController.text.trim();
     final success = await ref
         .read(magicLinkNotifierProvider.notifier)
-        .send(email);
+        .send(email, rememberMe: widget.rememberMe);
     if (!mounted) return;
 
     if (success) {
