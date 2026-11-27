@@ -179,7 +179,7 @@ class _Table extends StatelessWidget {
             ),
             for (var r = 0; r < rowCount; r++)
               Material(
-                color: colors.onPrimary,
+                color: colors.background,
                 child: InkWell(
                   onTap: onTapRow == null ? null : () => onTapRow!(r),
                   child: DecoratedBox(
@@ -567,7 +567,7 @@ class _FileActionsMenu extends StatelessWidget {
     return PopupMenuButton<_FileAction>(
       tooltip: 'More actions for $fileName',
       position: PopupMenuPosition.under,
-      color: colors.onPrimary,
+      color: colors.background,
       padding: EdgeInsets.zero,
       iconSize: 20,
       constraints: const BoxConstraints(minWidth: 160),

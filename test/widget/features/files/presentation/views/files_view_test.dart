@@ -329,6 +329,7 @@ Future<void> _pump(
   WidgetTester tester,
   _FakeFilesRepository repository, {
   String? savePath = '/Users/ada/Downloads/logo.png',
+  ThemeData? theme,
 }) async {
   tester.view.physicalSize = const Size(1600, 1000);
   tester.view.devicePixelRatio = 1;
@@ -346,12 +347,15 @@ Future<void> _pump(
         saveLocationPickerProvider.overrideWithValue((_) async => savePath),
       ],
       child: buildTestMaterialApp(
-        const Scaffold(
-          body: Row(
-            children: [
-              FilesSidebar(),
-              Expanded(child: FilesView()),
-            ],
+        Theme(
+          data: theme ?? AppTheme.light,
+          child: const Scaffold(
+            body: Row(
+              children: [
+                FilesSidebar(),
+                Expanded(child: FilesView()),
+              ],
+            ),
           ),
         ),
       ),
@@ -380,6 +384,34 @@ void main() {
     expect(find.text('1 item'), findsOneWidget);
     expect(repository.folderRequests.last, (FilesScope.all, null));
   });
+
+  for (final (name, theme, palette) in [
+    ('light', AppTheme.light, AppPalette.light),
+    ('dark', AppTheme.dark, AppPalette.dark),
+  ]) {
+    testWidgets('the page and its rows use the $name background', (
+      tester,
+    ) async {
+      await _pump(tester, _FakeFilesRepository(), theme: theme);
+
+      final page = tester.widget<Container>(
+        find
+            .descendant(
+              of: find.byType(FilesView),
+              matching: find.byType(Container),
+            )
+            .first,
+      );
+      expect(page.color, palette.background);
+
+      final folderName = find.text('docs');
+      final row = tester.widget<Material>(
+        find.ancestor(of: folderName, matching: find.byType(Material)).first,
+      );
+      expect(row.color, palette.background);
+      expect(tester.widget<Text>(folderName).style?.color, isNot(row.color));
+    });
+  }
 
   testWidgets('labels the folder item count column Items', (tester) async {
     await _pump(tester, _FakeFilesRepository());

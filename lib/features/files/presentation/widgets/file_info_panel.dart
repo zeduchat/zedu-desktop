@@ -79,7 +79,7 @@ class FileInfoPanel extends ConsumerWidget {
     };
 
     return Material(
-      color: colors.onPrimary,
+      color: colors.background,
       elevation: 8,
       child: SizedBox(
         width: width,
