@@ -649,13 +649,45 @@ class UserProfileNotifier extends Notifier<UserProfileState> {
       clearError: true,
       clearSuccess: true,
     );
-    final result = await _repository.updateMember(member);
+    var orgId = ref.read(workspaceProvider).selectedWorkspace?.id;
+    if (locator<AppConfig>().usesMockData &&
+        (orgId == null || orgId.length < 36)) {
+      orgId = '019700db-4e22-7f90-a20e-f9116291ef24';
+    }
+    if (orgId == null) {
+      state = state.copyWith(
+        isSaving: false,
+        error: 'No active workspace selected to update members.',
+      );
+      return;
+    }
+
+    // `member.role` is the role name picked in the dialog; the backend needs
+    // the role id, resolved the same way as for invites.
+    final roleName = member.role.trim();
+    final roles = await _fetchOrganisationRoles(orgId);
+    final roleId = _resolveRoleId(roles, roleName);
+    if (roleId == null) {
+      state = state.copyWith(
+        isSaving: false,
+        error:
+            'Could not assign the selected role. Refresh roles and try again.',
+      );
+      return;
+    }
+
+    final result = await _repository.updateMember(
+      member,
+      roleId: roleId,
+      orgId: orgId,
+    );
     switch (result) {
       case Success<TeamMember>():
+        final updated = result.value.copyWith(role: roleName);
         state = state.copyWith(
           teamMembers: [
             for (final current in state.teamMembers)
-              current.id == result.value.id ? result.value : current,
+              current.id == updated.id ? updated : current,
           ],
           isSaving: false,
           successMessage: 'Team member updated successfully.',

@@ -38,7 +38,13 @@ abstract interface class UserProfileRemoteDataSource {
     required String role,
     required String orgId,
   });
-  Future<TeamMemberModel> updateMember(TeamMember member);
+
+  /// Gives [member] the organisation role [roleId] in organisation [orgId].
+  Future<TeamMemberModel> updateMember(
+    TeamMember member, {
+    required String roleId,
+    required String orgId,
+  });
   Future<void> removeMember(String memberId);
   Future<List<RolePermissionModel>> getRolesAndPermissions({String? orgId});
   Future<BillingInfoModel> getBillingInfo();
@@ -540,25 +546,28 @@ class UserProfileRemoteDataSourceImpl implements UserProfileRemoteDataSource {
   }
 
   @override
-  Future<TeamMemberModel> updateMember(TeamMember member) async {
-    if (_config.usesMockData) {
-      return TeamMemberModel(
-        id: member.id,
-        email: member.email,
-        role: member.role,
-        dateJoined: member.dateJoined,
-        status: member.status,
-        name: member.name,
-        avatarUrl: member.avatarUrl,
-      );
-    }
-    final response = await _apiBaseService.patch<Map<String, dynamic>>(
-      path: '/profile/organization/members/${member.id}',
-      data: {'email': member.email, 'role': member.role},
+  Future<TeamMemberModel> updateMember(
+    TeamMember member, {
+    required String roleId,
+    required String orgId,
+  }) async {
+    final updated = TeamMemberModel(
+      id: member.id,
+      email: member.email,
+      role: member.role,
+      dateJoined: member.dateJoined,
+      status: member.status,
+      name: member.name,
+      avatarUrl: member.avatarUrl,
     );
-    return TeamMemberModel.fromJson(
-      response.data['data'] as Map<String, dynamic>,
+    if (_config.usesMockData) return updated;
+    // zedu-be: PATCH /organisations/:org_id/users/:user_id/role with
+    // UpdateMemberRoleRequest {role_id}. The response carries no member data.
+    await _apiBaseService.patch<Map<String, dynamic>>(
+      path: '/organisations/$orgId/users/${member.id}/role',
+      data: {'role_id': roleId},
     );
+    return updated;
   }
 
   @override

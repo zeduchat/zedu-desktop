@@ -516,13 +516,24 @@ Future<void> showInviteMemberDialog(
   emailCtrl.dispose();
 }
 
-/// Dialog for editing a team member's role.
+/// The roles offered when the organisation's roles have not loaded.
+const List<String> _kDefaultMemberRoles = ['Administrator', 'Manager', 'User'];
+
+/// Dialog for editing a team member's role. [roles] are the organisation's
+/// role names; the member's current role is always offered, even when it is
+/// not one of them, so the dropdown never starts on a missing value.
 Future<void> showEditMemberDialog(
   BuildContext context,
   TeamMember member,
-  ValueChanged<TeamMember> onUpdate,
-) async {
+  ValueChanged<TeamMember> onUpdate, {
+  List<String> roles = const [],
+}) async {
   String role = member.role;
+  final options = <String>{
+    if (member.role.trim().isNotEmpty) member.role,
+    for (final name in roles.isEmpty ? _kDefaultMemberRoles : roles)
+      if (name.trim().isNotEmpty) name,
+  }.toList();
 
   await showDialog<void>(
     context: context,
@@ -551,7 +562,7 @@ Future<void> showEditMemberDialog(
               ProfileFieldLabel('Role'),
               const SizedBox(height: 6),
               DropdownButtonFormField<String>(
-                initialValue: role,
+                initialValue: options.contains(role) ? role : null,
                 decoration: InputDecoration(
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(6),
@@ -561,13 +572,9 @@ Future<void> showEditMemberDialog(
                     vertical: 14,
                   ),
                 ),
-                items: const [
-                  DropdownMenuItem(
-                    value: 'Administrator',
-                    child: Text('Administrator'),
-                  ),
-                  DropdownMenuItem(value: 'Manager', child: Text('Manager')),
-                  DropdownMenuItem(value: 'User', child: Text('User')),
+                items: [
+                  for (final name in options)
+                    DropdownMenuItem(value: name, child: Text(name)),
                 ],
                 onChanged: (v) => setDialogState(() => role = v ?? member.role),
               ),

@@ -19,6 +19,7 @@ class UserManagementSection extends StatefulWidget {
     required this.onUpdate,
     required this.onRemove,
     this.invites,
+    this.roles = const [],
   });
 
   final List<TeamMember> members;
@@ -28,6 +29,9 @@ class UserManagementSection extends StatefulWidget {
   final ValueChanged<TeamMember> onUpdate;
   final ValueChanged<String> onRemove;
   final List<TeamMember>? invites;
+
+  /// The organisation's role names, offered when editing a member.
+  final List<String> roles;
 
   @override
   State<UserManagementSection> createState() => _UserManagementSectionState();
@@ -625,7 +629,7 @@ class _UserManagementSectionState extends State<UserManagementSection> {
     BuildContext context,
     TeamMember member,
     ValueChanged<TeamMember> onUpdate,
-  ) => showEditMemberDialog(context, member, onUpdate);
+  ) => showEditMemberDialog(context, member, onUpdate, roles: widget.roles);
 
   Future<void> _confirmRemove(
     BuildContext context,
