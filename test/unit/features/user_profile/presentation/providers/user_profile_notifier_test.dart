@@ -19,6 +19,17 @@ class _FakeWorkspaceNotifier extends WorkspaceNotifier {
   );
 }
 
+/// Counts refreshes of the signed-in user.
+class _RefreshCountingAuthNotifier extends AuthNotifier {
+  int refreshes = 0;
+
+  @override
+  AuthState build() => const AuthState(status: AuthStatus.authenticated);
+
+  @override
+  Future<void> refreshCurrentUser() async => refreshes++;
+}
+
 /// Builds an [ApiBaseService] whose Dio is intercepted to reply with the
 /// canned roles payload so the notifier's role lookup can be verified
 /// end-to-end without a real network. Outgoing requests are captured too.
@@ -115,6 +126,53 @@ void main() {
         expect(shown.phoneNumber, '+2348012345678');
         expect(shown.name, placeholder.name);
         expect(shown.email, placeholder.email);
+      });
+    });
+
+    test('a saved profile refreshes the signed-in user app-wide', () {
+      return ignoringProfileLoadError(() async {
+        final auth = _RefreshCountingAuthNotifier();
+        final container = ProviderContainer(
+          overrides: [
+            userProfileRepositoryProvider.overrideWithValue(repository),
+            authNotifierProvider.overrideWith(() => auth),
+          ],
+        );
+        addTearDown(container.dispose);
+        container.read(authNotifierProvider);
+        final notifier = container.read(userProfileNotifierProvider.notifier);
+
+        await notifier.updateAccount(
+          ProfileAccount.empty().copyWith(username: 'new-name'),
+        );
+
+        expect(auth.refreshes, 1);
+      });
+    });
+
+    test('a failed save does not refresh the signed-in user', () {
+      return ignoringProfileLoadError(() async {
+        when(() => repository.updateAccount(any())).thenAnswer(
+          (_) async => const Failure<ProfileAccount>(
+            ApiFailure(message: 'Taken', kind: ApiFailureKind.client),
+          ),
+        );
+        final auth = _RefreshCountingAuthNotifier();
+        final container = ProviderContainer(
+          overrides: [
+            userProfileRepositoryProvider.overrideWithValue(repository),
+            authNotifierProvider.overrideWith(() => auth),
+          ],
+        );
+        addTearDown(container.dispose);
+        container.read(authNotifierProvider);
+        final notifier = container.read(userProfileNotifierProvider.notifier);
+
+        await notifier.updateAccount(
+          ProfileAccount.empty().copyWith(username: 'new-name'),
+        );
+
+        expect(auth.refreshes, 0);
       });
     });
 

@@ -59,6 +59,11 @@ class UserProfileNotifier extends Notifier<UserProfileState> {
           isSaving: false,
           successMessage: 'Account information saved successfully.',
         );
+        // The rest of the app (sidebar, avatar menu, top bar) shows the
+        // signed-in user from auth, so fetch the saved profile there too.
+        if (ref.exists(authNotifierProvider)) {
+          await ref.read(authNotifierProvider.notifier).refreshCurrentUser();
+        }
       case Failure<ProfileAccount>():
         state = state.copyWith(
           isSaving: false,
