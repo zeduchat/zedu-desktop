@@ -489,6 +489,29 @@ void main() {
     });
   });
 
+  group('renameFolder', () {
+    test('sends the new name as folder_name (#2719)', () async {
+      when(
+        () => api.put<dynamic>(
+          path: any(named: 'path'),
+          data: any(named: 'data'),
+        ),
+      ).thenAnswer(
+        (_) async =>
+            const ApiResponseModel<dynamic>(statusCode: 200, data: null),
+      );
+
+      await datasource.renameFolder('folder-1', 'Reports');
+
+      verify(
+        () => api.put<dynamic>(
+          path: '/files/folders/folder-1',
+          data: {'folder_name': 'Reports'},
+        ),
+      ).called(1);
+    });
+  });
+
   group('moveFile', () {
     test('sends the target folder', () async {
       when(

@@ -230,6 +230,7 @@ class _FoldersSection extends ConsumerWidget {
               folders: page.folders,
               ownerNameOf: ownerName,
               onOpen: notifier.openFolder,
+              onRename: (folder) => _renameFolder(context, folder),
               onDelete: (folder) => _deleteFolder(context, ref, folder),
             ),
             if (page.totalPages > 1)
@@ -539,6 +540,17 @@ Future<void> _newFolder(BuildContext context) async {
       context,
     ).showSnackBar(const SnackBar(content: Text('Folder created')));
   }
+}
+
+Future<void> _renameFolder(BuildContext context, FileFolder folder) async {
+  final overlay = Overlay.of(context, rootOverlay: true);
+  final newName = await RenameFolderDialog.show(context, folder: folder);
+  if (newName == null || !overlay.mounted) return;
+  AppToastService.showWith(
+    overlay,
+    type: AppToastType.success,
+    message: 'Renamed ${folder.name} to $newName.',
+  );
 }
 
 Future<void> _deleteFolder(

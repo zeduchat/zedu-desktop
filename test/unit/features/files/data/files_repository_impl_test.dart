@@ -207,6 +207,34 @@ void main() {
     });
   });
 
+  group('renameFolder (#2719)', () {
+    test('passes the request on and succeeds', () async {
+      when(
+        () => remote.renameFolder('folder-1', 'Reports'),
+      ).thenAnswer((_) async {});
+
+      expect(
+        await repository.renameFolder('folder-1', 'Reports'),
+        isA<Success<void>>(),
+      );
+    });
+
+    test('returns the failure when the server refuses', () async {
+      when(() => remote.renameFolder('folder-1', 'Reports')).thenThrow(
+        const ApiFailure(message: 'Name taken', kind: ApiFailureKind.client),
+      );
+
+      expect(
+        await repository.renameFolder('folder-1', 'Reports'),
+        isA<Failure<void>>().having(
+          (f) => f.error.message,
+          'message',
+          'Name taken',
+        ),
+      );
+    });
+  });
+
   group('moveFile', () {
     test('passes the request on and succeeds', () async {
       when(() => remote.moveFile('f-1', 'docs')).thenAnswer((_) async {});

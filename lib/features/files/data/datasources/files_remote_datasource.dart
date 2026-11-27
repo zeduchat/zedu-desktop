@@ -71,6 +71,9 @@ abstract class FilesRemoteDataSource {
   Future<void> unpinFile(String fileId);
 
   Future<void> deleteFolder(String id);
+
+  /// Renames folder [id] to [name], with `PUT /files/folders/{id}`.
+  Future<void> renameFolder(String id, String name);
 }
 
 /// Reads `current_page` and `total_pages_count` (or `total_pages`).
@@ -424,6 +427,15 @@ class FilesRemoteDataSourceImpl implements FilesRemoteDataSource {
     if (config.usesMockData) throw _mockBuildFailure;
     await apiBaseService.delete<Map<String, dynamic>>(
       path: '/files/folders/$id',
+    );
+  }
+
+  @override
+  Future<void> renameFolder(String id, String name) async {
+    if (config.usesMockData) throw _mockBuildFailure;
+    await apiBaseService.put<dynamic>(
+      path: '/files/folders/$id',
+      data: {'folder_name': name},
     );
   }
 }

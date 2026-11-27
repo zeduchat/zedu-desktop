@@ -3,7 +3,7 @@ import 'package:zedu/features/features.dart';
 
 /// "Rename file": edits a file's name, then saves it. Keeping the same name
 /// just closes the dialog. A failure keeps it open with the reason.
-class RenameFileDialog extends ConsumerStatefulWidget {
+class RenameFileDialog extends ConsumerWidget {
   const RenameFileDialog({super.key, required this.file});
 
   final WorkspaceFile file;
@@ -18,23 +18,96 @@ class RenameFileDialog extends ConsumerStatefulWidget {
   );
 
   @override
-  ConsumerState<RenameFileDialog> createState() => _RenameFileDialogState();
+  Widget build(BuildContext context, WidgetRef ref) {
+    final name = file.name;
+    // Select the name without its extension, so typing keeps `.pdf`.
+    final dot = name.lastIndexOf('.');
+    return _RenameDialog(
+      title: 'Rename file',
+      label: 'File name',
+      emptyError: 'Enter a file name.',
+      connectionError: 'Failed to rename file. Please check your connection.',
+      name: name,
+      selectionEnd: dot > 0 ? dot : name.length,
+      isRenaming: ref.watch(
+        fileRenamesProvider.select((ids) => ids.contains(file.id)),
+      ),
+      rename: (newName) =>
+          ref.read(fileRenamesProvider.notifier).rename(file, newName),
+    );
+  }
 }
 
-class _RenameFileDialogState extends ConsumerState<RenameFileDialog> {
+/// "Rename folder": edits a folder's name, then saves it, like
+/// [RenameFileDialog] (Ziki #2719).
+class RenameFolderDialog extends ConsumerWidget {
+  const RenameFolderDialog({super.key, required this.folder});
+
+  final FileFolder folder;
+
+  /// Shows the dialog. Returns the new name when the folder was renamed.
+  static Future<String?> show(
+    BuildContext context, {
+    required FileFolder folder,
+  }) => showDialog<String>(
+    context: context,
+    builder: (_) => RenameFolderDialog(folder: folder),
+  );
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) => _RenameDialog(
+    title: 'Rename folder',
+    label: 'Folder name',
+    emptyError: 'Enter a folder name.',
+    connectionError: 'Failed to rename folder. Please check your connection.',
+    name: folder.name,
+    selectionEnd: folder.name.length,
+    isRenaming: ref.watch(
+      folderRenamesProvider.select((ids) => ids.contains(folder.id)),
+    ),
+    rename: (newName) =>
+        ref.read(folderRenamesProvider.notifier).rename(folder, newName),
+  );
+}
+
+/// The name field and buttons the rename dialogs share. [rename] returns
+/// what to tell the person when it failed, or null.
+class _RenameDialog extends StatefulWidget {
+  const _RenameDialog({
+    required this.title,
+    required this.label,
+    required this.emptyError,
+    required this.connectionError,
+    required this.name,
+    required this.selectionEnd,
+    required this.isRenaming,
+    required this.rename,
+  });
+
+  final String title;
+  final String label;
+  final String emptyError;
+  final String connectionError;
+  final String name;
+  final int selectionEnd;
+  final bool isRenaming;
+  final Future<String?> Function(String name) rename;
+
+  @override
+  State<_RenameDialog> createState() => _RenameDialogState();
+}
+
+class _RenameDialogState extends State<_RenameDialog> {
   late final TextEditingController _controller;
   String? _error;
 
   @override
   void initState() {
     super.initState();
-    final name = widget.file.name;
-    // Select the name without its extension, so typing keeps `.pdf`.
-    final dot = name.lastIndexOf('.');
-    _controller = TextEditingController(text: name)
+    _controller = TextEditingController(text: widget.name)
       ..selection = TextSelection(
         baseOffset: 0,
-        extentOffset: dot > 0 ? dot : name.length,
+        extentOffset: widget.selectionEnd,
       );
   }
 
@@ -47,17 +120,15 @@ class _RenameFileDialogState extends ConsumerState<RenameFileDialog> {
   Future<void> _rename() async {
     final name = _controller.text.trim();
     if (name.isEmpty) {
-      setState(() => _error = 'Enter a file name.');
+      setState(() => _error = widget.emptyError);
       return;
     }
-    if (name == widget.file.name) {
+    if (name == widget.name) {
       Navigator.of(context).pop();
       return;
     }
     try {
-      final error = await ref
-          .read(fileRenamesProvider.notifier)
-          .rename(widget.file, name);
+      final error = await widget.rename(name);
       if (!mounted) return;
       if (error == null) {
         Navigator.of(context).pop(name);
@@ -66,18 +137,14 @@ class _RenameFileDialogState extends ConsumerState<RenameFileDialog> {
       }
     } catch (e) {
       if (!mounted) return;
-      setState(
-        () => _error = 'Failed to rename file. Please check your connection.',
-      );
+      setState(() => _error = widget.connectionError);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    final isRenaming = ref.watch(
-      fileRenamesProvider.select((ids) => ids.contains(widget.file.id)),
-    );
+    final isRenaming = widget.isRenaming;
     OutlineInputBorder border(Color color) => OutlineInputBorder(
       borderRadius: BorderRadius.circular(6),
       borderSide: BorderSide(color: color),
@@ -95,7 +162,7 @@ class _RenameFileDialogState extends ConsumerState<RenameFileDialog> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                'Rename file',
+                widget.title,
                 style: context.textTheme.titleMedium?.copyWith(
                   fontSize: 18,
                   fontWeight: FontWeight.w700,
@@ -117,7 +184,7 @@ class _RenameFileDialogState extends ConsumerState<RenameFileDialog> {
                   color: colors.textPrimary,
                 ),
                 decoration: InputDecoration(
-                  labelText: 'File name',
+                  labelText: widget.label,
                   counterText: '',
                   errorText: _error,
                   errorMaxLines: 3,
