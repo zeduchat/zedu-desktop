@@ -1531,7 +1531,7 @@ class DmMessageComposerState extends ConsumerState<DmMessageComposer> {
                                   'Message ${widget.recipientName} · '
                                       'Enter to send, Shift+Enter for a new line',
                         hintStyle: TextStyle(
-                          color: colors.textHint.withValues(alpha: 0.75),
+                          color: colors.textHint,
                           fontSize: 12,
                         ),
                         border: InputBorder.none,
