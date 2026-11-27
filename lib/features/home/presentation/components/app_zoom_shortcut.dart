@@ -1,8 +1,9 @@
 import 'package:zedu/core/core.dart';
 import 'package:zedu/features/features.dart';
 
-/// Ctrl/Cmd + and - zoom the app text, Ctrl/Cmd 0 resets it. The zoom level
-/// is applied as a text scale to everything below.
+/// Ctrl/Cmd + and - zoom the app text, Ctrl/Cmd 0 resets it. + works as `=`,
+/// Shift+`=`, a dedicated `+` key or numpad +. The zoom level is applied as a
+/// text scale to everything below.
 class AppZoomShortcut extends ConsumerWidget {
   final Widget child;
 
@@ -19,9 +20,19 @@ class AppZoomShortcut extends ConsumerWidget {
         for (final key in [
           LogicalKeyboardKey.equal,
           LogicalKeyboardKey.numpadAdd,
+          LogicalKeyboardKey.add,
         ]) ...{
           SingleActivator(key, control: true): notifier.zoomIn,
           SingleActivator(key, meta: true): notifier.zoomIn,
+        },
+        // `+` is Shift+= on US/UK keyboards, and a dedicated `+` key may be
+        // pressed with Shift too.
+        for (final key in [
+          LogicalKeyboardKey.equal,
+          LogicalKeyboardKey.add,
+        ]) ...{
+          SingleActivator(key, control: true, shift: true): notifier.zoomIn,
+          SingleActivator(key, meta: true, shift: true): notifier.zoomIn,
         },
         for (final key in [
           LogicalKeyboardKey.minus,
