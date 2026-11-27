@@ -240,11 +240,19 @@ class _ChatAreaSwitcher extends ConsumerWidget {
   }
 }
 
-class _MainSidebar extends ConsumerWidget {
+class _MainSidebar extends ConsumerStatefulWidget {
   const _MainSidebar();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_MainSidebar> createState() => _MainSidebarState();
+}
+
+class _MainSidebarState extends ConsumerState<_MainSidebar> {
+  // The Channels header collapses and expands the channel section.
+  bool _channelsExpanded = true;
+
+  @override
+  Widget build(BuildContext context) {
     final colors = context.colors;
 
     return Container(
@@ -259,75 +267,89 @@ class _MainSidebar extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.arrow_drop_down,
-                          color: colors.onPrimary,
-                          size: 20,
+                  Semantics(
+                    button: true,
+                    expanded: _channelsExpanded,
+                    child: InkWell(
+                      key: const Key('home-channels-section-toggle'),
+                      onTap: () => setState(
+                        () => _channelsExpanded = !_channelsExpanded,
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
+                        child: Row(
+                          children: [
+                            Icon(
+                              _channelsExpanded
+                                  ? Icons.arrow_drop_down
+                                  : Icons.arrow_right,
+                              color: colors.onPrimary,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Channels',
+                              style: TextStyle(
+                                color: colors.onPrimary,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 15,
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Channels',
-                          style: TextStyle(
-                            color: colors.onPrimary,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 15,
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
                   ),
-                  const SidebarChannelList(),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 8,
-                    ),
-                    child: Material(
-                      color: colors.onPrimary.withValues(alpha: 0.12),
-                      shape: RoundedRectangleBorder(
-                        side: BorderSide(
-                          color: colors.onPrimary.withValues(alpha: 0.45),
-                        ),
-                        borderRadius: BorderRadius.circular(6),
+                  if (_channelsExpanded) ...[
+                    const SidebarChannelList(),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
                       ),
-                      clipBehavior: Clip.antiAlias,
-                      child: InkWell(
-                        hoverColor: colors.onPrimary.withValues(alpha: 0.2),
-                        onTap: () => ref
-                            .read(activeChatProvider.notifier)
-                            .selectChannelDirectory(),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 8,
+                      child: Material(
+                        color: colors.onPrimary.withValues(alpha: 0.12),
+                        shape: RoundedRectangleBorder(
+                          side: BorderSide(
+                            color: colors.onPrimary.withValues(alpha: 0.45),
                           ),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  'View all channels',
-                                  style: TextStyle(
-                                    color: colors.onPrimary,
-                                    fontSize: 13,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        clipBehavior: Clip.antiAlias,
+                        child: InkWell(
+                          hoverColor: colors.onPrimary.withValues(alpha: 0.2),
+                          onTap: () => ref
+                              .read(activeChatProvider.notifier)
+                              .selectChannelDirectory(),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 8,
+                            ),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    'View all channels',
+                                    style: TextStyle(
+                                      color: colors.onPrimary,
+                                      fontSize: 13,
+                                    ),
                                   ),
                                 ),
-                              ),
-                              Icon(
-                                Icons.chevron_right,
-                                color: colors.onPrimary,
-                                size: 16,
-                              ),
-                            ],
+                                Icon(
+                                  Icons.chevron_right,
+                                  color: colors.onPrimary,
+                                  size: 16,
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ),
                     ),
-                  ),
-                  const _AddChannelButton(),
+                    const _AddChannelButton(),
+                  ],
                   const SidebarDmSection(),
                   const SizedBox(height: 20),
                   Padding(
