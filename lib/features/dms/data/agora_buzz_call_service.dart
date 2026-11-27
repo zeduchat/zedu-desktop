@@ -212,6 +212,23 @@ class AgoraBuzzCallService implements BuzzCallService {
   }
 
   @override
+  Widget? remoteScreenView(int remoteUid) {
+    final engine = _engine;
+    final connection = _screenConnection;
+    if (engine == null || connection == null) return null;
+    return AgoraVideoView(
+      controller: VideoViewController.remote(
+        rtcEngine: engine,
+        canvas: VideoCanvas(
+          uid: remoteUid,
+          renderMode: RenderModeType.renderModeFit,
+        ),
+        connection: connection,
+      ),
+    );
+  }
+
+  @override
   Future<void> leave() async {
     final engine = _engine;
     if (engine == null) return;

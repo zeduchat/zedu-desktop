@@ -24,6 +24,7 @@ class _BuzzMeetingViewState extends ConsumerState<BuzzMeetingView> {
 
     final bool isFullPage = activeCall.state.isFullPage;
     final remoteName = activeCall.state.remoteUserName ?? 'Unknown';
+    final isSharingScreen = activeCall.state.isSharingScreen;
 
     if (!isFullPage) {
       return Positioned(
@@ -224,12 +225,14 @@ class _BuzzMeetingViewState extends ConsumerState<BuzzMeetingView> {
               child: Column(
                 children: [
                   Expanded(
-                    child: _buildVideoFeed(
-                      const Color(0xFF4A2B1D),
-                      remoteName,
-                      activeCall.state.remoteAvatarUrl,
-                      double.infinity,
-                    ),
+                    child:
+                        _buildRemoteScreen(activeCall) ??
+                        _buildVideoFeed(
+                          const Color(0xFF4A2B1D),
+                          remoteName,
+                          activeCall.state.remoteAvatarUrl,
+                          double.infinity,
+                        ),
                   ),
                   const SizedBox(height: 16),
                   Expanded(
@@ -261,14 +264,18 @@ class _BuzzMeetingViewState extends ConsumerState<BuzzMeetingView> {
                 ),
                 const SizedBox(width: 16),
                 _buildControlButton(
-                  icon: Icons.screen_share_outlined,
-                  tooltip: 'Share screen',
-                  color: colors.primary.withValues(alpha: 0.2),
-                  onTap: () => AppToastService.show(
-                    context,
-                    type: AppToastType.info,
-                    message: 'Screen sharing is not available yet.',
-                  ),
+                  icon: isSharingScreen
+                      ? Icons.stop_screen_share_outlined
+                      : Icons.screen_share_outlined,
+                  tooltip: isSharingScreen ? 'Stop sharing' : 'Share screen',
+                  color: isSharingScreen
+                      ? colors.primary
+                      : colors.primary.withValues(alpha: 0.2),
+                  onTap: isSharingScreen
+                      ? () => ref
+                            .read(activeCallProvider.notifier)
+                            .stopScreenShare()
+                      : _pickAndShareScreen,
                   small: false,
                 ),
                 const SizedBox(width: 16),
@@ -305,6 +312,83 @@ class _BuzzMeetingViewState extends ConsumerState<BuzzMeetingView> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  /// Lets the user pick a screen or window, then shares it.
+  Future<void> _pickAndShareScreen() async {
+    final calls = ref.read(activeCallProvider.notifier);
+    final sources = await calls.screenSources();
+    if (!mounted) return;
+    if (sources.isEmpty) {
+      AppToastService.show(
+        context,
+        type: AppToastType.error,
+        message: 'No screens or windows to share.',
+      );
+      return;
+    }
+    final source = await showDialog<BuzzScreenSource>(
+      context: context,
+      builder: (context) => _ScreenSourcePicker(sources: sources),
+    );
+    if (source == null || !mounted) return;
+    final started = await calls.startScreenShare(source);
+    if (started || !mounted) return;
+    AppToastService.show(
+      context,
+      type: AppToastType.error,
+      message:
+          calls.state.errorMessage ?? "Couldn't start sharing your screen.",
+    );
+  }
+
+  /// The screen someone else is sharing, or null when nobody else shares.
+  Widget? _buildRemoteScreen(ActiveCallNotifier activeCall) {
+    final sharerId = activeCall.state.remoteScreenSharerId;
+    final view = activeCall.remoteScreenView();
+    if (sharerId == null || view == null) return null;
+    String? sharerName;
+    for (final p in activeCall.state.participants) {
+      if (p.userId == sharerId && p.name.isNotEmpty) sharerName = p.name;
+    }
+    sharerName ??= sharerId == activeCall.state.remoteUserId
+        ? activeCall.state.remoteUserName
+        : null;
+    final label = sharerName == null || sharerName.isEmpty
+        ? 'Shared screen'
+        : "$sharerName's screen";
+    return ClipRRect(
+      key: const ValueKey('buzz-remote-screen'),
+      borderRadius: BorderRadius.circular(12),
+      child: ColoredBox(
+        color: context.colors.textPrimary,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            view,
+            Positioned(
+              top: 12,
+              left: 12,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  label,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -381,6 +465,55 @@ class _BuzzMeetingViewState extends ConsumerState<BuzzMeetingView> {
           child: Icon(icon, color: Colors.white, size: small ? 18 : 24),
         ),
       ),
+    );
+  }
+}
+
+/// Lists the screens and windows that can be shared; pops the chosen one.
+class _ScreenSourcePicker extends StatelessWidget {
+  const _ScreenSourcePicker({required this.sources});
+
+  final List<BuzzScreenSource> sources;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    return SimpleDialog(
+      title: Text(
+        'Share your screen',
+        style: TextStyle(
+          fontWeight: FontWeight.w600,
+          fontSize: 16,
+          color: colors.textPrimary,
+        ),
+      ),
+      children: [
+        for (final source in sources)
+          SimpleDialogOption(
+            onPressed: () => Navigator.of(context).pop(source),
+            child: Row(
+              children: [
+                Icon(
+                  source.isScreen ? Icons.desktop_windows_outlined : Icons.web,
+                  size: 20,
+                  color: colors.textSecondary,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    source.name.isNotEmpty
+                        ? source.name
+                        : source.isScreen
+                        ? 'Screen'
+                        : 'Window',
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 14, color: colors.textPrimary),
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
     );
   }
 }

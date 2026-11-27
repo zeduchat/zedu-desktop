@@ -589,6 +589,32 @@ void main() {
       expect(state().remoteScreenSharerId, isNull);
     });
 
+    test("someone else's share is rendered from their screen uid", () async {
+      await activeCall();
+      expect(calls().remoteScreenView(), isNull);
+
+      media
+        ..emit(const BuzzRemoteIdentified(70, 'screen-bob'))
+        ..emit(const BuzzRemoteVideoChanged(BuzzChannel.screen, 70, true));
+      await settle();
+
+      final view = calls().remoteScreenView();
+      expect(view?.key, const ValueKey('remote-screen-70'));
+
+      media.emit(const BuzzRemoteVideoChanged(BuzzChannel.screen, 70, false));
+      await settle();
+      expect(calls().remoteScreenView(), isNull);
+    });
+
+    test('leaving while sharing releases the engine', () async {
+      await activeCall();
+      await calls().startScreenShare(media.sources.first);
+      await calls().leaveCall();
+
+      expect(state().isSharingScreen, isFalse);
+      expect(media.calls, contains('dispose'));
+    });
+
     test(
       'your own share on the screen channel is not shown as remote',
       () async {

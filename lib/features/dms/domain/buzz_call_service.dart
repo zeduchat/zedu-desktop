@@ -1,4 +1,4 @@
-import 'dart:typed_data';
+import 'package:zedu/core/core.dart';
 
 /// Which of a call's two Agora channels an event belongs to: the call itself
 /// (`buzz_id`) or its screen-share channel (`screen-<buzz_id>`).
@@ -137,6 +137,10 @@ abstract class BuzzCallService {
   Future<void> startScreenShare(BuzzScreenSource source);
 
   Future<void> stopScreenShare();
+
+  /// Renders the share [remoteUid] publishes on the screen channel, or null
+  /// while the screen channel isn't joined.
+  Widget? remoteScreenView(int remoteUid);
 
   /// Leaves both channels. The engine stays ready for another call.
   Future<void> leave();
