@@ -222,7 +222,7 @@ class FilesDropdown<T> extends StatelessWidget {
     return PopupMenuButton<int>(
       tooltip: placeholder,
       position: PopupMenuPosition.under,
-      color: colors.onPrimary,
+      color: colors.background,
       onSelected: (index) => onChanged(index == _clear ? null : options[index]),
       itemBuilder: (context) => [
         if (allowsClear)

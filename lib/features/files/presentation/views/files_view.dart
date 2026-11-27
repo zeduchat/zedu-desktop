@@ -19,7 +19,7 @@ class FilesView extends ConsumerWidget {
     final tab = inFolder ? FilesTab.files : state.tab;
 
     return Container(
-      color: colors.onPrimary,
+      color: colors.background,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
