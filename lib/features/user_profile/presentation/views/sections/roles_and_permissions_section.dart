@@ -41,7 +41,7 @@ class _RoleCardState extends State<_RoleCard> {
   @override
   Widget build(BuildContext context) {
     final role = widget.role;
-    const hint = Color(0xFF6B7280);
+    final hint = context.colors.textSecondary;
     return Semantics(
       button: true,
       expanded: _expanded,
@@ -65,7 +65,7 @@ class _RoleCardState extends State<_RoleCard> {
                   AnimatedRotation(
                     turns: _expanded ? 0.25 : 0,
                     duration: const Duration(milliseconds: 150),
-                    child: const Icon(
+                    child: Icon(
                       Icons.keyboard_arrow_right,
                       size: 20,
                       color: hint,
@@ -91,7 +91,7 @@ class _RoleCardState extends State<_RoleCard> {
                       padding: const EdgeInsets.only(top: 6),
                       child: Row(
                         children: [
-                          const Icon(
+                          Icon(
                             Icons.check_circle_outline,
                             size: 16,
                             color: hint,
