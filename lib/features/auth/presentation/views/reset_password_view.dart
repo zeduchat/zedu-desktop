@@ -87,6 +87,20 @@ class _ResetPasswordViewState extends ConsumerState<ResetPasswordView> {
     return KeyEventResult.handled;
   }
 
+  /// Spreads several [digits] entered into box [index] (a paste, or a digit
+  /// typed into a filled box) one per box. A whole code fills every box,
+  /// whichever box it was pasted into.
+  void _fillCode(int index, String digits) {
+    final boxCount = _tokenControllers.length;
+    final start = digits.length >= boxCount ? 0 : index;
+    final chars = digits.split('').take(boxCount - start).toList();
+    for (var i = 0; i < chars.length; i++) {
+      _tokenControllers[start + i].text = chars[i];
+    }
+    final next = start + chars.length;
+    _focusNodes[next < boxCount ? next : boxCount - 1].requestFocus();
+  }
+
   Future<void> _onResetPasswordPressed() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -161,7 +175,8 @@ class _ResetPasswordViewState extends ConsumerState<ResetPasswordView> {
             keyboardType: TextInputType.number,
             inputFormatters: [
               FilteringTextInputFormatter.digitsOnly,
-              LengthLimitingTextInputFormatter(1),
+              // More than one digit is a paste; onChanged spreads it out.
+              LengthLimitingTextInputFormatter(6),
             ],
             style: theme.textTheme.titleLarge?.copyWith(
               fontWeight: FontWeight.w600,
@@ -181,7 +196,9 @@ class _ResetPasswordViewState extends ConsumerState<ResetPasswordView> {
               ),
             ),
             onChanged: (value) {
-              if (value.isNotEmpty && index < 5) {
+              if (value.length > 1) {
+                _fillCode(index, value);
+              } else if (value.isNotEmpty && index < 5) {
                 _focusNodes[index + 1].requestFocus();
               } else if (value.isEmpty && index > 0) {
                 _focusNodes[index - 1].requestFocus();
