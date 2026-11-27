@@ -46,6 +46,7 @@ void main() {
   Future<void> pumpShell(
     WidgetTester tester, {
     ValueChanged<UserProfileSection>? onSectionSelected,
+    ThemeData? theme,
   }) async {
     tester.view.physicalSize = const Size(1280, 800);
     tester.view.devicePixelRatio = 1;
@@ -61,7 +62,7 @@ void main() {
           ),
         ],
         child: MaterialApp(
-          theme: AppTheme.light,
+          theme: theme ?? AppTheme.light,
           home: ProfileSettingsShell(
             selectedSection: UserProfileSection.account,
             onSectionSelected: onSectionSelected ?? (_) {},
@@ -86,6 +87,18 @@ void main() {
     for (final label in labels) {
       expect(find.text(label), matcher, reason: label);
     }
+  }
+
+  for (final (name, theme, palette) in [
+    ('light', AppTheme.light, AppPalette.light),
+    ('dark', AppTheme.dark, AppPalette.dark),
+  ]) {
+    testWidgets('the content pane uses the $name background', (tester) async {
+      await pumpShell(tester, theme: theme);
+
+      final scaffold = tester.widget<Scaffold>(find.byType(Scaffold).first);
+      expect(scaffold.backgroundColor, palette.background);
+    });
   }
 
   group('Settings navigation groups', () {
