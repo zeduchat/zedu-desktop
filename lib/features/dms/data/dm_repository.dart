@@ -143,6 +143,24 @@ class DmRepository {
         .toList();
   }
 
+  /// Creates a group DM with [participantIds] on the server and returns its
+  /// channel id, as Zedu web's New chat does.
+  Future<String> createGroupDm({
+    required String orgId,
+    required List<String> participantIds,
+  }) async {
+    final response = await _apiClient.post<Map<String, dynamic>>(
+      path: '/organisations/$orgId/group-dms',
+      data: {'chat_type': 'user', 'participants': participantIds},
+    );
+    final data = response.data['data'];
+    final channelId = data is Map ? '${data['channel_id'] ?? ''}'.trim() : '';
+    if (channelId.isEmpty) {
+      throw const FormatException('Invalid group DM response.');
+    }
+    return channelId;
+  }
+
   /// Opens (or creates) the direct message with [participantId].
   Future<({String channelId, String participantId})> openConversation({
     required String orgId,

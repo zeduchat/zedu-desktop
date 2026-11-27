@@ -7,6 +7,20 @@ import 'package:zedu/features/features.dart';
 
 class MockChatWebsocketService extends Mock implements ChatWebsocketService {}
 
+/// Stands in for the server: each created group gets the next channel id.
+class _FakeDmRepository extends Fake implements DmRepository {
+  final created = <List<String>>[];
+
+  @override
+  Future<String> createGroupDm({
+    required String orgId,
+    required List<String> participantIds,
+  }) async {
+    created.add(participantIds);
+    return 'channel-${created.length}';
+  }
+}
+
 void main() {
   const member1 = TeamMember(
     id: 'm1',
@@ -36,7 +50,11 @@ void main() {
       when(() => mockWs.connect(any())).thenReturn(null);
 
       container = ProviderContainer(
-        overrides: [chatWebsocketProvider.overrideWithValue(mockWs)],
+        overrides: [
+          chatWebsocketProvider.overrideWithValue(mockWs),
+          currentOrgIdProvider.overrideWithValue('org-1'),
+          dmRepositoryProvider.overrideWithValue(_FakeDmRepository()),
+        ],
       );
     });
 
@@ -140,4 +158,85 @@ void main() {
       },
     );
   });
+
+  group('GroupDmNotifier.createGroupDm on the server (Ziki #2315)', () {
+    test('creates the group on the server and uses its channel id', () async {
+      final repo = _FakeDmRepository();
+      final ws = MockChatWebsocketService();
+      when(
+        () => ws.messageStream,
+      ).thenAnswer((_) => const Stream<ChatWebsocketMessage>.empty());
+      when(() => ws.connect(any())).thenReturn(null);
+      final container = ProviderContainer(
+        overrides: [
+          chatWebsocketProvider.overrideWithValue(ws),
+          currentOrgIdProvider.overrideWithValue('org-1'),
+          dmRepositoryProvider.overrideWithValue(repo),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final result = await container
+          .read(groupDmProvider.notifier)
+          .createGroupDm([member1, member2]);
+
+      expect(repo.created.single, ['m1', 'm2']);
+      expect((result as Success<GroupDM>).value.id, 'channel-1');
+      expect(container.read(groupDmProvider).single.id, 'channel-1');
+    });
+
+    test('a server error is returned instead of a made-up group', () async {
+      final ws = MockChatWebsocketService();
+      when(
+        () => ws.messageStream,
+      ).thenAnswer((_) => const Stream<ChatWebsocketMessage>.empty());
+      final container = ProviderContainer(
+        overrides: [
+          chatWebsocketProvider.overrideWithValue(ws),
+          currentOrgIdProvider.overrideWithValue('org-1'),
+          dmRepositoryProvider.overrideWithValue(_FailingDmRepository()),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final result = await container
+          .read(groupDmProvider.notifier)
+          .createGroupDm([member1, member2]);
+
+      expect(result, isA<Failure<GroupDM>>());
+      expect((result as Failure<GroupDM>).error.message, 'Server said no');
+      expect(container.read(groupDmProvider), isEmpty);
+    });
+
+    test('without a workspace nothing is created', () async {
+      final repo = _FakeDmRepository();
+      final ws = MockChatWebsocketService();
+      when(
+        () => ws.messageStream,
+      ).thenAnswer((_) => const Stream<ChatWebsocketMessage>.empty());
+      final container = ProviderContainer(
+        overrides: [
+          chatWebsocketProvider.overrideWithValue(ws),
+          currentOrgIdProvider.overrideWithValue(''),
+          dmRepositoryProvider.overrideWithValue(repo),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final result = await container
+          .read(groupDmProvider.notifier)
+          .createGroupDm([member1, member2]);
+
+      expect(result, isA<Failure<GroupDM>>());
+      expect(repo.created, isEmpty);
+    });
+  });
+}
+
+class _FailingDmRepository extends Fake implements DmRepository {
+  @override
+  Future<String> createGroupDm({
+    required String orgId,
+    required List<String> participantIds,
+  }) async => throw const ApiFailure(message: 'Server said no');
 }

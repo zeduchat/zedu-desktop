@@ -102,19 +102,14 @@ class GroupDmNotifier extends Notifier<List<GroupDM>> {
     ];
   }
 
+  /// Creates the group on the server (`POST /organisations/{orgId}/group-dms`,
+  /// as Zedu web does), so every member gets it and it survives a restart.
+  /// The server's channel id becomes the group's id. A group with exactly
+  /// these members that this session already has is reused.
   Future<Result<GroupDM>> createGroupDm(
     List<TeamMember> selectedMembers,
   ) async {
     final generation = _generation;
-    await Future<void>.delayed(const Duration(milliseconds: 800));
-    if (_isStale(generation)) {
-      return Failure<GroupDM>(
-        const ApiFailure(
-          message: 'Your session changed before the group was created.',
-        ),
-      );
-    }
-
     final selectedIds = selectedMembers.map((m) => m.id).toSet();
     for (final group in state) {
       final groupIds = group.members.map((m) => m.id).toSet();
@@ -124,12 +119,37 @@ class GroupDmNotifier extends Notifier<List<GroupDM>> {
       }
     }
 
+    final orgId = ref.read(currentOrgIdProvider);
+    if (orgId.isEmpty) {
+      return const Failure<GroupDM>(
+        ApiFailure(message: 'Select a workspace before creating a group.'),
+      );
+    }
+
+    final String channelId;
+    try {
+      channelId = await ref
+          .read(dmRepositoryProvider)
+          .createGroupDm(orgId: orgId, participantIds: selectedIds.toList());
+    } on ApiFailure catch (failure) {
+      return Failure<GroupDM>(failure);
+    } on Object catch (error) {
+      return Failure<GroupDM>(ApiFailure.unknown(error));
+    }
+    if (_isStale(generation)) {
+      return Failure<GroupDM>(
+        const ApiFailure(
+          message: 'Your session changed before the group was created.',
+        ),
+      );
+    }
+
     final name = selectedMembers
         .map((m) => m.name ?? m.email.split('@').first)
         .join(', ');
 
     final newGroup = GroupDM(
-      id: 'group-dm-${DateTime.now().millisecondsSinceEpoch}',
+      id: channelId,
       name: name,
       members: selectedMembers,
       unreadCount: 0,
@@ -142,7 +162,18 @@ class GroupDmNotifier extends Notifier<List<GroupDM>> {
     final activeIds = state.map((g) => g.id).toList();
     ref.read(chatWebsocketProvider).connect(activeIds);
 
+    // The group now lives on the server, so the DMs list picks it up.
+    unawaited(_refreshDmList());
+
     return Success(newGroup);
+  }
+
+  Future<void> _refreshDmList() async {
+    try {
+      await ref.read(dmListProvider.notifier).refresh();
+    } on Object catch (error) {
+      AppLogger.w('Could not refresh DMs after creating a group: $error');
+    }
   }
 
   Future<void> sendMessage(String groupDmId, String messageText) async {

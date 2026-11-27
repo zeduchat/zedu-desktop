@@ -2,6 +2,20 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:zedu/core/core.dart';
 import 'package:zedu/features/features.dart';
 
+/// Stands in for the server: each created group gets the next channel id.
+class _FakeDmRepository extends Fake implements DmRepository {
+  final created = <List<String>>[];
+
+  @override
+  Future<String> createGroupDm({
+    required String orgId,
+    required List<String> participantIds,
+  }) async {
+    created.add(participantIds);
+    return 'channel-${created.length}';
+  }
+}
+
 class _FakeChatStorage extends Fake implements ChatStorageService {
   final List<(String, String)> appended = [];
 
@@ -31,7 +45,11 @@ void main() {
 
   ProviderContainer newContainer() {
     final container = ProviderContainer(
-      overrides: [chatStorageProvider.overrideWithValue(storage)],
+      overrides: [
+        chatStorageProvider.overrideWithValue(storage),
+        currentOrgIdProvider.overrideWithValue('org-1'),
+        dmRepositoryProvider.overrideWithValue(_FakeDmRepository()),
+      ],
     );
     addTearDown(container.dispose);
     return container;
