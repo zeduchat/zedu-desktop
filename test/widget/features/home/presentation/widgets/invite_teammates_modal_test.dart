@@ -29,12 +29,16 @@ class ErrorUserProfileNotifier extends UserProfileNotifier {
 // The members the fake organisation has; anyone else is not in it.
 List<TeamMember> orgMembers = [];
 
+// The roles the fake organisation has.
+List<RolePermission> orgRoles = [];
+
 // Avoids the locator and API: serves [orgMembers], invites are recorded.
 class FakeUserProfileNotifier extends UserProfileNotifier {
   final List<String> invited = [];
+  final List<String> invitedRoles = [];
 
   @override
-  UserProfileState build() => const UserProfileState();
+  UserProfileState build() => UserProfileState(rolesAndPermissions: orgRoles);
 
   @override
   Future<List<TeamMember>> fetchOrganisationMembers() async => orgMembers;
@@ -46,6 +50,7 @@ class FakeUserProfileNotifier extends UserProfileNotifier {
     String? userId,
   }) async {
     invited.add(email);
+    invitedRoles.add(role);
   }
 }
 
@@ -118,7 +123,10 @@ Future<void> openModal(WidgetTester tester) async {
 }
 
 void main() {
-  setUp(() => orgMembers = []);
+  setUp(() {
+    orgMembers = [];
+    orgRoles = [];
+  });
 
   for (final entry in {
     1: 'Successfully invited 1 teammate.',
@@ -482,6 +490,65 @@ void main() {
 
       expect(find.text('Failed to invite member'), findsOneWidget);
       await drainToastTimer(tester);
+    });
+  });
+
+  group('InviteTeammatesModal role (Ziki #3056)', () {
+    RolePermission role(String name) =>
+        RolePermission(role: name, description: '', permissions: const []);
+
+    Future<FakeUserProfileNotifier> inviteOne(WidgetTester tester) async {
+      await tester.pumpWidget(
+        buildModalUnderTest(
+          () async => const AddEveryoneNobodyToAdd('general'),
+        ),
+      );
+      await openModal(tester);
+      await tester.enterText(find.byType(TextField), 'person@example.com');
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pump();
+      final element = tester.element(find.byType(InviteTeammatesModal));
+      return ProviderScope.containerOf(
+            element,
+          ).read(userProfileNotifierProvider.notifier)
+          as FakeUserProfileNotifier;
+    }
+
+    testWidgets('defaults to the member role', (tester) async {
+      orgRoles = [role('Administrator'), role('User'), role('Manager')];
+      final notifier = await inviteOne(tester);
+
+      await tester.tap(find.widgetWithText(ElevatedButton, 'Add'));
+      await tester.pumpAndSettle();
+
+      expect(notifier.invitedRoles, ['User']);
+    });
+
+    testWidgets('lists the organisation roles and sends the picked one', (
+      tester,
+    ) async {
+      orgRoles = [
+        role('Owner'),
+        role('Administrator'),
+        role('User'),
+        role('Manager'),
+        role('Bot'),
+      ];
+      final notifier = await inviteOne(tester);
+
+      await tester.tap(find.byKey(const Key('invite_role_dropdown')));
+      await tester.pumpAndSettle();
+      expect(find.text('Administrator').hitTestable(), findsOneWidget);
+      expect(find.text('Manager').hitTestable(), findsOneWidget);
+      expect(find.text('Owner'), findsNothing);
+      expect(find.text('Bot'), findsNothing);
+
+      await tester.tap(find.text('Manager').hitTestable());
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(ElevatedButton, 'Add'));
+      await tester.pumpAndSettle();
+
+      expect(notifier.invitedRoles, ['Manager']);
     });
   });
 }

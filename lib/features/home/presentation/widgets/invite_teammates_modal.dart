@@ -18,6 +18,31 @@ class _InviteTeammatesModalState extends ConsumerState<InviteTeammatesModal> {
   bool _isAddingEveryone = false;
   String? _emailError;
 
+  /// The role picked for the invites; null until the user picks one, which
+  /// means the member role ([_defaultRole]).
+  String? _selectedRole;
+
+  static const _defaultRole = 'User';
+
+  /// Organisation roles a person can be invited with, by name. The notifier
+  /// resolves the name to the role id from `/organisations/{id}/roles`.
+  static List<String> _inviteRoles(List<RolePermission> roles) {
+    final names = <String>{
+      for (final role in roles)
+        if (role.role.trim().isNotEmpty &&
+            role.role != 'Owner' &&
+            role.role != 'Bot')
+          role.role.trim(),
+    };
+    return names.isEmpty ? const [_defaultRole] : names.toList();
+  }
+
+  String _roleFor(List<String> options) {
+    final selected = _selectedRole;
+    if (selected != null && options.contains(selected)) return selected;
+    return options.contains(_defaultRole) ? _defaultRole : options.first;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -106,15 +131,17 @@ class _InviteTeammatesModalState extends ConsumerState<InviteTeammatesModal> {
     });
 
     final notifier = ref.read(userProfileNotifierProvider.notifier);
+    final role = _roleFor(
+      _inviteRoles(ref.read(userProfileNotifierProvider).rolesAndPermissions),
+    );
     int successCount = 0;
     String? lastError;
 
     // Loop through and invite all
     for (final invite in _invites) {
-      // Assuming 'User' role by default since there's no dropdown in UI
       await notifier.inviteMember(
         email: invite['email']!,
-        role: 'User',
+        role: role,
         userId: invite['userId'],
       );
       final state = ref.read(userProfileNotifierProvider);
@@ -185,6 +212,13 @@ class _InviteTeammatesModalState extends ConsumerState<InviteTeammatesModal> {
   Widget build(BuildContext context) {
     final colors = context.colors;
     final channelName = openChannelName(ref.watch(activeChatProvider));
+    final roleOptions = _inviteRoles(
+      ref.watch(
+        userProfileNotifierProvider.select(
+          (state) => state.rolesAndPermissions,
+        ),
+      ),
+    );
 
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -340,6 +374,32 @@ class _InviteTeammatesModalState extends ConsumerState<InviteTeammatesModal> {
             Text(
               'Search for people in your organisation and add them to #$channelName.',
               style: TextStyle(fontSize: 12, color: colors.textHint),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Text(
+                  'Role',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: colors.textPrimary,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                DropdownButton<String>(
+                  key: const Key('invite_role_dropdown'),
+                  value: _roleFor(roleOptions),
+                  underline: const SizedBox(),
+                  items: [
+                    for (final role in roleOptions)
+                      DropdownMenuItem(value: role, child: Text(role)),
+                  ],
+                  onChanged: _isLoading
+                      ? null
+                      : (value) => setState(() => _selectedRole = value),
+                ),
+              ],
             ),
             const SizedBox(height: 24),
             Divider(color: colors.divider.withValues(alpha: 0.5)),

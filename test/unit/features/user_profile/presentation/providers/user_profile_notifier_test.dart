@@ -620,6 +620,50 @@ void main() {
       expect(state.isSaving, isFalse);
     });
 
+    test('never sends a role label as role_id when the roles lookup fails '
+        '(Ziki #3056)', () async {
+      stubRoles(const []);
+      // The loaded role list still holds the label.
+      when(
+        () => repository.getRolesAndPermissions(orgId: any(named: 'orgId')),
+      ).thenAnswer(
+        (_) async => const Success(<RolePermission>[
+          RolePermission(role: 'User', description: '', permissions: []),
+        ]),
+      );
+      stubInvite(
+        Success(
+          const TeamMember(
+            id: 'new-member',
+            email: 'invitee@example.com',
+            role: 'User',
+            dateJoined: '2026-01-01',
+            status: TeamMemberStatus.pending,
+          ),
+        ),
+      );
+
+      final container = makeContainer();
+      await waitForLoad(container);
+      expect(
+        container.read(userProfileNotifierProvider).rolesAndPermissions,
+        isNotEmpty,
+      );
+      await invite(container, role: 'User');
+
+      verifyNever(
+        () => repository.inviteMember(
+          email: any(named: 'email'),
+          role: any(named: 'role'),
+          orgId: any(named: 'orgId'),
+        ),
+      );
+      expect(lastInviteRoleId, isNot('User'));
+      final state = container.read(userProfileNotifierProvider);
+      expect(state.error, isNotNull);
+      expect(state.teamMembers, isEmpty);
+    });
+
     test('does not add a member when the invitation fails', () async {
       stubRoles(_rolesResponse);
       stubInvite(
