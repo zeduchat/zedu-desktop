@@ -274,4 +274,19 @@ class AuthRepositoryImpl implements AuthRepository {
       return Failure(ApiFailure.unknown(error));
     }
   }
+
+  @override
+  Future<Result<void>> logout() async {
+    try {
+      await _remote.logout();
+      AppLogger.i('Backend session revoked', tag: _tag);
+      return const Success(null);
+    } on ApiFailure catch (failure) {
+      AppLogger.w('Backend logout failed — ${failure.message}', tag: _tag);
+      return Failure(failure);
+    } catch (error) {
+      AppLogger.e('Unexpected logout error', tag: _tag, error: error);
+      return Failure(ApiFailure.unknown(error));
+    }
+  }
 }

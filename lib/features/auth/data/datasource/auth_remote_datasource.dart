@@ -39,6 +39,9 @@ abstract interface class AuthRemoteDataSource {
     required bool online,
   });
   Future<void> setPresence({required bool online});
+
+  /// Revokes the current access token on the backend.
+  Future<void> logout();
 }
 
 class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
@@ -375,6 +378,24 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       rethrow;
     } catch (error) {
       AppLogger.e('Failed /profile/presence', tag: _tag, error: error);
+      throw ApiFailure.unknown(error);
+    }
+  }
+
+  @override
+  Future<void> logout() async {
+    try {
+      if (_config.usesMockData) {
+        AppLogger.d('Using mock data for POST /auth/logout', tag: _tag);
+        return;
+      }
+
+      AppLogger.d('POST /auth/logout', tag: _tag);
+      await _apiBaseService.post<dynamic>(path: '/auth/logout');
+    } on ApiFailure {
+      rethrow;
+    } catch (error) {
+      AppLogger.e('Failed /auth/logout', tag: _tag, error: error);
       throw ApiFailure.unknown(error);
     }
   }
