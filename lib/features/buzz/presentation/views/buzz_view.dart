@@ -30,7 +30,18 @@ class _BuzzViewState extends ConsumerState<BuzzView> {
       AppToastService.show(context, type: type, message: message);
 
   Future<void> _open(Uri link) async {
-    final opened = await canLaunchUrl(link) && await launchUrl(link);
+    bool opened;
+    try {
+      opened = await canLaunchUrl(link) && await launchUrl(link);
+    } catch (error, stackTrace) {
+      AppLogger.w(
+        'Could not open the meeting link',
+        tag: 'Buzz',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      opened = false;
+    }
     if (!opened && mounted) {
       _toast("Couldn't open the meeting in your browser.");
     }
