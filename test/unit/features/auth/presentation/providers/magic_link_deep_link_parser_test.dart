@@ -21,6 +21,32 @@ void main() {
       expect(token, 'abc123');
     });
 
+    test('extracts token from the emailed web login link', () {
+      final uri = Uri.parse(
+        'https://zedu.chat/auth/login/magic-link?token=abc123',
+      );
+
+      expect(MagicLinkDeepLinkParser.extractToken(uri), 'abc123');
+    });
+
+    test('extracts token from the short web magiclink route', () {
+      final uri = Uri.parse('https://zedu.chat/auth/magiclink?token=abc123');
+
+      expect(MagicLinkDeepLinkParser.extractToken(uri), 'abc123');
+    });
+
+    test('extracts token from custom zedu scheme login link', () {
+      final uri = Uri.parse('zedu://auth/login/magic-link?token=abc123');
+
+      expect(MagicLinkDeepLinkParser.extractToken(uri), 'abc123');
+    });
+
+    test('returns null for an unrelated web path', () {
+      final uri = Uri.parse('https://zedu.chat/auth/login?token=abc123');
+
+      expect(MagicLinkDeepLinkParser.extractToken(uri), isNull);
+    });
+
     test('returns null for missing token query parameter', () {
       final uri = Uri.parse('zedu://auth/magick-link/verify');
 
