@@ -135,11 +135,14 @@ class DmPreviewThread {
       message: json['message'] as String? ?? '',
       userId: json['user_id'] as String? ?? '',
       username: json['username'] as String? ?? '',
-      createdAt: json['created_at'] != null
-          ? DateTime.parse(json['created_at'] as String).toLocal()
-          : DateTime.now(),
+      createdAt: _parseCreatedAt(json['created_at']),
       messageCount: json['message_count'] as int? ?? 0,
     );
+  }
+
+  static DateTime _parseCreatedAt(dynamic value) {
+    if (value is! String) return DateTime.now();
+    return DateTime.tryParse(value)?.toLocal() ?? DateTime.now();
   }
 }
 
