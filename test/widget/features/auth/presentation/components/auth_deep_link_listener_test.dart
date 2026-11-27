@@ -104,6 +104,12 @@ void main() {
     late StreamController<Uri> linkController;
 
     setUp(() {
+      locator.registerSingleton<AppConfig>(
+        const AppConfig(
+          apiBaseUrl: 'https://api.zedu.chat/api/v1/',
+          usesMockData: false,
+        ),
+      );
       mockAppLinks = MockAppLinks();
       linkController = StreamController<Uri>.broadcast();
 
@@ -114,6 +120,49 @@ void main() {
 
     tearDown(() async {
       await linkController.close();
+      await locator.reset();
+    });
+
+    testWidgets(
+      'ignores a magic link from an untrusted web host (Ziki #2482)',
+      (tester) async {
+        final verified = <String>[];
+        when(() => mockAppLinks.getInitialLink()).thenAnswer(
+          (_) async => Uri.parse(
+            'https://attacker.example/auth/magick-link/verify?token=t-evil',
+          ),
+        );
+        await _pumpRoutedListener(
+          tester,
+          appLinks: mockAppLinks,
+          notifier: FakeDeepLinkAuthNotifier(onVerify: verified.add),
+        );
+
+        linkController.add(
+          Uri.parse('https://evilzedu.chat/auth/magick-link/verify?token=t-2'),
+        );
+        await tester.pumpAndSettle();
+
+        expect(verified, isEmpty);
+      },
+    );
+
+    testWidgets('verifies a magic link from the trusted web host', (
+      tester,
+    ) async {
+      final verified = <String>[];
+      when(() => mockAppLinks.getInitialLink()).thenAnswer(
+        (_) async =>
+            Uri.parse('https://zedu.chat/auth/magick-link/verify?token=t-ok'),
+      );
+      await _pumpRoutedListener(
+        tester,
+        appLinks: mockAppLinks,
+        notifier: FakeDeepLinkAuthNotifier(onVerify: verified.add),
+      );
+      await tester.pumpAndSettle();
+
+      expect(verified, ['t-ok']);
     });
 
     testWidgets('ignores link when token query param is missing', (
