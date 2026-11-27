@@ -466,6 +466,47 @@ void main() {
     });
   });
 
+  group('restoreFile', () {
+    test('restores the file with PUT (#2489)', () async {
+      when(() => api.put<dynamic>(path: any(named: 'path'))).thenAnswer(
+        (_) async =>
+            const ApiResponseModel<dynamic>(statusCode: 200, data: null),
+      );
+
+      await datasource.restoreFile('f-1');
+
+      verify(() => api.put<dynamic>(path: '/files/file/f-1/restore')).called(1);
+    });
+
+    test('passes on a failed request (#2489)', () async {
+      const failure = ApiFailure(
+        message: 'File is not deleted',
+        statusCode: 400,
+        kind: ApiFailureKind.client,
+      );
+      when(() => api.put<dynamic>(path: any(named: 'path'))).thenThrow(failure);
+
+      await expectLater(datasource.restoreFile('f-1'), throwsA(same(failure)));
+    });
+
+    test('mock build makes no request (#2489)', () async {
+      final mockDatasource = FilesRemoteDataSourceImpl(
+        apiBaseService: api,
+        config: AppConfig(
+          apiBaseUrl: 'https://example.test',
+          usesMockData: true,
+        ),
+        downloadClient: downloadClient,
+      );
+
+      await expectLater(
+        mockDatasource.restoreFile('f-1'),
+        throwsA(isA<ApiFailure>()),
+      );
+      verifyNever(() => api.put<dynamic>(path: any(named: 'path')));
+    });
+  });
+
   group('renameFile', () {
     test('sends the new name', () async {
       when(

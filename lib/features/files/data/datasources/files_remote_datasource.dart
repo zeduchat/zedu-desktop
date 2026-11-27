@@ -33,6 +33,10 @@ abstract class FilesRemoteDataSource {
   /// when [permanent].
   Future<void> deleteFile(String fileId, {bool permanent = false});
 
+  /// Restores file [fileId] from Deleted files, with
+  /// `PUT /files/file/{id}/restore`.
+  Future<void> restoreFile(String fileId);
+
   /// Renames file [fileId] to [name].
   Future<void> renameFile(String fileId, String name);
 
@@ -272,6 +276,12 @@ class FilesRemoteDataSourceImpl implements FilesRemoteDataSource {
       path: '/files/file/$fileId',
       queryParameters: permanent ? const {'permanent': true} : null,
     );
+  }
+
+  @override
+  Future<void> restoreFile(String fileId) async {
+    if (config.usesMockData) throw _mockBuildFailure;
+    await apiBaseService.put<dynamic>(path: '/files/file/$fileId/restore');
   }
 
   @override
