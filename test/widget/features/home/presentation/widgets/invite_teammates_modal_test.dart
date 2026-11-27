@@ -109,8 +109,11 @@ Widget buildModalUnderTest(
   );
 }
 
-Future<void> openModal(WidgetTester tester) async {
-  await tester.binding.setSurfaceSize(const Size(1280, 900));
+Future<void> openModal(
+  WidgetTester tester, {
+  Size size = const Size(1280, 900),
+}) async {
+  await tester.binding.setSurfaceSize(size);
   addTearDown(() => tester.binding.setSurfaceSize(null));
   await tester.tap(find.text('Open'));
   await tester.pumpAndSettle();
@@ -146,6 +149,37 @@ void main() {
       expect(find.byType(InviteTeammatesModal), findsNothing);
     });
   }
+
+  group('on narrow windows (Ziki #696)', () {
+    testWidgets('fits a 360x640 window and scrolls to Add', (tester) async {
+      await tester.pumpWidget(
+        buildModalUnderTest(
+          () async => const AddEveryoneNobodyToAdd('general'),
+        ),
+      );
+      await openModal(tester, size: const Size(360, 640));
+
+      expect(tester.takeException(), isNull);
+      final add = find.widgetWithText(ElevatedButton, 'Add');
+      await tester.ensureVisible(add);
+      await tester.pumpAndSettle();
+      expect(add.hitTestable(), findsOneWidget);
+    });
+
+    testWidgets('keeps its 480px width on a wide window', (tester) async {
+      await tester.pumpWidget(
+        buildModalUnderTest(
+          () async => const AddEveryoneNobodyToAdd('general'),
+        ),
+      );
+      await openModal(tester);
+
+      final surface = find
+          .descendant(of: find.byType(Dialog), matching: find.byType(Material))
+          .first;
+      expect(tester.getSize(surface).width, 480);
+    });
+  });
 
   testWidgets('shows the invite hint without a leading pipe', (tester) async {
     await tester.pumpWidget(
