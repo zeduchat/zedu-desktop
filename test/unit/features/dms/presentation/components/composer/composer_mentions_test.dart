@@ -108,5 +108,70 @@ void main() {
         isNull,
       );
     });
+
+    test('records a mention followed by punctuation (#6341)', () {
+      for (final text in [
+        'thanks @ada',
+        'thanks @ada.',
+        '@ada. Next',
+        'thanks @ada, see',
+        'ping @ada!',
+        'is it @ada?',
+        '(@ada)',
+      ]) {
+        expect(
+          composerMentionsIn(text, participants: [_ada], isChannel: false),
+          [
+            {'type': 'user', 'id': 'user-1'},
+          ],
+          reason: text,
+        );
+      }
+    });
+
+    test('a longer handle is not the shorter one', () {
+      final lovelace = DmParticipant(
+        userId: 'user-2',
+        username: 'ada.lovelace',
+        email: 'lovelace@example.com',
+      );
+      expect(
+        composerMentionsIn(
+          'hi @ada.lovelace',
+          participants: [_ada],
+          isChannel: false,
+        ),
+        isNull,
+      );
+      expect(
+        composerMentionsIn(
+          'hi @ada.lovelace.',
+          participants: [_ada, lovelace],
+          isChannel: false,
+        ),
+        [
+          {'type': 'user', 'id': 'user-2'},
+        ],
+      );
+      expect(
+        composerMentionsIn('hi @ada-b', participants: [_ada], isChannel: false),
+        isNull,
+      );
+    });
+
+    test('@channel and a picked #channel can end a sentence', () {
+      expect(
+        composerMentionsIn(
+          'heads up @channel. See #general.',
+          participants: [],
+          isChannel: true,
+          pickedChannels: {'general': 'id-general'},
+        ),
+        [
+          {'type': 'user', 'id': channelMentionId},
+          {'type': 'channel', 'id': 'id-general', 'label': 'general'},
+        ],
+      );
+    });
   });
 }
