@@ -32,17 +32,21 @@ class _DmChatAreaState extends ConsumerState<DmChatArea> {
 
   final _searchPanelKey = GlobalKey<SearchPanelState>();
 
-  String get _recipientHandle {
-    final parts = widget.conversation.displayName
-        .trim()
-        .split(RegExp(r'\s+'))
-        .where((part) => part.isNotEmpty)
-        .toList();
-
-    if (parts.isEmpty) return '@user';
-    if (parts.length == 1) return '@${parts.first}';
-    return '@${parts.first}_${parts.last}';
+  /// The other person's real `@username`, or null when their participant
+  /// record has not loaded. Mentions match `DmParticipant.username`, so a
+  /// handle built from the display name would mention nobody.
+  String? get _recipientUsernameHandle {
+    final conversation = widget.conversation;
+    for (final participant in conversation.participants) {
+      if (participant.userId != conversation.participantId) continue;
+      final username = participant.username.trim();
+      return username.isEmpty ? null : '@$username';
+    }
+    return null;
   }
+
+  String get _recipientHandle =>
+      _recipientUsernameHandle ?? widget.conversation.displayName;
 
   bool get _isOwnSpace {
     final userId = ref.read(authNotifierProvider).user?.id;
@@ -96,7 +100,7 @@ class _DmChatAreaState extends ConsumerState<DmChatArea> {
           context: context,
           builder: (context) => _ParticipantProfileDialog(
             conversation: conversation,
-            handle: _recipientHandle,
+            handle: _recipientUsernameHandle,
           ),
         );
       case 'mute_notifications':
@@ -772,7 +776,7 @@ class _HistoryLoadError extends StatelessWidget {
 /// The other person's profile, opened from the header's "View profile".
 class _ParticipantProfileDialog extends StatelessWidget {
   final DmConversation conversation;
-  final String handle;
+  final String? handle;
 
   const _ParticipantProfileDialog({
     required this.conversation,
@@ -822,13 +826,15 @@ class _ParticipantProfileDialog extends StatelessWidget {
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              const SizedBox(height: 4),
-              Text(
-                handle,
-                style: textTheme.bodyMedium?.copyWith(
-                  color: colors.textSecondary,
+              if (handle case final handle?) ...[
+                const SizedBox(height: 4),
+                Text(
+                  handle,
+                  style: textTheme.bodyMedium?.copyWith(
+                    color: colors.textSecondary,
+                  ),
                 ),
-              ),
+              ],
               if (email.isNotEmpty) ...[
                 const SizedBox(height: 20),
                 Divider(height: 1, color: colors.divider),
