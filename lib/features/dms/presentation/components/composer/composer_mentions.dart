@@ -86,8 +86,11 @@ List<Map<String, String>>? composerMentionsIn(
 }
 
 /// Whether [text] holds [prefix][name] as a whole token: not part of an
-/// email or a longer handle.
+/// email or a longer handle. A `.` only continues the handle when a handle
+/// character follows it, so a full stop can end the sentence (`thanks @ada.`)
+/// while `@ada.lovelace` is still not `@ada`.
 bool _hasToken(String text, String prefix, String name) => RegExp(
-  '(?<![\\w@#.])${RegExp.escape(prefix)}${RegExp.escape(name)}(?![\\w.-])',
+  '(?<![\\w@#.])${RegExp.escape(prefix)}${RegExp.escape(name)}'
+  r'(?![\w-]|\.[\w-])',
   caseSensitive: false,
 ).hasMatch(text);
