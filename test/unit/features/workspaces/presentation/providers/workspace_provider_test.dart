@@ -337,6 +337,90 @@ void main() {
       expect(state.workspaces.map((w) => w.name), ['Riverside Academy']);
     });
 
+    group('after a session reset', () {
+      // Each call to /users/organisations gets the next completer, so a test
+      // decides when (and how) every request finishes.
+      late List<Completer<ApiResponseModel<Map<String, dynamic>>>> requests;
+
+      ApiResponseModel<Map<String, dynamic>> orgs(String id) =>
+          ApiResponseModel(
+            data: {
+              'data': [
+                {'id': id, 'name': 'Org $id'},
+              ],
+            },
+            statusCode: 200,
+          );
+
+      Future<ProviderContainer> startStaleFetch() async {
+        registerConfig(usesMockData: false);
+        requests = [];
+        when(
+          () => mockApi.get<Map<String, dynamic>>(path: '/users/organisations'),
+        ).thenAnswer((_) {
+          final request = Completer<ApiResponseModel<Map<String, dynamic>>>();
+          requests.add(request);
+          return request.future;
+        });
+        final container = ProviderContainer();
+        addTearDown(container.dispose);
+        container.listen(workspaceProvider, (_, _) {});
+        await pumpEventQueue();
+        expect(requests, hasLength(1));
+
+        // Sign-out and sign-in reset the provider, which fetches again.
+        container.invalidate(workspaceProvider);
+        container.read(workspaceProvider);
+        await pumpEventQueue();
+        expect(requests, hasLength(2));
+
+        requests[1].complete(orgs('b'));
+        await pumpEventQueue();
+        expect(container.read(workspaceProvider).selectedWorkspace?.id, 'b');
+        return container;
+      }
+
+      test('a late response from the old session is ignored', () async {
+        final container = await startStaleFetch();
+
+        requests[0].complete(orgs('a'));
+        await pumpEventQueue();
+
+        final state = container.read(workspaceProvider);
+        expect(state.workspaces.map((w) => w.id), ['b']);
+        expect(state.selectedWorkspace?.id, 'b');
+        expect(state.isLoading, isFalse);
+        expect(state.errorMessage, isNull);
+      });
+
+      test('a late failure from the old session is ignored', () async {
+        final container = await startStaleFetch();
+
+        requests[0].completeError(Exception('old session failed'));
+        await pumpEventQueue();
+
+        final state = container.read(workspaceProvider);
+        expect(state.workspaces.map((w) => w.id), ['b']);
+        expect(state.selectedWorkspace?.id, 'b');
+        expect(state.errorMessage, isNull);
+      });
+
+      test('a refresh in the current session still applies', () async {
+        final container = await startStaleFetch();
+
+        final refresh = container
+            .read(workspaceProvider.notifier)
+            .fetchWorkspaces();
+        await pumpEventQueue();
+        requests.last.complete(orgs('c'));
+        await refresh;
+
+        final state = container.read(workspaceProvider);
+        expect(state.workspaces.map((w) => w.id), ['c']);
+        expect(state.selectedWorkspace?.id, 'c');
+      });
+    });
+
     test('keeps the demo organisations in mock-data mode', () async {
       registerConfig(usesMockData: true);
       final container = ProviderContainer();
