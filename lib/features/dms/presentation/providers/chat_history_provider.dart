@@ -371,10 +371,23 @@ class ChatHistoryNotifier extends ChangeNotifier {
         page: nextPage,
       );
 
-      messages = [
-        ...messages,
-        ...newMessages.where((m) => !_isDeleted(m) && !_isCleared(m)),
-      ];
+      // A message that arrived since page 1 loaded shifts the page
+      // boundaries, so this page can repeat messages already loaded. Skip any
+      // id that is already in the list or repeats within the page.
+      final loadedIds = <String>{
+        for (final m in messages) ...[
+          if (m['id'] != null) m['id'].toString(),
+          if (m['thread_id'] != null) m['thread_id'].toString(),
+        ],
+      };
+      final older = <Map<String, dynamic>>[];
+      for (final m in newMessages) {
+        if (_isDeleted(m) || _isCleared(m)) continue;
+        final id = m['id']?.toString();
+        if (id != null && !loadedIds.add(id)) continue;
+        older.add(m);
+      }
+      messages = [...messages, ...older];
       // Pages run newest first, so once a cleared message shows up every
       // older page is cleared too.
       hasMore =
