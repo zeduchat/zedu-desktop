@@ -329,4 +329,71 @@ void main() {
       },
     );
   });
+
+  group('DmRepository.getMessages', () {
+    void stubThreads(Map<String, dynamic> body) {
+      when(
+        () => api.get<Map<String, dynamic>>(
+          path: any(named: 'path'),
+          queryParameters: any(named: 'queryParameters'),
+        ),
+      ).thenAnswer(
+        (_) async =>
+            ApiResponseModel<Map<String, dynamic>>(data: body, statusCode: 200),
+      );
+    }
+
+    test('loads history from the DM threads route', () async {
+      stubThreads({'data': <dynamic>[]});
+
+      await repository.getMessages('ch-1', page: 2);
+
+      verify(
+        () => api.get<Map<String, dynamic>>(
+          path: '/dms/channels/ch-1/threads',
+          queryParameters: {'page': 2, 'limit': DmRepository.pageSize},
+        ),
+      ).called(1);
+    });
+
+    test('maps each thread to the message shape the chat reads', () async {
+      stubThreads({
+        'data': [
+          {
+            'thread_id': 'thread-1',
+            'message': '<p>hello</p>',
+            'user_id': 'user-2',
+            'username': 'ada',
+            'created_at': '2026-10-16T19:19:04Z',
+            'status': 'active',
+          },
+        ],
+      });
+
+      final messages = await repository.getMessages('ch-1');
+
+      expect(messages, hasLength(1));
+      final message = messages.single;
+      expect(message['id'], 'thread-1');
+      expect(message['content'], '<p>hello</p>');
+      expect(message['user_id'], 'user-2');
+      expect(message['username'], 'ada');
+      expect(message['created_at'], '2026-10-16T19:19:04Z');
+      // A status on a loaded message means "sending" or "failed" to the chat.
+      expect(message.containsKey('status'), isFalse);
+    });
+
+    test('returns an empty list when data is not a list', () async {
+      stubThreads({'data': null});
+
+      expect(await repository.getMessages('ch-1'), isEmpty);
+    });
+
+    test('uses an empty string when the thread has no text', () {
+      final message = DmRepository.threadToMessage({'thread_id': 'thread-1'});
+
+      expect(message['id'], 'thread-1');
+      expect(message['content'], '');
+    });
+  });
 }
