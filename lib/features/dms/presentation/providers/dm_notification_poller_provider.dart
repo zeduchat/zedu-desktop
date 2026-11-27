@@ -77,6 +77,9 @@ class DmNotificationPollerNotifier extends Notifier<void> {
 
         seen.add(id);
 
+        // Move the conversation up the list, whoever sent the message.
+        ref.read(dmListProvider.notifier).recordIncomingMessage(channelId, msg);
+
         // Only notify for messages from other users.
         final authState = ref.read(authNotifierProvider);
         final currentUserId = authState.user?.id ?? '';

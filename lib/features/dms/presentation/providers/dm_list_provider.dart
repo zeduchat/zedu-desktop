@@ -192,6 +192,40 @@ class DmListNotifier extends AsyncNotifier<List<DmConversation>> {
     }
   }
 
+  /// Records a message that just arrived in [channelId], so the conversation
+  /// shows it as its preview and moves up the recent-activity order. A message
+  /// older than what the list already shows, or for a channel not in the list,
+  /// changes nothing.
+  void recordIncomingMessage(String channelId, Map<String, dynamic> message) {
+    final current = state.value;
+    if (current == null) return;
+    final index = current.indexWhere((c) => c.channelId == channelId);
+    if (index < 0) return;
+    final createdAt = DateTime.tryParse(
+      message['created_at']?.toString() ?? '',
+    )?.toLocal();
+    if (createdAt == null) return;
+    final conversation = current[index];
+    if (conversation.hasActivity &&
+        !createdAt.isAfter(conversation.lastActivityAt)) {
+      return;
+    }
+    final thread = DmPreviewThread(
+      threadId: (message['thread_id'] ?? message['id'] ?? '').toString(),
+      message: notificationPreview(
+        (message['content'] ?? message['message'] ?? '').toString(),
+      ),
+      userId: (message['user_id'] ?? message['userId'] ?? '').toString(),
+      username: (message['username'] ?? message['sender_name'] ?? '')
+          .toString(),
+      createdAt: createdAt,
+    );
+    state = AsyncValue.data([
+      for (var i = 0; i < current.length; i++)
+        i == index ? conversation.withLatestMessage(thread) : current[i],
+    ]);
+  }
+
   Future<void> refresh() async {
     final orgId = ref.read(currentOrgIdProvider);
     if (orgId.isEmpty) return;

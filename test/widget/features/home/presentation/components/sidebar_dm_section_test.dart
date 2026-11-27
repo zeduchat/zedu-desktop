@@ -255,4 +255,33 @@ void main() {
       expect(container.read(homeSidebarProvider), HomeSidebarType.dms);
     });
   });
+
+  testWidgets('a new message moves its conversation to the top (#12395)', (
+    tester,
+  ) async {
+    final container = await _pump(
+      tester,
+      dms: () => _FakeDmListNotifier([
+        _dm('c-1', 'Ada Okafor', lastReadAt: newer),
+        _dm('c-2', 'Bola Ige', lastReadAt: older),
+      ]),
+    );
+    expect(
+      tester.getTopLeft(find.text('Ada Okafor')).dy,
+      lessThan(tester.getTopLeft(find.text('Bola Ige')).dy),
+    );
+
+    container.read(dmListProvider.notifier).recordIncomingMessage('c-2', {
+      'id': 'm1',
+      'user_id': 'user-c-2',
+      'content': 'Are you there?',
+      'created_at': DateTime(2026, 11, 4).toUtc().toIso8601String(),
+    });
+    await tester.pump();
+
+    expect(
+      tester.getTopLeft(find.text('Bola Ige')).dy,
+      lessThan(tester.getTopLeft(find.text('Ada Okafor')).dy),
+    );
+  });
 }

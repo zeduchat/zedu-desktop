@@ -62,6 +62,26 @@ class DmConversation {
     return lastReadAt ?? DateTime.fromMillisecondsSinceEpoch(0);
   }
 
+  /// This conversation with [thread] as its newest message, so its preview
+  /// and [lastActivityAt] show it.
+  DmConversation withLatestMessage(DmPreviewThread thread) => DmConversation(
+    channelId: channelId,
+    username: username,
+    participantId: participantId,
+    participantEmail: participantEmail,
+    avatarUrl: avatarUrl,
+    defaultAvatarUrl: defaultAvatarUrl,
+    channelType: channelType,
+    isFavourite: isFavourite,
+    threadCount: threadCount,
+    lastThreadId: lastThreadId,
+    lastReadAt: lastReadAt,
+    previewMessage: thread.message.isEmpty ? previewMessage : thread.message,
+    previewThreads: [thread, ...previewThreads],
+    participants: participants,
+    unreadCount: unreadCount,
+  );
+
   factory DmConversation.fromJson(Map<String, dynamic> json) {
     final rawThreads = json['preview_thread'];
     final threads = (rawThreads is List ? rawThreads : const <dynamic>[])
