@@ -107,8 +107,14 @@ class UserProfileRepositoryImpl implements UserProfileRepository {
   }
 
   @override
-  Future<Result<TeamMember>> updateMember(TeamMember member) {
-    return _guard(() => _remote.updateMember(member));
+  Future<Result<TeamMember>> updateMember(
+    TeamMember member, {
+    required String roleId,
+    required String orgId,
+  }) {
+    return _guard(
+      () => _remote.updateMember(member, roleId: roleId, orgId: orgId),
+    );
   }
 
   @override
