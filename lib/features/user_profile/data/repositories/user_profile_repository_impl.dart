@@ -18,6 +18,11 @@ class UserProfileRepositoryImpl implements UserProfileRepository {
   }
 
   @override
+  Future<Result<void>> updateAvatar(ProfileAvatarChange change) {
+    return _guard(() => _remote.updateAvatar(change));
+  }
+
+  @override
   Future<Result<void>> deleteAccount() => _guard(_remote.deleteAccount);
 
   @override

@@ -400,7 +400,7 @@ void main() {
     });
   });
 
-  testWidgets('photo buttons are disabled and say they are coming soon', (
+  testWidgets('photo buttons are disabled without a photo save handler', (
     tester,
   ) async {
     await openDialog(tester, (_) async => null);
@@ -416,13 +416,7 @@ void main() {
         isNull,
         reason: '$label should be disabled',
       );
-      expect(
-        find.ancestor(of: button, matching: find.byType(Tooltip)),
-        findsOneWidget,
-        reason: label,
-      );
     }
-    expect(find.byTooltip('Coming soon'), findsNWidgets(2));
 
     // Tapping a disabled button keeps the dialog open and does nothing.
     await tester.tap(find.text('Upload photo'), warnIfMissed: false);

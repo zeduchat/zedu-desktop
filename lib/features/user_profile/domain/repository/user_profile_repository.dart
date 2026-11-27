@@ -4,6 +4,7 @@ import 'package:zedu/features/features.dart';
 abstract interface class UserProfileRepository {
   Future<Result<ProfileAccount>> getAccount();
   Future<Result<ProfileAccount>> updateAccount(ProfileAccount account);
+  Future<Result<void>> updateAvatar(ProfileAvatarChange change);
   Future<Result<void>> deleteAccount();
 
   Future<Result<NotificationPreferences>> getNotificationPreferences({

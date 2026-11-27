@@ -60,24 +60,57 @@ String _canonicalCountryName(String value) {
 /// save succeeded.
 typedef EditProfileSave = Future<String?> Function(ProfileAccount account);
 
+/// Saves a profile photo change and returns an error message, or null when
+/// the save succeeded.
+typedef EditProfileAvatarSave =
+    Future<String?> Function(ProfileAvatarChange change);
+
+/// Lets the user choose an image file, or returns null when they cancel.
+typedef EditProfileAvatarPicker = Future<PlatformFile?> Function();
+
+Future<PlatformFile?> _pickAvatarFile() async {
+  final result = await FilePicker.pickFiles(
+    type: FileType.custom,
+    allowedExtensions: ProfileAvatarChange.allowedExtensions,
+    withData: true,
+  );
+  return result?.files.firstOrNull;
+}
+
 /// Opens the editor. It stays open while [onSave] runs and closes only when
 /// the save succeeds; on failure it keeps the draft and shows the error.
+/// With [onSaveAvatar] the photo can be changed too; a chosen photo is saved
+/// after the other fields, when the user saves.
 Future<void> showEditProfileDialog(
   BuildContext context,
   ProfileAccount account,
-  EditProfileSave onSave,
-) async {
+  EditProfileSave onSave, {
+  EditProfileAvatarSave? onSaveAvatar,
+  EditProfileAvatarPicker pickAvatar = _pickAvatarFile,
+}) async {
   await showDialog<void>(
     context: context,
-    builder: (context) => _EditProfileDialog(account: account, onSave: onSave),
+    builder: (context) => _EditProfileDialog(
+      account: account,
+      onSave: onSave,
+      onSaveAvatar: onSaveAvatar,
+      pickAvatar: pickAvatar,
+    ),
   );
 }
 
 class _EditProfileDialog extends StatefulWidget {
-  const _EditProfileDialog({required this.account, required this.onSave});
+  const _EditProfileDialog({
+    required this.account,
+    required this.onSave,
+    required this.onSaveAvatar,
+    required this.pickAvatar,
+  });
 
   final ProfileAccount account;
   final EditProfileSave onSave;
+  final EditProfileAvatarSave? onSaveAvatar;
+  final EditProfileAvatarPicker pickAvatar;
 
   @override
   State<_EditProfileDialog> createState() => _EditProfileDialogState();
@@ -102,6 +135,46 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
   bool _saving = false;
   String? _saveError;
   bool _confirmingDiscard = false;
+
+  /// The photo change to save, or null when the photo is unchanged.
+  ProfileAvatarChange? _avatarChange;
+  String? _avatarError;
+
+  bool get _hasSavedAvatar =>
+      (widget.account.avatarUrl ?? '').trim().isNotEmpty;
+
+  Future<void> _chooseAvatar() async {
+    final file = await widget.pickAvatar();
+    if (file == null || !mounted) return;
+    final extension = (file.extension ?? file.name.split('.').last)
+        .toLowerCase();
+    final bytes = file.bytes;
+    setState(() {
+      if (!ProfileAvatarChange.allowedExtensions.contains(extension)) {
+        _avatarError = 'Choose a PNG or JPEG image.';
+      } else if (file.size > ProfileAvatarChange.maxBytes ||
+          (bytes != null && bytes.length > ProfileAvatarChange.maxBytes)) {
+        _avatarError = 'Choose an image of 5 MB or less.';
+      } else if (bytes == null || bytes.isEmpty) {
+        _avatarError = 'Could not read that image. Try another file.';
+      } else {
+        _avatarError = null;
+        _avatarChange = ProfileAvatarChange.upload(
+          bytes: bytes,
+          fileName: file.name,
+        );
+      }
+    });
+  }
+
+  void _removeAvatar() {
+    setState(() {
+      _avatarError = null;
+      _avatarChange = _hasSavedAvatar
+          ? const ProfileAvatarChange.remove()
+          : null;
+    });
+  }
 
   @override
   void initState() {
@@ -138,7 +211,8 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
   bool get _isDirty {
     final account = widget.account;
     String norm(String value) => value.trim();
-    return norm(nameCtrl.text) != norm(account.name) ||
+    return _avatarChange != null ||
+        norm(nameCtrl.text) != norm(account.name) ||
         norm(displayNameCtrl.text) != norm(account.displayName) ||
         norm(usernameCtrl.text) != norm(account.username) ||
         norm(emailCtrl.text) != norm(account.email) ||
@@ -210,6 +284,19 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
     );
     // Closed with Cancel while saving: nothing left to update or pop.
     if (!mounted) return;
+    final avatarChange = _avatarChange;
+    final onSaveAvatar = widget.onSaveAvatar;
+    if (error == null && avatarChange != null && onSaveAvatar != null) {
+      final avatarError = await onSaveAvatar(avatarChange);
+      if (!mounted) return;
+      if (avatarError != null) {
+        setState(() {
+          _saving = false;
+          _saveError = avatarError;
+        });
+        return;
+      }
+    }
     if (error == null) {
       Navigator.pop(context);
       return;
@@ -218,6 +305,48 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
       _saving = false;
       _saveError = error;
     });
+  }
+
+  bool get _canEditAvatar => widget.onSaveAvatar != null && !_saving;
+
+  bool get _canRemoveAvatar =>
+      _canEditAvatar &&
+      (_avatarChange?.isRemoval == false ||
+          (_hasSavedAvatar && _avatarChange == null));
+
+  /// The chosen photo, else the saved one (unless it is being removed), else
+  /// a placeholder.
+  Widget _avatarPreview(AppPalette colors) {
+    final placeholder = Container(
+      width: 160,
+      height: 160,
+      decoration: BoxDecoration(
+        color: colors.accent.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Icon(Icons.person, size: 80, color: colors.accent),
+    );
+    final change = _avatarChange;
+    final Widget? image = switch (change) {
+      ProfileAvatarChange(isRemoval: false, :final bytes?) => Image.memory(
+        bytes,
+        key: const ValueKey('edit-profile-photo-preview'),
+        width: 160,
+        height: 160,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => placeholder,
+      ),
+      null when _hasSavedAvatar => Image.network(
+        widget.account.avatarUrl!.trim(),
+        width: 160,
+        height: 160,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => placeholder,
+      ),
+      _ => null,
+    };
+    if (image == null) return placeholder;
+    return ClipRRect(borderRadius: BorderRadius.circular(8), child: image);
   }
 
   @override
@@ -575,61 +704,63 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
                               ),
                             ),
                             const SizedBox(height: 12),
-                            Center(
-                              child: Container(
-                                width: 160,
-                                height: 160,
-                                decoration: BoxDecoration(
-                                  color: colors.accent.withValues(alpha: 0.15),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Icon(
-                                  Icons.person,
-                                  size: 80,
-                                  color: colors.accent,
-                                ),
-                              ),
-                            ),
+                            Center(child: _avatarPreview(colors)),
                             const SizedBox(height: 12),
-                            // Photo upload isn't supported yet, so both
-                            // buttons are disabled and say why (Ziki #117).
                             Center(
-                              child: Tooltip(
-                                message: 'Coming soon',
-                                child: TextButton.icon(
-                                  onPressed: null,
-                                  icon: Icon(
-                                    Icons.upload_outlined,
-                                    size: 16,
-                                    color: colors.textHint,
-                                  ),
-                                  label: Text(
-                                    'Upload photo',
-                                    style: context.textTheme.bodySmall
-                                        ?.copyWith(
-                                          color: colors.textHint,
-                                          fontWeight: FontWeight.w500,
-                                        ),
+                              child: TextButton.icon(
+                                key: const ValueKey(
+                                  'edit-profile-upload-photo',
+                                ),
+                                onPressed: _canEditAvatar
+                                    ? _chooseAvatar
+                                    : null,
+                                icon: Icon(
+                                  Icons.upload_outlined,
+                                  size: 16,
+                                  color: _canEditAvatar
+                                      ? colors.primary
+                                      : colors.textHint,
+                                ),
+                                label: Text(
+                                  'Upload photo',
+                                  style: context.textTheme.bodySmall?.copyWith(
+                                    color: _canEditAvatar
+                                        ? colors.primary
+                                        : colors.textHint,
+                                    fontWeight: FontWeight.w500,
                                   ),
                                 ),
                               ),
                             ),
                             Center(
-                              child: Tooltip(
-                                message: 'Coming soon',
-                                child: TextButton(
-                                  onPressed: null,
-                                  child: Text(
-                                    'Remove photo',
-                                    style: context.textTheme.bodySmall
-                                        ?.copyWith(
-                                          color: colors.textHint,
-                                          fontWeight: FontWeight.w500,
-                                        ),
+                              child: TextButton(
+                                key: const ValueKey(
+                                  'edit-profile-remove-photo',
+                                ),
+                                onPressed: _canRemoveAvatar
+                                    ? _removeAvatar
+                                    : null,
+                                child: Text(
+                                  'Remove photo',
+                                  style: context.textTheme.bodySmall?.copyWith(
+                                    color: _canRemoveAvatar
+                                        ? colors.error
+                                        : colors.textHint,
+                                    fontWeight: FontWeight.w500,
                                   ),
                                 ),
                               ),
                             ),
+                            if (_avatarError != null)
+                              Center(
+                                child: Text(
+                                  _avatarError!,
+                                  textAlign: TextAlign.center,
+                                  style: context.textTheme.bodySmall?.copyWith(
+                                    color: colors.error,
+                                  ),
+                                ),
+                              ),
                           ],
                         ),
                       ),

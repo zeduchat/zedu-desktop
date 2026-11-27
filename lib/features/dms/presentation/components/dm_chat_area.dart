@@ -85,7 +85,7 @@ class _DmChatAreaState extends ConsumerState<DmChatArea> {
       await notifier.updateAccount(updated);
       // updateAccount clears the error when it starts and sets it on failure.
       return ref.read(userProfileNotifierProvider).error;
-    });
+    }, onSaveAvatar: notifier.updateAvatar);
   }
 
   Future<void> _handleMenuAction(String action) async {

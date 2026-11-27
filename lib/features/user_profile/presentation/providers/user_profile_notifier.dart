@@ -67,6 +67,38 @@ class UserProfileNotifier extends Notifier<UserProfileState> {
     }
   }
 
+  /// Uploads or removes the profile photo, then reloads the account so the
+  /// new photo shows. Returns an error message, or null on success.
+  Future<String?> updateAvatar(ProfileAvatarChange change) async {
+    state = state.copyWith(
+      isSaving: true,
+      clearError: true,
+      clearSuccess: true,
+    );
+    final result = await _repository.updateAvatar(change);
+    if (!ref.mounted) return null;
+    if (result case Failure(:final error)) {
+      state = state.copyWith(isSaving: false, error: error.friendlyMessage);
+      return error.friendlyMessage;
+    }
+    final refreshed = await _repository.getAccount();
+    if (!ref.mounted) return null;
+    final current = state.account ?? ProfileAccount.empty();
+    state = state.copyWith(
+      account: switch (refreshed) {
+        Success(:final value) => value,
+        // The photo was saved; without the new link, at least drop the old one.
+        Failure() =>
+          change.isRemoval ? current.copyWith(avatarUrl: '') : current,
+      },
+      isSaving: false,
+      successMessage: change.isRemoval
+          ? 'Profile photo removed.'
+          : 'Profile photo updated.',
+    );
+    return null;
+  }
+
   /// Keeps only the fields the user edited. Unchanged fields are set to
   /// [kUnchangedField] so they are not sent to the server. Explicitly cleared
   /// optional fields are preserved as empty strings so they can be cleared.
