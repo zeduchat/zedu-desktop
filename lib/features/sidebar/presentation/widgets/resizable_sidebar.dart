@@ -4,11 +4,13 @@ class ResizableSidebar extends StatefulWidget {
   const ResizableSidebar({
     super.key,
     required this.child,
-    this.initialWidth = 320,
+    this.initialWidth = defaultInitialWidth,
     this.minWidth = defaultMinWidth,
     this.maxWidth = defaultMaxWidth,
+    this.onWidthChanged,
   });
 
+  static const double defaultInitialWidth = 320;
   static const double defaultMinWidth = 220;
   static const double defaultMaxWidth = 420;
 
@@ -16,6 +18,9 @@ class ResizableSidebar extends StatefulWidget {
   final double initialWidth;
   final double minWidth;
   final double maxWidth;
+
+  /// Called with the new width while the user drags the handle.
+  final ValueChanged<double>? onWidthChanged;
 
   @override
   State<ResizableSidebar> createState() => _ResizableSidebarState();
@@ -63,6 +68,7 @@ class _ResizableSidebarState extends State<ResizableSidebar> {
                       .clamp(widget.minWidth, widget.maxWidth)
                       .toDouble();
                 });
+                widget.onWidthChanged?.call(_width);
               },
               child: MouseRegion(
                 cursor: SystemMouseCursors.resizeColumn,

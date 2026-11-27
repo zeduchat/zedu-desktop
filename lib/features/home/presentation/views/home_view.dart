@@ -63,8 +63,17 @@ class _HomeViewState extends ConsumerState<HomeView> {
                           HomeSidebarType.buzz,
                       maintainState: true,
                       child: sidebarVisible
-                          ? const ResizableSidebar(
-                              child: _MainSidebarSwitcher(),
+                          ? ResizableSidebar(
+                              // Read, not watched: the sidebar owns its width
+                              // while mounted and reports each drag back, so
+                              // a remount (after Settings, say) restores it.
+                              initialWidth:
+                                  ref.read(sidebarWidthProvider) ??
+                                  ResizableSidebar.defaultInitialWidth,
+                              onWidthChanged: ref
+                                  .read(sidebarWidthProvider.notifier)
+                                  .setWidth,
+                              child: const _MainSidebarSwitcher(),
                             )
                           : const SizedBox(width: 0),
                     ),
