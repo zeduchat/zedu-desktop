@@ -66,4 +66,61 @@ void main() {
 
     expect(scale(), closeTo(0.9, 0.001));
   });
+
+  Future<void> pressZoom(
+    WidgetTester tester,
+    LogicalKeyboardKey key, {
+    LogicalKeyboardKey modifier = LogicalKeyboardKey.controlLeft,
+    bool shift = false,
+  }) async {
+    await tester.sendKeyDownEvent(modifier);
+    if (shift) await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+    // A dedicated `+` key (German, Nordic, Swiss layouts) has no physical key
+    // of its own in the simulator, so press it where German keyboards have it.
+    final physicalKey = key == LogicalKeyboardKey.add
+        ? PhysicalKeyboardKey.bracketRight
+        : null;
+    await tester.sendKeyDownEvent(key, physicalKey: physicalKey);
+    await tester.sendKeyUpEvent(key, physicalKey: physicalKey);
+    if (shift) await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+    await tester.sendKeyUpEvent(modifier);
+    await tester.pumpAndSettle();
+  }
+
+  for (final modifier in [
+    LogicalKeyboardKey.controlLeft,
+    LogicalKeyboardKey.metaLeft,
+  ]) {
+    final name = modifier == LogicalKeyboardKey.metaLeft ? 'Cmd' : 'Ctrl';
+
+    testWidgets('$name+Shift+= zooms the text in (#7796)', (tester) async {
+      final scale = await pumpShortcut(tester);
+
+      await pressZoom(
+        tester,
+        LogicalKeyboardKey.equal,
+        modifier: modifier,
+        shift: true,
+      );
+
+      expect(scale(), closeTo(1.1, 0.001));
+    });
+
+    testWidgets('$name and a dedicated + key zoom the text in (#7796)', (
+      tester,
+    ) async {
+      final scale = await pumpShortcut(tester);
+
+      await pressZoom(tester, LogicalKeyboardKey.add, modifier: modifier);
+      expect(scale(), closeTo(1.1, 0.001));
+
+      await pressZoom(
+        tester,
+        LogicalKeyboardKey.add,
+        modifier: modifier,
+        shift: true,
+      );
+      expect(scale(), closeTo(1.25, 0.001));
+    });
+  }
 }
