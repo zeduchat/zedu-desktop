@@ -116,7 +116,7 @@ class _OrganizationSectionState extends State<OrganizationSection> {
           runSpacing: 12,
           children: [
             AppButton.outlined(
-              label: 'Sign out of workspace',
+              label: 'Leave workspace',
               expand: false,
               height: 44,
               style: OutlinedButton.styleFrom(
@@ -147,10 +147,10 @@ class _OrganizationSectionState extends State<OrganizationSection> {
 
   Future<void> _confirmLeave(BuildContext context) => showProfileConfirmDialog(
     context,
-    title: 'Sign out of workspace?',
+    title: 'Leave workspace?',
     message:
-        'This will securely sign you out and remove your access from this workspace. You will need to be re-invited to join again.',
-    confirmLabel: 'Sign out',
+        'You will be removed from this workspace and lose access to it. You will need to be re-invited to join again.',
+    confirmLabel: 'Leave',
     onConfirm: () => _run(_OrganizationAction.leave, widget.onLeave),
     destructive: true,
   );

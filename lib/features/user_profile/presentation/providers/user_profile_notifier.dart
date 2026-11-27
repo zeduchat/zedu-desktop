@@ -335,7 +335,7 @@ class UserProfileNotifier extends Notifier<UserProfileState> {
 
       state = state.copyWith(
         isSaving: false,
-        successMessage: 'Successfully signed out of workspace.',
+        successMessage: 'You left the workspace.',
       );
     } catch (e) {
       state = state.copyWith(

@@ -64,7 +64,7 @@ void main() {
       final sectionRight = tester
           .getTopRight(find.byType(OrganizationSection))
           .dx;
-      for (final label in ['Sign out of workspace', 'Delete organization']) {
+      for (final label in ['Leave workspace', 'Delete organization']) {
         expect(_button(label).hitTestable(), findsOneWidget);
         expect(
           tester.getTopRight(_button(label)).dx,
@@ -74,13 +74,48 @@ void main() {
     },
   );
 
+  testWidgets('the leave action is labelled as leaving (Ziki #3049)', (
+    tester,
+  ) async {
+    var left = 0;
+    await tester.pumpWidget(
+      buildTestMaterialApp(
+        Scaffold(
+          body: SingleChildScrollView(
+            child: OrganizationSection(
+              organization: _org,
+              onSave: (_) {},
+              onDelete: () async {},
+              onLeave: () async => left++,
+            ),
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('Leave workspace'), findsOneWidget);
+    expect(find.textContaining('Sign out'), findsNothing);
+
+    await tester.tap(find.text('Leave workspace'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Leave workspace?'), findsOneWidget);
+    expect(find.textContaining('sign you out'), findsNothing);
+    expect(left, 0);
+
+    await tester.tap(find.widgetWithText(AppButton, 'Leave'));
+    await tester.pumpAndSettle();
+
+    expect(left, 1);
+  });
+
   testWidgets('action buttons stay on one row in a wide window', (
     tester,
   ) async {
     await _pumpInSettingsLayout(tester, windowWidth: 1600);
 
     expect(tester.takeException(), isNull);
-    final leave = tester.getRect(_button('Sign out of workspace'));
+    final leave = tester.getRect(_button('Leave workspace'));
     final delete = tester.getRect(_button('Delete organization'));
     expect(delete.top, leave.top);
     expect(delete.left, leave.right + 16);
@@ -187,10 +222,10 @@ void main() {
       );
 
       expect(tester.takeException(), isNull);
-      expect(find.text('Sign out of workspace'), findsOneWidget);
+      expect(find.text('Leave workspace'), findsOneWidget);
       expect(find.text('Delete organization'), findsOneWidget);
 
-      final signOut = tester.getRect(find.text('Sign out of workspace'));
+      final signOut = tester.getRect(find.text('Leave workspace'));
       final deleteOrg = tester.getRect(find.text('Delete organization'));
       expect(deleteOrg.top, greaterThan(signOut.bottom));
     },
