@@ -861,4 +861,25 @@ void main() {
     expect(find.text('Optimistic message'), findsOneWidget);
     expect(find.byIcon(Icons.add_reaction_outlined), findsNothing);
   });
+
+  testWidgets('highlights @mentions in a channel message', (tester) async {
+    stubPage(
+      1,
+      _page(const [
+        ChannelMessage(id: '1', senderName: 'Ada', text: 'hey @channel look'),
+      ]),
+    );
+    await pumpList(tester);
+
+    final text = tester.widget<SelectableText>(find.byType(SelectableText));
+    TextSpan? mention;
+    text.textSpan!.visitChildren((span) {
+      if (span is TextSpan && span.text == '@channel') mention = span;
+      return mention == null;
+    });
+    expect(
+      mention?.style?.backgroundColor,
+      AppPalette.light.mentionHighlightBg,
+    );
+  });
 }

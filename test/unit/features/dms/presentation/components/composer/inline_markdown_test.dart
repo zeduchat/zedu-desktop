@@ -1,3 +1,4 @@
+import 'package:zedu/core/core.dart';
 import 'package:zedu/features/dms/presentation/components/composer/composer.dart';
 
 import '../../../../../../helpers/helpers.dart';
@@ -220,6 +221,66 @@ void main() {
       final run = _visible(span).single;
       expect(run.$1, 'test');
       expect(_isBold(run.$2) && _isItalic(run.$2), isTrue);
+    });
+  });
+
+  group('mentions', () {
+    const colors = AppPalette.light;
+    const highlight = MentionHighlight(colors: colors, selfUsername: 'me_user');
+    final mentionBackgrounds = {colors.mentionBg, colors.mentionHighlightBg};
+
+    List<(String, TextStyle)> mentionRuns(String text) => _runs(
+      buildInlineMarkdownSpan(text, _base, mentions: highlight),
+    ).where((r) => mentionBackgrounds.contains(r.$2.backgroundColor)).toList();
+
+    test('each @name and @channel is its own highlighted span', () {
+      final runs = mentionRuns('hi @ada and @channel, see you');
+
+      expect(runs.map((r) => r.$1), ['@ada', '@channel']);
+      expect(runs[0].$2.backgroundColor, colors.mentionBg);
+      expect(runs[0].$2.color, colors.mention);
+      expect(runs[1].$2.backgroundColor, colors.mentionHighlightBg);
+      expect(runs[1].$2.color, colors.channelMention);
+    });
+
+    test('a mention of the signed-in user gets the yellow highlight', () {
+      final runs = mentionRuns('ping @Me_User.');
+
+      expect(runs.single.$1, '@Me_User');
+      expect(runs.single.$2.backgroundColor, colors.mentionHighlightBg);
+    });
+
+    test('the text around a mention is kept as it was', () {
+      final span = buildInlineMarkdownSpan(
+        'hi @ada and @channel',
+        _base,
+        mentions: highlight,
+      );
+
+      expect(span.toPlainText(), 'hi @ada and @channel');
+    });
+
+    test('an email, a URL or inline code is not a mention', () {
+      expect(
+        mentionRuns('mail a@b.com or https://x.com/@ada or `@ada`'),
+        isEmpty,
+      );
+    });
+
+    test('mentions stay plain without a highlight', () {
+      final runs = _runs(buildInlineMarkdownSpan('hi @ada', _base));
+
+      expect(
+        runs.where((r) => mentionBackgrounds.contains(r.$2.backgroundColor)),
+        isEmpty,
+      );
+    });
+
+    test('a mention inside bold text is highlighted and bold', () {
+      final runs = mentionRuns('**hey @ada**');
+
+      expect(runs.single.$1, '@ada');
+      expect(_isBold(runs.single.$2), isTrue);
     });
   });
 }

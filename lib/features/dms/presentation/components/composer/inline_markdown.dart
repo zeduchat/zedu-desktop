@@ -30,6 +30,9 @@ final _inlineMarkdown = RegExp(
 /// text outside inline code, for example to make links tappable. [link]
 /// builds the span for a `[label](url)` link, with the label's formatted
 /// spans as children; without it links render as their raw text.
+///
+/// With [mentions], each `@name`, `@channel` or `@here` outside inline code
+/// and links becomes its own highlighted span, coloured as on web.
 TextSpan buildInlineMarkdownSpan(
   String text,
   TextStyle style, {
@@ -42,18 +45,83 @@ TextSpan buildInlineMarkdownSpan(
     List<InlineSpan> children,
   )?
   link,
+  MentionHighlight? mentions,
 }) {
   if (text.isEmpty) return TextSpan(style: style, text: '');
+  final plain =
+      plainText ?? (text, style) => TextSpan(text: text, style: style);
   return TextSpan(
     style: style,
     children: _inlineSpans(
       text,
       style,
       keepMarkers,
-      plainText ?? (text, style) => TextSpan(text: text, style: style),
+      mentions == null
+          ? plain
+          : (text, style) => _mentionSpans(text, style, plain, mentions),
       link,
     ),
   );
+}
+
+/// How [buildInlineMarkdownSpan] highlights @mentions.
+class MentionHighlight {
+  const MentionHighlight({required this.colors, this.selfUsername});
+
+  final AppPalette colors;
+
+  /// The signed-in user's username, whose mentions get the yellow highlight.
+  final String? selfUsername;
+}
+
+/// `@name` not glued to a word or another `@`, so `ada@example.com` is not a
+/// mention. Names end on a letter, digit or `_`, leaving out a trailing `.`.
+final _mention = RegExp(r'(?<![\w@])@([A-Za-z0-9_](?:[\w.-]*[A-Za-z0-9_])?)');
+
+const _channelMentions = {'channel', 'here', 'everyone'};
+
+TextSpan _mentionSpans(
+  String text,
+  TextStyle style,
+  TextSpan Function(String text, TextStyle style) plainText,
+  MentionHighlight mentions,
+) {
+  final colors = mentions.colors;
+  final self = mentions.selfUsername?.trim().toLowerCase();
+  final children = <InlineSpan>[];
+  var last = 0;
+  for (final match in _mention.allMatches(text)) {
+    // An @ inside a URL (`https://x.com/@ada`) belongs to the link.
+    final wordStart = text.lastIndexOf(RegExp(r'\s'), match.start) + 1;
+    final word = text.substring(wordStart, match.start).toLowerCase();
+    if (word.contains('://') || word.startsWith('www.')) continue;
+
+    final name = match.group(1)!.toLowerCase();
+    final isChannel = _channelMentions.contains(name);
+    final isSelf = self != null && self.isNotEmpty && name == self;
+    if (match.start > last) {
+      children.add(plainText(text.substring(last, match.start), style));
+    }
+    children.add(
+      TextSpan(
+        text: match.group(0),
+        style: style.copyWith(
+          color: isChannel ? colors.channelMention : colors.mention,
+          backgroundColor: isChannel || isSelf
+              ? colors.mentionHighlightBg
+              : colors.mentionBg,
+          // Medium as on web, without undoing bold around the mention.
+          fontWeight: style.fontWeight == FontWeight.bold
+              ? FontWeight.bold
+              : FontWeight.w500,
+        ),
+      ),
+    );
+    last = match.end;
+  }
+  if (children.isEmpty) return plainText(text, style);
+  if (last < text.length) children.add(plainText(text.substring(last), style));
+  return TextSpan(children: children);
 }
 
 List<InlineSpan> _inlineSpans(

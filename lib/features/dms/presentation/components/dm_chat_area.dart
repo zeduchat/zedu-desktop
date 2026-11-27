@@ -1062,11 +1062,13 @@ class _MessageBubble extends ConsumerWidget {
     String text,
     TextStyle defaultStyle,
     MessageLinks links,
+    MentionHighlight mentions,
   ) => buildInlineMarkdownSpan(
     text,
     defaultStyle,
     plainText: links.span,
     link: links.link,
+    mentions: mentions,
   );
 
   /// Splits [text] around Markdown thematic breaks: a line that is exactly
@@ -1090,16 +1092,26 @@ class _MessageBubble extends ConsumerWidget {
     return parts;
   }
 
-  Widget _buildMessageText(String content, TextStyle style) {
+  Widget _buildMessageText(
+    String content,
+    TextStyle style,
+    MentionHighlight mentions,
+  ) {
     return MessageLinkScope(
-      builder: (context, links) => _buildLinkedText(content, style, links),
+      builder: (context, links) =>
+          _buildLinkedText(content, style, links, mentions),
     );
   }
 
-  Widget _buildLinkedText(String content, TextStyle style, MessageLinks links) {
+  Widget _buildLinkedText(
+    String content,
+    TextStyle style,
+    MessageLinks links,
+    MentionHighlight mentions,
+  ) {
     final parts = _splitOnDividers(content);
     if (parts.length == 1) {
-      return RichText(text: _parseRichText(content, style, links));
+      return RichText(text: _parseRichText(content, style, links, mentions));
     }
 
     final divider = Divider(
@@ -1119,7 +1131,9 @@ class _MessageBubble extends ConsumerWidget {
             for (var i = 0; i < parts.length; i++) ...[
               if (i > 0) divider,
               if (parts[i].isNotEmpty)
-                RichText(text: _parseRichText(parts[i], style, links)),
+                RichText(
+                  text: _parseRichText(parts[i], style, links, mentions),
+                ),
             ],
           ],
         ),
@@ -1344,6 +1358,13 @@ class _MessageBubble extends ConsumerWidget {
                         TextStyle(
                           color: isMe ? Colors.white : colors.textPrimary,
                           fontSize: 14,
+                        ),
+                        MentionHighlight(
+                          colors: colors,
+                          // Only a message with an @ needs the user.
+                          selfUsername: content.contains('@')
+                              ? ref.watch(authNotifierProvider).user?.username
+                              : null,
                         ),
                       ),
                     ),
