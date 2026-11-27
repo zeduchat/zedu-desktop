@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zedu/core/core.dart';
 
@@ -87,6 +89,74 @@ void main() {
         expect(container.read(networkStatusProvider), NetworkStatus.online);
       },
     );
+
+    group('out-of-order checks (#2676)', () {
+      late List<Completer<bool>> checks;
+      late ProviderContainer container;
+
+      setUp(() {
+        checks = [];
+        container = ProviderContainer(
+          overrides: [
+            reachabilityCheckerProvider.overrideWithValue(() {
+              final check = Completer<bool>();
+              checks.add(check);
+              return check.future;
+            }),
+          ],
+        );
+        addTearDown(container.dispose);
+      });
+
+      test(
+        'an older offline result does not overwrite a newer online one',
+        () async {
+          container.read(networkStatusProvider);
+          final newer = container
+              .read(networkStatusProvider.notifier)
+              .checkReachability();
+          expect(checks, hasLength(2));
+
+          checks[1].complete(true);
+          await newer;
+          checks[0].complete(false);
+          await pumpEventQueue();
+
+          expect(container.read(networkStatusProvider), NetworkStatus.online);
+        },
+      );
+
+      test('an older failed check does not overwrite a newer result', () async {
+        container.read(networkStatusProvider);
+        final newer = container
+            .read(networkStatusProvider.notifier)
+            .checkReachability();
+
+        checks[1].complete(true);
+        await newer;
+        checks[0].completeError(Exception('lookup failed'));
+        await pumpEventQueue();
+
+        expect(container.read(networkStatusProvider), NetworkStatus.online);
+      });
+
+      test(
+        'an older online result does not overwrite a newer offline one',
+        () async {
+          container.read(networkStatusProvider);
+          final newer = container
+              .read(networkStatusProvider.notifier)
+              .checkReachability();
+
+          checks[1].complete(false);
+          await newer;
+          checks[0].complete(true);
+          await pumpEventQueue();
+
+          expect(container.read(networkStatusProvider), NetworkStatus.offline);
+        },
+      );
+    });
 
     test('disposing container cleanly cancels monitoring timer', () async {
       final container = ProviderContainer(
