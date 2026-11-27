@@ -1,10 +1,11 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:zedu/core/mock/mock.dart';
 import 'package:zedu/features/auth/data/models/login_response_model.dart';
 
 void main() {
   group('LoginResponseModel and UserModel timestamp parsing (#2574)', () {
     final mockUser = Map<String, dynamic>.from(
-      LoginResponseModel.mockLoginResponse['user'] as Map<String, dynamic>,
+      mockLoginResponse['user'] as Map<String, dynamic>,
     );
 
     test('parses when timestamps are integer epoch numbers', () {
