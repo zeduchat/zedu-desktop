@@ -9,9 +9,26 @@ class FakeAuthNotifier extends AuthNotifier {
   AuthState build() => const AuthState(status: AuthStatus.unauthenticated);
 }
 
-Widget buildResetPasswordViewUnderTest() {
+/// Records the code a reset was submitted with.
+class _RecordingAuthNotifier extends FakeAuthNotifier {
+  final tokens = <String>[];
+
+  @override
+  Future<bool> resetPassword({
+    required String email,
+    required String token,
+    required String newPassword,
+  }) async {
+    tokens.add(token);
+    return false;
+  }
+}
+
+Widget buildResetPasswordViewUnderTest({AuthNotifier? notifier}) {
   return ProviderScope(
-    overrides: [authNotifierProvider.overrideWith(() => FakeAuthNotifier())],
+    overrides: [
+      authNotifierProvider.overrideWith(() => notifier ?? FakeAuthNotifier()),
+    ],
     child: const MaterialApp(
       home: ResetPasswordView(email: 'test@example.com'),
     ),
@@ -81,6 +98,50 @@ void main() {
         expect(codeDigits(tester), ['', '', '', '', '', '']);
       },
     );
+
+    testWidgets('pasting the whole code fills every box and submits it', (
+      tester,
+    ) async {
+      final notifier = _RecordingAuthNotifier();
+      await tester.pumpWidget(
+        buildResetPasswordViewUnderTest(notifier: notifier),
+      );
+      final fields = find.byType(TextFormField);
+
+      await tester.enterText(fields.at(0), '123456');
+      await tester.pump();
+      expect(codeDigits(tester), ['1', '2', '3', '4', '5', '6']);
+
+      await tester.enterText(fields.at(6), 'NewSecret123!');
+      await tester.enterText(fields.at(7), 'NewSecret123!');
+      await tester.ensureVisible(find.byType(AppButton));
+      await tester.tap(find.byType(AppButton));
+      await tester.pump();
+
+      expect(notifier.tokens, ['123456']);
+    });
+
+    testWidgets('a code pasted into a later box still fills every box', (
+      tester,
+    ) async {
+      await tester.pumpWidget(buildResetPasswordViewUnderTest());
+
+      await tester.enterText(find.byType(TextFormField).at(3), '654321');
+      await tester.pump();
+
+      expect(codeDigits(tester), ['6', '5', '4', '3', '2', '1']);
+    });
+
+    testWidgets('a partial paste fills boxes from where it was pasted', (
+      tester,
+    ) async {
+      await tester.pumpWidget(buildResetPasswordViewUnderTest());
+
+      await tester.enterText(find.byType(TextFormField).at(2), '789');
+      await tester.pump();
+
+      expect(codeDigits(tester), ['', '', '7', '8', '9', '']);
+    });
 
     testWidgets('Backspace in the first empty box does nothing', (
       tester,
