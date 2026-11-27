@@ -153,4 +153,39 @@ void main() {
       AppPalette.light.primaryBg,
     );
   });
+
+  testWidgets('keeps a long email on one line with a full-address tooltip', (
+    tester,
+  ) async {
+    const email = 'henryuks129.with.a.very.long.address@gmail.com';
+    tester.view.physicalSize = const Size(700, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      buildTestMaterialApp(
+        Scaffold(
+          body: SingleChildScrollView(
+            child: AccountSection(
+              account: account.copyWith(email: email),
+              isSaving: false,
+              onSave: (_) {},
+              onDelete: () async {},
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final text = tester.widget<Text>(find.text(email));
+    expect(text.maxLines, 1);
+    expect(text.overflow, TextOverflow.ellipsis);
+
+    final tooltip = tester.widget<Tooltip>(
+      find.ancestor(of: find.text(email), matching: find.byType(Tooltip)),
+    );
+    expect(tooltip.message, email);
+    expect(tester.takeException(), isNull);
+  });
 }
