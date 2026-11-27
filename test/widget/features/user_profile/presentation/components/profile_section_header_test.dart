@@ -26,5 +26,28 @@ void main() {
         tester.element(title).colors.textPrimary,
       );
     });
+
+    testWidgets(
+      'section subtitle uses the palette in ${brightness.name} mode',
+      (tester) async {
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: ThemeData(brightness: brightness),
+            home: const Scaffold(
+              body: ProfileSectionHeader(
+                title: 'Account',
+                subtitle: 'Your profile',
+              ),
+            ),
+          ),
+        );
+
+        final subtitle = find.text('Your profile');
+        expect(
+          tester.widget<Text>(subtitle).style?.color,
+          tester.element(subtitle).colors.textSecondary,
+        );
+      },
+    );
   }
 }

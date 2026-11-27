@@ -32,7 +32,7 @@ class ProfileSectionHeader extends StatelessWidget {
               Text(
                 subtitle,
                 style: context.textTheme.bodySmall?.copyWith(
-                  color: const Color(0xFF6B7280),
+                  color: context.colors.textSecondary,
                 ),
               ),
             ],
