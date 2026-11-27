@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:zedu/core/core.dart';
 
@@ -7,20 +6,43 @@ enum NetworkStatus { online, offline }
 
 typedef ReachabilityChecker = Future<bool> Function();
 
-/// Provides a reachability check strategy. Defaults to resolving DNS via `InternetAddress.lookup`.
+/// Provides a reachability check strategy. Defaults to asking the app's API
+/// host ([AppConfig.apiBaseUrl]) for any HTTP response.
 final reachabilityCheckerProvider = Provider<ReachabilityChecker>((ref) {
-  return NetworkStatusNotifier.defaultReachabilityChecker;
+  return () => NetworkStatusNotifier.apiReachabilityChecker(
+    locator<AppConfig>().apiBaseUrl,
+  );
 });
 
 class NetworkStatusNotifier extends Notifier<NetworkStatus> {
   Timer? _checkTimer;
 
-  /// Resolves a stable host over DNS to decide whether the device is online.
-  /// DNS resolution failure (no connection / resolver unavailable) maps to offline.
-  static Future<bool> defaultReachabilityChecker() async {
+  /// A plain client with short timeouts, so the check sends no session token
+  /// and an unreachable host is reported quickly.
+  static final Dio _reachabilityClient = Dio(
+    BaseOptions(
+      connectTimeout: const Duration(seconds: 5),
+      sendTimeout: const Duration(seconds: 5),
+      receiveTimeout: const Duration(seconds: 5),
+      validateStatus: (_) => true,
+    ),
+  );
+
+  /// Sends `HEAD` to [baseUrl], the app's API host. Any HTTP response, even
+  /// an error status, means the device is online; a connection error or a
+  /// timeout means it is offline.
+  static Future<bool> apiReachabilityChecker(
+    String baseUrl, {
+    Dio? client,
+  }) async {
     try {
-      final result = await InternetAddress.lookup('ziki.dev');
-      return result.any((record) => record.address.isNotEmpty);
+      await (client ?? _reachabilityClient).head<void>(
+        baseUrl,
+        options: Options(validateStatus: (_) => true),
+      );
+      return true;
+    } on DioException catch (error) {
+      return error.response != null;
     } catch (_) {
       return false;
     }
