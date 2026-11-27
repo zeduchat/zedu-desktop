@@ -49,7 +49,6 @@ class AppConfig {
     required this.apiBaseUrl,
     required this.usesMockData,
     this.googleClientId = kDefaultDesktopGoogleClientId,
-    this.googleClientSecret = '',
     this.contactSalesUrl = kDefaultContactSalesUrl,
     this.webAppUrl = '',
     this.repoUrl = kDefaultRepoUrl,
@@ -84,7 +83,6 @@ class AppConfig {
     const defineApiBaseUrl = String.fromEnvironment('API_BASE_URL');
     const defineUsesMock = String.fromEnvironment('USE_MOCK_DATA');
     const defineClientId = String.fromEnvironment('GOOGLE_CLIENT_ID');
-    const defineClientSecret = String.fromEnvironment('GOOGLE_CLIENT_SECRET');
     const defineWebAppUrl = String.fromEnvironment('WEB_APP_URL');
     const defineRepoUrl = String.fromEnvironment('REPO_URL');
     const defineRepoUrls = String.fromEnvironment('REPO_URLS');
@@ -93,7 +91,6 @@ class AppConfig {
     final envApiBaseUrl = dotenv.maybeGet('API_BASE_URL')?.trim();
     final envUsesMock = dotenv.maybeGet('USE_MOCK_DATA')?.trim();
     final envClientId = dotenv.maybeGet('GOOGLE_CLIENT_ID')?.trim();
-    final envClientSecret = dotenv.maybeGet('GOOGLE_CLIENT_SECRET')?.trim();
     final envWebAppUrl = dotenv.maybeGet('WEB_APP_URL')?.trim();
     final envRepoUrl = dotenv.maybeGet('REPO_URL')?.trim();
     final envRepoUrls = dotenv.maybeGet('REPO_URLS')?.trim();
@@ -125,12 +122,6 @@ class AppConfig {
         : (envClientId?.isNotEmpty ?? false)
         ? envClientId!
         : kDefaultDesktopGoogleClientId;
-
-    final googleClientSecret = defineClientSecret.isNotEmpty
-        ? defineClientSecret
-        : (envClientSecret?.isNotEmpty ?? false)
-        ? envClientSecret!
-        : '';
 
     // Build the list of accepted repository URLs: the explicit repo URL plus
     // any additional comma-separated URLs from REPO_URLS.
@@ -165,7 +156,6 @@ class AppConfig {
       apiBaseUrl: apiBaseUrl,
       usesMockData: usesMockData,
       googleClientId: googleClientId,
-      googleClientSecret: googleClientSecret,
       webAppUrl: defineWebAppUrl.isNotEmpty
           ? defineWebAppUrl
           : envWebAppUrl ?? '',
@@ -178,7 +168,6 @@ class AppConfig {
   final String apiBaseUrl;
   final bool usesMockData;
   final String googleClientId;
-  final String googleClientSecret;
   final String contactSalesUrl;
 
   /// The web app's address, from `WEB_APP_URL`. Empty means [webBaseUrl]

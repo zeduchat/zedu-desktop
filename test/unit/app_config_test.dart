@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zedu/core/core.dart';
 
@@ -50,6 +52,42 @@ void main() {
       final config = AppConfig.fromEnvironment();
 
       expect(config.apiBaseUrl, defaultApiBaseUrl(isRelease: kReleaseMode));
+    });
+  });
+
+  group('AppConfig Google client secret', () {
+    const leaked = 'leaked-google-client-secret';
+
+    setUpAll(() {
+      // A stale `.env` that still carries a client secret must not feed it
+      // into the app: desktop Google sign-in sends only the client id and
+      // the backend does the token exchange.
+      dotenv.loadFromString(
+        envString: 'GOOGLE_CLIENT_ID=\nGOOGLE_CLIENT_SECRET=$leaked',
+      );
+    });
+
+    test('fromEnvironment ignores GOOGLE_CLIENT_SECRET from .env', () {
+      final config = AppConfig.fromEnvironment();
+
+      final values = <String>[
+        config.apiBaseUrl,
+        config.googleClientId,
+        config.contactSalesUrl,
+        config.webAppUrl,
+        config.webBaseUrl,
+        config.repoUrl,
+        ...config.repoUrls,
+        config.connectUrl,
+      ];
+      expect(values, everyElement(isNot(contains(leaked))));
+      expect(config.googleClientId, kDefaultDesktopGoogleClientId);
+    });
+
+    test('.env.example no longer asks for a client secret', () {
+      final template = File('.env.example').readAsStringSync();
+
+      expect(template, isNot(contains('GOOGLE_CLIENT_SECRET')));
     });
   });
 }
