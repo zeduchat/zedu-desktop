@@ -18,6 +18,12 @@ abstract interface class UserProfileRepository {
   Future<Result<List<SecuritySession>>> getSecuritySessions({
     required String userId,
   });
+
+  /// Signs out the session [sessionId] (an access token id) of [userId].
+  Future<Result<void>> revokeSession({
+    required String userId,
+    required String sessionId,
+  });
   Future<Result<void>> changePassword({
     required String currentPassword,
     required String newPassword,

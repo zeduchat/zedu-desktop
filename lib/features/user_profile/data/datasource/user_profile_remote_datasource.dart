@@ -17,6 +17,10 @@ abstract interface class UserProfileRemoteDataSource {
   Future<List<SecuritySessionModel>> getSecuritySessions({
     required String userId,
   });
+  Future<void> revokeSession({
+    required String userId,
+    required String sessionId,
+  });
   Future<void> changePassword({
     required String currentPassword,
     required String newPassword,
@@ -291,6 +295,21 @@ class UserProfileRemoteDataSourceImpl implements UserProfileRemoteDataSource {
         .cast<Map<String, dynamic>>()
         .map(SecuritySessionModel.fromJson)
         .toList();
+  }
+
+  @override
+  Future<void> revokeSession({
+    required String userId,
+    required String sessionId,
+  }) async {
+    if (_config.usesMockData) return;
+    // zedu-be signs a session out with PUT /users/revoke-session. Without
+    // access_token_id it would revoke the caller's own session instead, so
+    // the id is always sent.
+    await _apiBaseService.put<dynamic>(
+      path: '/users/revoke-session',
+      data: {'user_id': userId, 'access_token_id': sessionId},
+    );
   }
 
   @override
@@ -626,6 +645,7 @@ const _organization = {
 
 const _sessions = [
   {
+    'id': 'session-mock-1',
     'device': 'Chrome',
     'location': 'Lagos',
     'date': 'May 8, 2026 1:07 PM',
@@ -633,6 +653,7 @@ const _sessions = [
     'status': 'Active',
   },
   {
+    'id': 'session-mock-2',
     'device': 'Chrome',
     'location': 'Abuja',
     'date': 'May 8, 2026 1:07 PM',
@@ -640,6 +661,7 @@ const _sessions = [
     'status': 'Active',
   },
   {
+    'id': 'session-mock-3',
     'device': 'Chrome',
     'location': 'Uyo',
     'date': 'May 8, 2026 1:07 PM',

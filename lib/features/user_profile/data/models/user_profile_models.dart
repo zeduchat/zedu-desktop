@@ -226,15 +226,20 @@ class SecuritySessionModel extends SecuritySession {
     required super.date,
     required super.lastActive,
     required super.status,
+    super.id,
+    super.isLive,
   });
 
-  /// Reads a session from `GET /users/{id}/sessions` (`created_at`,
+  /// Reads a session from `GET /users/{id}/sessions` (`id`, `created_at`,
   /// `updated_at`, `is_live`) or from the mock data (display strings). The
   /// API gives no device or location, so those show [unknown] rather than
   /// made-up values.
   factory SecuritySessionModel.fromJson(Map<String, dynamic> json) {
     final isLive = json['is_live'];
+    final status = _text(json['status']);
     return SecuritySessionModel(
+      id: _text(json['id']) ?? '',
+      isLive: isLive is bool ? isLive : status == 'Active',
       device: _text(json['device']) ?? unknown,
       location: _text(json['location']) ?? unknown,
       date: _text(json['date']) ?? _formatTime(json['created_at']) ?? unknown,
@@ -243,7 +248,7 @@ class SecuritySessionModel extends SecuritySession {
           _formatTime(json['updated_at']) ??
           unknown,
       status:
-          _text(json['status']) ??
+          status ??
           (isLive is bool ? (isLive ? 'Active' : 'Signed out') : unknown),
     );
   }
