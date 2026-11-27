@@ -123,9 +123,13 @@ class DmRepository {
   Future<List<Map<String, dynamic>>> getMessages(
     String channelId, {
     int page = 1,
+    bool isGroup = false,
   }) async {
     final response = await _apiClient.get<Map<String, dynamic>>(
-      path: '/channels/$channelId/messages',
+      // A group DM's history is on its own route, as on Zedu web.
+      path: isGroup
+          ? '/group-dms/channels/$channelId/threads'
+          : '/channels/$channelId/messages',
       queryParameters: {'page': page, 'limit': pageSize},
     );
 
@@ -169,6 +173,7 @@ class DmRepository {
     List<XFile>? media,
     List<dynamic>? mentions,
     bool isChannel = false,
+    bool isGroup = false,
   }) async {
     // Files are uploaded first (same as the web app); the message then
     // carries the file details the server returns, not a local file path.
@@ -184,6 +189,8 @@ class DmRepository {
       // web app, it is posted to the DM route, not /channels/:id/messages.
       path: isChannel
           ? '/threads/$channelId'
+          : isGroup
+          ? '/group-dms/channels/$channelId/threads'
           : '/dms/channels/$channelId/threads',
       data: {
         // The server rejects an empty content, so a voice note or file sent

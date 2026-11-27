@@ -1,5 +1,10 @@
 class DmConversation {
   final String channelId;
+
+  /// Whether this is a group DM (the server's `group_dm` / `groupdm`), whose
+  /// messages use the /group-dms routes instead of the one-to-one DM ones.
+  bool get isGroup => isGroupChannelType(channelType);
+
   final String username;
   final String participantId;
   final String? participantEmail;
@@ -171,3 +176,9 @@ class DmParticipant {
     );
   }
 }
+
+/// Whether [channelType] names a group DM ("group_dm", "groupdm", "group-dms").
+bool isGroupChannelType(String channelType) => channelType
+    .toLowerCase()
+    .replaceAll(RegExp(r'[\s_-]'), '')
+    .startsWith('groupdm');

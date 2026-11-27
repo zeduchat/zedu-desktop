@@ -59,6 +59,30 @@ class ChatHistoryNotifier extends ChangeNotifier {
     _loadInitial();
   }
 
+  /// Whether this conversation is a group DM, per the DMs list or the
+  /// groups created in this session; its messages use the /group-dms routes.
+  /// Only providers that are already alive are read, so this never starts
+  /// loading the DMs or workspaces itself.
+  bool get _isGroup {
+    if (ref.exists(dmListProvider)) {
+      final conversations = ref.read(dmListProvider).value;
+      for (final c in conversations ?? const <DmConversation>[]) {
+        if (c.channelId == channelId) return c.isGroup;
+      }
+    }
+    return ref.exists(groupDmProvider) &&
+        ref.read(groupDmProvider).any((g) => g.id == channelId);
+  }
+
+  /// Loads [page] of history; a group passes isGroup, a DM calls exactly as
+  /// before.
+  Future<List<Map<String, dynamic>>> _getMessages(
+    DmRepository repository, {
+    required int page,
+  }) => _isGroup
+      ? repository.getMessages(channelId, page: page, isGroup: true)
+      : repository.getMessages(channelId, page: page);
+
   String get _currentUserId {
     final authState = ref.read(authNotifierProvider);
     return authState.user?.id ?? '';
@@ -118,7 +142,7 @@ class ChatHistoryNotifier extends ChangeNotifier {
     } catch (_) {}
     try {
       final repository = ref.read(dmRepositoryProvider);
-      final loaded = await repository.getMessages(channelId, page: 1);
+      final loaded = await _getMessages(repository, page: 1);
       final visible = loaded.where((m) => !_isCleared(m)).toList();
       // Keep messages sent (or failing to send) while the history was missing.
       final unsent = messages.where((m) => m['status'] != null);
@@ -192,7 +216,7 @@ class ChatHistoryNotifier extends ChangeNotifier {
     _pollInFlight = true;
     try {
       final repository = ref.read(dmRepositoryProvider);
-      final fresh = await repository.getMessages(channelId, page: 1);
+      final fresh = await _getMessages(repository, page: 1);
       if (_isDisposed) return;
 
       // A message edited elsewhere keeps its id, so it is not "new": replace
@@ -292,7 +316,7 @@ class ChatHistoryNotifier extends ChangeNotifier {
   Future<Map<String, dynamic>?> _findDeliveredCopy(OutboundSend send) async {
     try {
       final repository = ref.read(dmRepositoryProvider);
-      final page = await repository.getMessages(channelId, page: 1);
+      final page = await _getMessages(repository, page: 1);
       if (_isDisposed) return null;
       return findDeliveredCopy(page, send: send, senderId: _currentUserId);
     } catch (_) {
@@ -366,10 +390,7 @@ class ChatHistoryNotifier extends ChangeNotifier {
     try {
       final repository = ref.read(dmRepositoryProvider);
       final nextPage = page + 1;
-      final newMessages = await repository.getMessages(
-        channelId,
-        page: nextPage,
-      );
+      final newMessages = await _getMessages(repository, page: nextPage);
 
       messages = [
         ...messages,
@@ -513,13 +534,21 @@ class ChatHistoryNotifier extends ChangeNotifier {
 
     try {
       final repository = ref.read(dmRepositoryProvider);
-      final threadId = await repository.sendMessage(
-        channelId,
-        content,
-        media: media,
-        mentions: mentions,
-        isChannel: isChannel,
-      );
+      final threadId = !isChannel && _isGroup
+          ? await repository.sendMessage(
+              channelId,
+              content,
+              media: media,
+              mentions: mentions,
+              isGroup: true,
+            )
+          : await repository.sendMessage(
+              channelId,
+              content,
+              media: media,
+              mentions: mentions,
+              isChannel: isChannel,
+            );
       _sendOptions.remove(tempId);
       _outboundSends.remove(tempId);
       _cancelRetry(tempId);
@@ -608,14 +637,23 @@ class ChatHistoryNotifier extends ChangeNotifier {
     try {
       final repository = ref.read(dmRepositoryProvider);
       final options = _sendOptions[messageId];
-      final threadId = await repository.sendMessage(
-        channelId,
-        content,
-        media: options?.media,
-        mentions: options?.mentions,
-        isChannel:
-            failedMsg['is_channel'] as bool? ?? options?.isChannel ?? false,
-      );
+      final retryIsChannel =
+          failedMsg['is_channel'] as bool? ?? options?.isChannel ?? false;
+      final threadId = !retryIsChannel && _isGroup
+          ? await repository.sendMessage(
+              channelId,
+              content,
+              media: options?.media,
+              mentions: options?.mentions,
+              isGroup: true,
+            )
+          : await repository.sendMessage(
+              channelId,
+              content,
+              media: options?.media,
+              mentions: options?.mentions,
+              isChannel: retryIsChannel,
+            );
       _sendOptions.remove(messageId);
       _outboundSends.remove(messageId);
       _cancelRetry(messageId);

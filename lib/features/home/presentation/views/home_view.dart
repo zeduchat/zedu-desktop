@@ -219,6 +219,22 @@ class _ChatAreaSwitcher extends ConsumerWidget {
     if (activeChat.type == ActiveChatType.channelDirectory) {
       return const ChannelDirectoryView();
     }
+    // A group DM (for example one just made in New Group Chat) opens in the
+    // DM chat area; without this branch it fell through to #general.
+    if (activeChat.type == ActiveChatType.groupDm) {
+      final groupId = activeChat.id ?? '';
+      final conversation = groupDmConversation(
+        groupId,
+        conversations: ref.watch(dmListProvider).value,
+        groups: ref.watch(groupDmProvider),
+      );
+      if (conversation != null) {
+        return DmChatArea(
+          key: ValueKey('group_dm_$groupId'),
+          conversation: conversation,
+        );
+      }
+    }
 
     if (state == HomeSidebarType.dms) {
       if (selectedDm != null) {
@@ -923,4 +939,32 @@ class _InviteCard extends StatelessWidget {
       },
     );
   }
+}
+
+/// The conversation to show for the group DM [groupId]: the DMs list's entry
+/// when the server has listed it, else the group this session just created
+/// (until the DMs list refreshes). Null when neither knows it.
+@visibleForTesting
+DmConversation? groupDmConversation(
+  String groupId, {
+  required List<DmConversation>? conversations,
+  required List<GroupDM> groups,
+}) {
+  if (groupId.isEmpty) return null;
+  for (final c in conversations ?? const <DmConversation>[]) {
+    if (c.channelId == groupId) return c;
+  }
+  for (final g in groups) {
+    if (g.id == groupId) {
+      return DmConversation(
+        channelId: g.id,
+        username: g.name,
+        participantId: '',
+        channelType: 'group_dm',
+        previewMessage: '',
+        unreadCount: 0,
+      );
+    }
+  }
+  return null;
 }
