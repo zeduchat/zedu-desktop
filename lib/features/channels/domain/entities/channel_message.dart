@@ -40,6 +40,10 @@ class ChannelMessage {
   final String? userId;
   final List<ChannelReaction> reactions;
 
+  /// The backend's message type: `thread` for a person's message, `system`
+  /// for an automatic notice such as "mimi joined this channel".
+  final String? type;
+
   const ChannelMessage({
     this.id,
     required this.senderName,
@@ -53,6 +57,7 @@ class ChannelMessage {
     this.threadId,
     this.userId,
     this.reactions = const [],
+    this.type,
   }) : rawContent = rawContent ?? text;
 
   static List<dynamic> mediaFrom(dynamic raw) {
@@ -61,6 +66,60 @@ class ChannelMessage {
     }
     return const [];
   }
+
+  /// Whether this is an automatic notice rather than something a person said.
+  bool get isSystem => type == 'system';
+
+  /// The text of a system notice split into plain text and the people it
+  /// names, read from the mention spans the backend writes into it
+  /// (`<span data-type="mention" data-id=".." data-label="..">@name</span>`).
+  List<ChannelNoticePart> get noticeParts {
+    final mentions = <ChannelNoticePart>[];
+    // Each mention becomes a marker that the HTML cleanup keeps, so the text
+    // around it is cleaned the same way as a normal message.
+    final marked = rawContent.replaceAllMapped(_mentionSpan, (match) {
+      final attributes = match[1]!;
+      String? attribute(String name) =>
+          RegExp('$name="([^"]*)"').firstMatch(attributes)?.group(1);
+      final label =
+          attribute('data-label') ??
+          match[2]!.replaceAll(_htmlTag, '').replaceFirst(RegExp('^@'), '');
+      final userId = attribute('data-id');
+      mentions.add(
+        ChannelNoticePart(
+          text: _decodeHtmlEntities(label),
+          userId: userId == null || userId.isEmpty
+              ? null
+              : _decodeHtmlEntities(userId),
+          isMention: true,
+        ),
+      );
+      return '$_mentionMarker${mentions.length - 1}$_mentionMarker';
+    });
+    if (mentions.isEmpty) return [ChannelNoticePart(text: text)];
+
+    final parts = <ChannelNoticePart>[];
+    final pieces = _cleanMessageText(marked).split(_mentionMarker);
+    for (var i = 0; i < pieces.length; i++) {
+      // Odd pieces sit between two markers: a mention's index.
+      final index = i.isOdd ? int.tryParse(pieces[i]) : null;
+      if (index != null && index < mentions.length) {
+        parts.add(mentions[index]);
+      } else if (pieces[i].isNotEmpty) {
+        parts.add(ChannelNoticePart(text: pieces[i]));
+      }
+    }
+    return parts;
+  }
+
+  /// A private-use character, which notice text does not contain.
+  static const _mentionMarker = '\u{E000}';
+
+  static final _mentionSpan = RegExp(
+    r'<span\b([^>]*\bdata-type="mention"[^>]*)>(.*?)</span>',
+    caseSensitive: false,
+    dotAll: true,
+  );
 
   /// Identifies this message when pages are merged, so a message that shows
   /// up on two pages is listed once. Falls back to the content for a message
@@ -100,6 +159,7 @@ class ChannelMessage {
         for (final entry in (json['reactions'] as List? ?? const []))
           if (entry is Map<String, dynamic>) ChannelReaction.fromJson(entry),
       ],
+      type: nonEmpty(json['type']),
     );
   }
 
@@ -159,4 +219,21 @@ class ChannelMessage {
       },
     );
   }
+}
+
+/// A piece of a system notice: plain text, or a person the notice names.
+class ChannelNoticePart {
+  final String text;
+
+  /// The named person's user id, when the notice gave one.
+  final String? userId;
+
+  /// Whether this piece names a person rather than being plain text.
+  final bool isMention;
+
+  const ChannelNoticePart({
+    required this.text,
+    this.userId,
+    this.isMention = false,
+  });
 }
