@@ -296,14 +296,49 @@ class _Results extends ConsumerWidget {
                 : 'No messages match.',
           );
         }
-        return ListView.separated(
-          key: const Key('message-search-results'),
-          shrinkWrap: true,
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          itemCount: results.length,
-          separatorBuilder: (_, _) => Divider(height: 1, color: colors.divider),
-          itemBuilder: (context, index) =>
-              _ResultTile(result: results[index], onTap: onOpen),
+        final notifier = ref.read(messageSearchProvider.notifier);
+        final showMore = state.hasMore || state.loadMoreFailed;
+        return NotificationListener<ScrollNotification>(
+          // Fetch the next page as the list nears its end.
+          onNotification: (notification) {
+            if (notification.metrics.extentAfter < 200 &&
+                !state.loadMoreFailed) {
+              notifier.loadMore();
+            }
+            return false;
+          },
+          child: ListView.separated(
+            key: const Key('message-search-results'),
+            shrinkWrap: true,
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            itemCount: results.length + (showMore ? 1 : 0),
+            separatorBuilder: (_, _) =>
+                Divider(height: 1, color: colors.divider),
+            itemBuilder: (context, index) {
+              if (index < results.length) {
+                return _ResultTile(result: results[index], onTap: onOpen);
+              }
+              return Padding(
+                padding: const EdgeInsets.all(8),
+                child: Center(
+                  child: state.isLoadingMore
+                      ? const SizedBox.square(
+                          dimension: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : TextButton(
+                          key: const Key('message-search-load-more'),
+                          onPressed: notifier.loadMore,
+                          child: Text(
+                            state.loadMoreFailed
+                                ? "Couldn't load more. Try again"
+                                : 'Load more',
+                          ),
+                        ),
+                ),
+              );
+            },
+          ),
         );
       },
     );

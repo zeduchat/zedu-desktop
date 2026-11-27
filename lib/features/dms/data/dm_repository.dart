@@ -115,7 +115,8 @@ class DmRepository {
     if (channelId.isEmpty || trimmed.isEmpty) return const [];
     final response = await _apiClient.get<Map<String, dynamic>>(
       path: '/search/channel/$channelId',
-      queryParameters: {'query': trimmed, 'sortBy': 'relevance'},
+      // The backend reads `sortby`; `sortBy` is ignored.
+      queryParameters: {'query': trimmed, 'sortby': 'relevance'},
     );
     return ConversationSearchHit.fromResponse(response.data['data']);
   }

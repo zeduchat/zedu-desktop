@@ -1,8 +1,21 @@
 import 'package:zedu/core/core.dart';
 import 'package:zedu/features/features.dart';
 
+/// How many matches the backend sends per page of search results.
+const messageSearchPageSize = 20;
+
+/// One page of search results, and whether the server has more after it.
+class MessageSearchPage {
+  const MessageSearchPage({required this.results, required this.hasMore});
+
+  static const empty = MessageSearchPage(results: [], hasMore: false);
+
+  final List<SearchResultModel> results;
+  final bool hasMore;
+}
+
 /// Workspace-wide message search (#2825), through the endpoint the web app
-/// uses: `GET /search/organisation/{orgId}?query=…&sortBy=…`.
+/// uses: `GET /search/organisation/{orgId}?query=…&sortby=…&page=…&limit=…`.
 class MessageSearchService {
   MessageSearchService(this._apiClient);
 
@@ -10,20 +23,35 @@ class MessageSearchService {
 
   /// Searches every channel and conversation in [orgId] for [query], which
   /// already carries the filter tokens (see [buildMessageSearchQuery]).
-  /// Newest first. A 404 means nothing matched.
-  Future<List<SearchResultModel>> search({
+  /// Newest first, one [page] (from 1) at a time. A 404 means nothing matched.
+  Future<MessageSearchPage> search({
     required String orgId,
     required String query,
+    int page = 1,
   }) async {
-    if (orgId.isEmpty || query.trim().isEmpty) return const [];
+    if (orgId.isEmpty || query.trim().isEmpty) return MessageSearchPage.empty;
     try {
       final response = await _apiClient.get<Map<String, dynamic>>(
         path: '/search/organisation/$orgId',
-        queryParameters: {'query': query, 'sortBy': 'newest'},
+        queryParameters: {
+          'query': query,
+          // The backend reads `sortby`; `sortBy` is ignored.
+          'sortby': 'newest',
+          'page': page,
+          'limit': messageSearchPageSize,
+        },
       );
-      return flattenMessageSearchResults(response.data['data']);
+      final results = flattenMessageSearchResults(response.data['data']);
+      final pagination = response.data['pagination'];
+      final totalPages = pagination is Map
+          ? int.tryParse('${pagination['total_pages_count']}')
+          : null;
+      return MessageSearchPage(
+        results: results,
+        hasMore: results.isNotEmpty && totalPages != null && page < totalPages,
+      );
     } on ApiFailure catch (failure) {
-      if (failure.statusCode == 404) return const [];
+      if (failure.statusCode == 404) return MessageSearchPage.empty;
       rethrow;
     }
   }
@@ -71,14 +99,17 @@ List<SearchResultModel> flattenMessageSearchResults(Object? raw) {
       );
     }
   }
-  results.sort((a, b) {
-    final aTime = a.createdAt, bTime = b.createdAt;
-    if (aTime == null && bTime == null) return 0;
-    if (aTime == null) return 1;
-    if (bTime == null) return -1;
-    return bTime.compareTo(aTime);
-  });
+  results.sort(compareMessageSearchResults);
   return results;
+}
+
+/// Orders search results newest first, with undated ones last.
+int compareMessageSearchResults(SearchResultModel a, SearchResultModel b) {
+  final aTime = a.createdAt, bTime = b.createdAt;
+  if (aTime == null && bTime == null) return 0;
+  if (aTime == null) return 1;
+  if (bTime == null) return -1;
+  return bTime.compareTo(aTime);
 }
 
 String? _nonEmpty(Object? value) {
