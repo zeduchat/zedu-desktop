@@ -6,7 +6,15 @@ import 'package:zedu/features/features.dart';
 class DmListTile extends ConsumerWidget {
   final DmConversation conversation;
 
-  const DmListTile({super.key, required this.conversation});
+  /// Whether this is the user's own space (a DM with themselves), shown with
+  /// a "(you)" after the name.
+  final bool isOwnSpace;
+
+  const DmListTile({
+    super.key,
+    required this.conversation,
+    this.isOwnSpace = false,
+  });
 
   String _formatTime(DateTime dt) {
     final now = DateTime.now();
@@ -129,7 +137,9 @@ class DmListTile extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                conversation.displayName,
+                isOwnSpace
+                    ? '${conversation.displayName} (you)'
+                    : conversation.displayName,
                 style: TextStyle(
                   color: colors.onPrimary,
                   fontSize: 13,

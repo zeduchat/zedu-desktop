@@ -23,6 +23,33 @@ class _FakeWorkspaceNotifier extends WorkspaceNotifier {
   );
 }
 
+class _FakeAuthNotifier extends AuthNotifier {
+  @override
+  AuthState build() => AuthState(
+    status: AuthStatus.authenticated,
+    user: User(
+      id: 'me-1',
+      firstName: 'Zed',
+      lastName: 'Me',
+      email: 'me@example.com',
+      phone: '',
+      username: 'zedme',
+      isVerified: true,
+      isOnboarded: true,
+      createdAt: DateTime(2026),
+      currentOrg: 'org-1',
+      currentOrganisationSlug: 'org-slug',
+      avatarUrl: '',
+      defaultAvatarUrl: '',
+    ),
+  );
+}
+
+class _AlphabeticalSort extends DmSortNotifier {
+  @override
+  DmSort build() => DmSort.alphabetical;
+}
+
 class _FakeDmListNotifier extends DmListNotifier {
   _FakeDmListNotifier(this._conversations);
 
@@ -72,6 +99,7 @@ Future<void> _pumpSidebar(
   WidgetTester tester,
   List<DmConversation> conversations, {
   DmRepository? repository,
+  bool alphabetical = false,
 }) async {
   final repo = repository ?? _FakeDmRepository(conversations);
   await tester.pumpWidget(
@@ -87,6 +115,8 @@ Future<void> _pumpSidebar(
         ),
         dmListProvider.overrideWith(() => _FakeDmListNotifier(conversations)),
         dmRepositoryProvider.overrideWithValue(repo),
+        authNotifierProvider.overrideWith(_FakeAuthNotifier.new),
+        if (alphabetical) dmSortProvider.overrideWith(_AlphabeticalSort.new),
       ],
       child: buildTestMaterialApp(const Scaffold(body: DmSidebarList())),
     ),
@@ -211,5 +241,47 @@ void main() {
     expect(find.text('Zainab Danjuma'), findsNothing);
     expect(find.text('Ada Okafor'), findsOneWidget);
     expect(find.text('Bola Ige'), findsOneWidget);
+  });
+
+  group('own space (Ziki #2870)', () {
+    final ownSpace = DmConversation(
+      channelId: 'channel-me',
+      username: 'Zed Me',
+      participantId: 'me-1',
+      previewMessage: '',
+      unreadCount: 0,
+    );
+    final withOwnSpace = [...conversations, ownSpace];
+
+    List<String> listedNames(WidgetTester tester) => [
+      for (final tile in tester.widgetList<DmListTile>(find.byType(DmListTile)))
+        tile.conversation.displayName,
+    ];
+
+    testWidgets('comes first with a (you) badge, whatever the sort', (
+      tester,
+    ) async {
+      await _pumpSidebar(tester, withOwnSpace, alphabetical: true);
+
+      expect(listedNames(tester), [
+        'Zed Me',
+        'Ada Okafor',
+        'Bola Ige',
+        'Chidi Ada',
+      ]);
+      expect(find.text('Zed Me (you)'), findsOneWidget);
+      expect(find.text('Ada Okafor (you)'), findsNothing);
+    });
+
+    testWidgets('search results keep their order but still show (you)', (
+      tester,
+    ) async {
+      await _pumpSidebar(tester, withOwnSpace, alphabetical: true);
+
+      await tester.enterText(find.byType(TextField), 'ed');
+      await tester.pumpAndSettle();
+
+      expect(find.text('Zed Me (you)'), findsOneWidget);
+    });
   });
 }
