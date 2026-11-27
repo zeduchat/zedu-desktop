@@ -3,12 +3,18 @@ import 'package:zedu/features/features.dart';
 import '../../../../../helpers/helpers.dart';
 
 class FakeActiveCallNotifier extends ActiveCallNotifier {
-  FakeActiveCallNotifier(super.ref, {required bool isFullPage})
-    : _fakeState = ActiveCallState(
-        status: CallStatus.active,
-        remoteUserName: 'Ruby',
-        isFullPage: isFullPage,
-      );
+  FakeActiveCallNotifier(
+    super.ref, {
+    required bool isFullPage,
+    List<CallParticipant> participants = const [
+      CallParticipant(userId: 'ruby', name: 'Ruby'),
+    ],
+  }) : _fakeState = ActiveCallState(
+         status: CallStatus.active,
+         remoteUserName: 'Ruby',
+         isFullPage: isFullPage,
+         participants: participants,
+       );
 
   final ActiveCallState _fakeState;
 
@@ -16,11 +22,20 @@ class FakeActiveCallNotifier extends ActiveCallNotifier {
   ActiveCallState get state => _fakeState;
 }
 
-Widget buildBuzzMeetingViewUnderTest({required bool isFullPage}) {
+Widget buildBuzzMeetingViewUnderTest({
+  required bool isFullPage,
+  List<CallParticipant>? participants,
+}) {
   return ProviderScope(
     overrides: [
       activeCallProvider.overrideWith(
-        (ref) => FakeActiveCallNotifier(ref, isFullPage: isFullPage),
+        (ref) => participants == null
+            ? FakeActiveCallNotifier(ref, isFullPage: isFullPage)
+            : FakeActiveCallNotifier(
+                ref,
+                isFullPage: isFullPage,
+                participants: participants,
+              ),
       ),
     ],
     // The compact view is a Positioned, so it needs a Stack ancestor.
@@ -51,6 +66,51 @@ void main() {
       expect(find.text('2 participants'), findsOneWidget);
       expect(find.text('2 participant'), findsNothing);
     });
+  });
+
+  group('BuzzMeetingView participant count', () {
+    const three = [
+      CallParticipant(userId: 'ruby', name: 'Ruby'),
+      CallParticipant(userId: 'sam', name: 'Sam'),
+    ];
+
+    for (final isFullPage in [false, true]) {
+      final view = isFullPage ? 'full-page' : 'compact';
+
+      testWidgets('$view view says "1 participant" when alone', (tester) async {
+        tester.view.physicalSize = const Size(1440, 900);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.reset);
+
+        await tester.pumpWidget(
+          buildBuzzMeetingViewUnderTest(
+            isFullPage: isFullPage,
+            participants: const [],
+          ),
+        );
+        await tester.pump();
+
+        expect(find.text('1 participant'), findsOneWidget);
+        expect(find.text('2 participants'), findsNothing);
+      });
+
+      testWidgets('$view view counts everyone in a group call', (tester) async {
+        tester.view.physicalSize = const Size(1440, 900);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.reset);
+
+        await tester.pumpWidget(
+          buildBuzzMeetingViewUnderTest(
+            isFullPage: isFullPage,
+            participants: three,
+          ),
+        );
+        await tester.pump();
+
+        expect(find.text('3 participants'), findsOneWidget);
+        expect(find.text('2 participants'), findsNothing);
+      });
+    }
   });
 
   group('BuzzMeetingView share screen button', () {
