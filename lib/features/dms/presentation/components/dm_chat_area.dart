@@ -23,6 +23,33 @@ class _DmChatAreaState extends ConsumerState<DmChatArea> {
   String? _highlightedId;
   Timer? _highlightTimer;
 
+  // A conversation opened with this many unread messages offers "Jump to
+  // first unread".
+  static const _jumpToUnreadThreshold = 10;
+
+  /// When the user last read this conversation, while the "Jump to first
+  /// unread" button is offered; null once it is used or dismissed.
+  DateTime? _unreadSince;
+
+  @override
+  void initState() {
+    super.initState();
+    _unreadSince = _unreadSinceFor(widget.conversation);
+  }
+
+  @override
+  void didUpdateWidget(covariant DmChatArea oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.conversation.channelId != widget.conversation.channelId) {
+      _unreadSince = _unreadSinceFor(widget.conversation);
+    }
+  }
+
+  static DateTime? _unreadSinceFor(DmConversation conversation) =>
+      conversation.unreadCount >= _jumpToUnreadThreshold
+      ? conversation.lastReadAt
+      : null;
+
   @override
   void dispose() {
     _highlightTimer?.cancel();
@@ -350,12 +377,64 @@ class _DmChatAreaState extends ConsumerState<DmChatArea> {
       return;
     }
 
-    setState(() => _highlightedId = hit.messageId);
+    _highlightAndScrollTo(hit.messageId, index);
+  }
+
+  /// Loads back to the first message that arrived since the user last read
+  /// this conversation, scrolls to it and highlights it for a moment.
+  Future<void> _jumpToFirstUnread() async {
+    final since = _unreadSince;
+    if (since == null) return;
+    setState(() => _unreadSince = null);
+
+    final channelId = widget.conversation.channelId;
+    final history = ref.read(chatHistoryProvider(channelId));
+    final messageId = await history.loadUntilFirstUnread(since);
+    if (!mounted || widget.conversation.channelId != channelId) return;
+
+    final index = messageId == null
+        ? -1
+        : _visibleMessages(
+            history.messages,
+          ).indexWhere((message) => message['id']?.toString() == messageId);
+    if (index < 0) {
+      _showActionNotice("Couldn't find the first unread message.");
+      return;
+    }
+
+    _highlightAndScrollTo(messageId!, index);
+  }
+
+  void _highlightAndScrollTo(String messageId, int index) {
+    setState(() => _highlightedId = messageId);
     _highlightTimer?.cancel();
     _highlightTimer = Timer(const Duration(seconds: 2), () {
       if (mounted) setState(() => _highlightedId = null);
     });
     _scrollToMessage(index, attempt: 0);
+  }
+
+  /// Floats the "Jump to first unread" button over the message list while it
+  /// is offered. The Stack stays either way so the list keeps its scroll.
+  Widget _withJumpToUnread(Widget list) {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        list,
+        if (_unreadSince != null)
+          Positioned(
+            top: 12,
+            left: 0,
+            right: 0,
+            child: Center(
+              child: _JumpToUnreadButton(
+                onJump: _jumpToFirstUnread,
+                onDismiss: () => setState(() => _unreadSince = null),
+              ),
+            ),
+          ),
+      ],
+    );
   }
 
   void _scrollToMessage(int index, {required int attempt}) {
@@ -431,131 +510,140 @@ class _DmChatAreaState extends ConsumerState<DmChatArea> {
                           onMenuAction: _handleMenuAction,
                         ),
                         Expanded(
-                          child: Consumer(
-                            builder: (context, ref, child) {
-                              final historyState = ref.watch(
-                                chatHistoryProvider(
-                                  widget.conversation.channelId,
-                                ),
-                              );
-                              final isOwnSpace = _isOwnSpace;
-                              final messages = _visibleMessages(
-                                historyState.messages,
-                              );
+                          child: _withJumpToUnread(
+                            Consumer(
+                              builder: (context, ref, child) {
+                                final historyState = ref.watch(
+                                  chatHistoryProvider(
+                                    widget.conversation.channelId,
+                                  ),
+                                );
+                                final isOwnSpace = _isOwnSpace;
+                                final messages = _visibleMessages(
+                                  historyState.messages,
+                                );
 
-                              return NotificationListener<ScrollNotification>(
-                                onNotification:
-                                    (ScrollNotification scrollInfo) {
-                                      if (!historyState.isLoading &&
-                                          historyState.hasMore &&
-                                          !historyState.loadFailed &&
-                                          !historyState.loadMoreFailed &&
-                                          scrollInfo.metrics.pixels >=
-                                              scrollInfo
-                                                      .metrics
-                                                      .maxScrollExtent *
-                                                  0.8) {
-                                        ref
-                                            .read(
-                                              chatHistoryProvider(
-                                                widget.conversation.channelId,
-                                              ),
-                                            )
-                                            .loadMore();
-                                      }
-                                      return false;
-                                    },
-                                child: CustomScrollView(
-                                  controller: _scrollController,
-                                  reverse: true,
-                                  slivers: [
-                                    SliverPadding(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 24,
-                                        vertical: 16,
-                                      ),
-                                      sliver: SliverList(
-                                        delegate: SliverChildBuilderDelegate((
-                                          context,
-                                          index,
-                                        ) {
-                                          final msg = messages[index];
-                                          final isTarget =
-                                              _highlightedId != null &&
-                                              msg['id']?.toString() ==
-                                                  _highlightedId;
-                                          return Container(
-                                            key: isTarget
-                                                ? _jumpTargetKey
-                                                : null,
-                                            color: isTarget
-                                                ? context.colors.primary
-                                                      .withValues(alpha: 0.12)
-                                                : null,
-                                            child: _MessageBubble(
-                                              message: msg,
-                                              conversation: widget.conversation,
-                                              channelId:
+                                return NotificationListener<ScrollNotification>(
+                                  onNotification:
+                                      (ScrollNotification scrollInfo) {
+                                        if (!historyState.isLoading &&
+                                            historyState.hasMore &&
+                                            !historyState.loadFailed &&
+                                            !historyState.loadMoreFailed &&
+                                            scrollInfo.metrics.pixels >=
+                                                scrollInfo
+                                                        .metrics
+                                                        .maxScrollExtent *
+                                                    0.8) {
+                                          ref
+                                              .read(
+                                                chatHistoryProvider(
                                                   widget.conversation.channelId,
-                                              onEdit: (id, text) => _composerKey
-                                                  .currentState
-                                                  ?.enterEditMode(id, text),
-                                            ),
-                                          );
-                                        }, childCount: messages.length),
-                                      ),
-                                    ),
-                                    if (historyState.isLoading)
-                                      const SliverToBoxAdapter(
-                                        child: Padding(
-                                          padding: EdgeInsets.symmetric(
-                                            vertical: 16,
-                                          ),
-                                          child: Center(
-                                            child: CircularProgressIndicator(),
-                                          ),
-                                        ),
-                                      ),
-                                    if (!historyState.isLoading &&
-                                        historyState.loadFailed)
-                                      SliverToBoxAdapter(
-                                        child: _HistoryLoadError(
-                                          message: "Couldn't load messages.",
-                                          onRetry: historyState.retryLoad,
-                                        ),
-                                      )
-                                    else if (!historyState.isLoading &&
-                                        historyState.loadMoreFailed)
-                                      SliverToBoxAdapter(
-                                        child: _HistoryLoadError(
-                                          message:
-                                              "Couldn't load older messages.",
-                                          onRetry: historyState.loadMore,
-                                        ),
-                                      ),
-                                    if (!historyState.hasMore)
-                                      SliverToBoxAdapter(
-                                        child: historyState.historyCleared
-                                            ? const _HistoryClearedNote()
-                                            : isOwnSpace
-                                            ? OwnSpaceIntro(
-                                                conversation:
-                                                    widget.conversation,
-                                                onEditProfile: _editOwnProfile,
+                                                ),
                                               )
-                                            : DmProfileCard(
+                                              .loadMore();
+                                        }
+                                        return false;
+                                      },
+                                  child: CustomScrollView(
+                                    controller: _scrollController,
+                                    reverse: true,
+                                    slivers: [
+                                      SliverPadding(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 24,
+                                          vertical: 16,
+                                        ),
+                                        sliver: SliverList(
+                                          delegate: SliverChildBuilderDelegate((
+                                            context,
+                                            index,
+                                          ) {
+                                            final msg = messages[index];
+                                            final isTarget =
+                                                _highlightedId != null &&
+                                                msg['id']?.toString() ==
+                                                    _highlightedId;
+                                            return Container(
+                                              key: isTarget
+                                                  ? _jumpTargetKey
+                                                  : null,
+                                              color: isTarget
+                                                  ? context.colors.primary
+                                                        .withValues(alpha: 0.12)
+                                                  : null,
+                                              child: _MessageBubble(
+                                                message: msg,
                                                 conversation:
                                                     widget.conversation,
-                                                onViewProfile: () =>
-                                                    _handleMenuAction(
-                                                      'view_profile',
-                                                    ),
+                                                channelId: widget
+                                                    .conversation
+                                                    .channelId,
+                                                onEdit: (id, text) =>
+                                                    _composerKey.currentState
+                                                        ?.enterEditMode(
+                                                          id,
+                                                          text,
+                                                        ),
                                               ),
+                                            );
+                                          }, childCount: messages.length),
+                                        ),
                                       ),
-                                  ],
-                                ),
-                              );
-                            },
+                                      if (historyState.isLoading)
+                                        const SliverToBoxAdapter(
+                                          child: Padding(
+                                            padding: EdgeInsets.symmetric(
+                                              vertical: 16,
+                                            ),
+                                            child: Center(
+                                              child:
+                                                  CircularProgressIndicator(),
+                                            ),
+                                          ),
+                                        ),
+                                      if (!historyState.isLoading &&
+                                          historyState.loadFailed)
+                                        SliverToBoxAdapter(
+                                          child: _HistoryLoadError(
+                                            message: "Couldn't load messages.",
+                                            onRetry: historyState.retryLoad,
+                                          ),
+                                        )
+                                      else if (!historyState.isLoading &&
+                                          historyState.loadMoreFailed)
+                                        SliverToBoxAdapter(
+                                          child: _HistoryLoadError(
+                                            message:
+                                                "Couldn't load older messages.",
+                                            onRetry: historyState.loadMore,
+                                          ),
+                                        ),
+                                      if (!historyState.hasMore)
+                                        SliverToBoxAdapter(
+                                          child: historyState.historyCleared
+                                              ? const _HistoryClearedNote()
+                                              : isOwnSpace
+                                              ? OwnSpaceIntro(
+                                                  conversation:
+                                                      widget.conversation,
+                                                  onEditProfile:
+                                                      _editOwnProfile,
+                                                )
+                                              : DmProfileCard(
+                                                  conversation:
+                                                      widget.conversation,
+                                                  onViewProfile: () =>
+                                                      _handleMenuAction(
+                                                        'view_profile',
+                                                      ),
+                                                ),
+                                        ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            ),
                           ),
                         ),
                         DmMessageComposer(
@@ -722,6 +810,57 @@ class _DmChatAreaState extends ConsumerState<DmChatArea> {
 
 /// Shown at the top of a cleared conversation instead of [DmProfileCard],
 /// which is meant for the real start of a conversation.
+class _JumpToUnreadButton extends StatelessWidget {
+  const _JumpToUnreadButton({required this.onJump, required this.onDismiss});
+
+  final VoidCallback onJump;
+  final VoidCallback onDismiss;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    final radius = BorderRadius.circular(20);
+    return Material(
+      color: colors.primary,
+      borderRadius: radius,
+      elevation: 2,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          InkWell(
+            onTap: onJump,
+            borderRadius: radius,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(14, 8, 4, 8),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.arrow_upward, size: 16, color: colors.onPrimary),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Jump to first unread',
+                    style: TextStyle(
+                      color: colors.onPrimary,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          IconButton(
+            tooltip: 'Dismiss',
+            onPressed: onDismiss,
+            visualDensity: VisualDensity.compact,
+            icon: Icon(Icons.close, size: 16, color: colors.onPrimary),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _HistoryClearedNote extends StatelessWidget {
   const _HistoryClearedNote();
 
