@@ -133,7 +133,13 @@ class FilesListNotifier extends AsyncNotifier<FilesPage> {
     if (query.sort != FilesSort.oldestFirst) {
       _seedQuery = null;
       _serverPages = null;
-      return _fetch(repository, query);
+      final page = await _fetch(repository, query);
+      if (_isPastLastPage(page.files.isEmpty, query.page, page.totalPages)) {
+        // The last file on the last page left the list: show the page that
+        // is now last, which reloads the list (Ziki #2710).
+        ref.read(filesProvider.notifier).setPage(page.totalPages);
+      }
+      return page;
     }
 
     // The seed page depends on the filters, not on the page or the sort.
@@ -178,12 +184,22 @@ class FoldersListNotifier extends AsyncNotifier<FoldersPage> {
     final result = await ref
         .read(filesRepositoryProvider)
         .fetchFolders(view: view, parentId: parentId, page: page);
-    return switch (result) {
+    final folders = switch (result) {
       Success<FoldersPage>(:final value) => value,
       Failure<FoldersPage>(:final error) => throw error,
     };
+    if (_isPastLastPage(folders.folders.isEmpty, page, folders.totalPages)) {
+      // The last folder on the last page was deleted (Ziki #2710).
+      ref.read(filesProvider.notifier).setFolderPage(folders.totalPages);
+    }
+    return folders;
   }
 }
+
+/// Whether an empty [requestedPage] lies past the [totalPages] the server now
+/// reports, as when the last item on the last page leaves the list.
+bool _isPastLastPage(bool isEmpty, int requestedPage, int totalPages) =>
+    isEmpty && requestedPage > 1 && requestedPage > totalPages;
 
 /// What an Upload File run did.
 class FilesUploadOutcome {

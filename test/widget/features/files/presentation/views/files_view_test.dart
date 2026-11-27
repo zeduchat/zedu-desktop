@@ -325,6 +325,75 @@ class _FakeFilesRepository extends Fake implements FilesRepository {
   }
 }
 
+/// Lists files and folders ten to a page, as the server does, and drops
+/// the ones that are deleted or moved, so the last page can empty out
+/// (Ziki #2710).
+class _PagedFilesRepository extends _FakeFilesRepository {
+  _PagedFilesRepository({int files = 11, int folders = 1})
+    : pagedFiles = [
+        for (var i = 1; i <= files; i++)
+          WorkspaceFile(id: 'p-$i', name: 'file-$i.png', userId: 'u-1'),
+      ],
+      pagedFolders = [
+        for (var i = 1; i <= folders; i++)
+          FileFolder(id: 'folder-$i', name: 'folder-$i', userId: 'u-1'),
+      ];
+
+  final List<WorkspaceFile> pagedFiles;
+  final List<FileFolder> pagedFolders;
+
+  static (List<T>, int) _page<T>(List<T> items, int page) {
+    final total = items.isEmpty ? 1 : (items.length + 9) ~/ 10;
+    return (items.skip((page - 1) * 10).take(10).toList(), total);
+  }
+
+  @override
+  Future<Result<FilesPage>> fetchFiles(FilesQuery query) async {
+    queries.add(query);
+    final (files, total) = _page(pagedFiles, query.page);
+    return Success(
+      FilesPage(files: files, currentPage: query.page, totalPages: total),
+    );
+  }
+
+  @override
+  Future<Result<FoldersPage>> fetchFolders({
+    required FilesScope view,
+    String? parentId,
+    int page = 1,
+  }) async {
+    folderRequests.add((view, parentId));
+    if (parentId != null) return const Success(FoldersPage(folders: []));
+    final (folders, total) = _page(pagedFolders, page);
+    return Success(
+      FoldersPage(folders: folders, currentPage: page, totalPages: total),
+    );
+  }
+
+  @override
+  Future<Result<void>> deleteFile(
+    String fileId, {
+    bool permanent = false,
+  }) async {
+    deletes.add((fileId, permanent));
+    pagedFiles.removeWhere((f) => f.id == fileId);
+    return const Success(null);
+  }
+
+  @override
+  Future<Result<void>> moveFile(String fileId, String folderId) async {
+    moves.add((fileId, folderId));
+    pagedFiles.removeWhere((f) => f.id == fileId);
+    return const Success(null);
+  }
+
+  @override
+  Future<Result<void>> deleteFolder(String id) async {
+    pagedFolders.removeWhere((f) => f.id == id);
+    return const Success(null);
+  }
+}
+
 Future<void> _pump(
   WidgetTester tester,
   _FakeFilesRepository repository, {
@@ -1675,5 +1744,140 @@ void main() {
       ),
       findsOneWidget,
     );
+  });
+
+  group('removing the last item on the last page (Ziki #2710)', () {
+    /// Tall enough to show a full page and the page controls.
+    Future<void> pumpTall(
+      WidgetTester tester,
+      _PagedFilesRepository repository,
+    ) async {
+      await _pump(tester, repository);
+      tester.view.physicalSize = const Size(1600, 1800);
+      await tester.pumpAndSettle();
+    }
+
+    Future<void> openLastFilesPage(WidgetTester tester) async {
+      await openFilesTab(tester);
+      await tester.tap(find.byTooltip('Next page'));
+      await tester.pumpAndSettle();
+      expect(find.text('Page 2 of 2'), findsOneWidget);
+      expect(find.text('file-11.png'), findsOneWidget);
+    }
+
+    Future<void> chooseOnLastFile(WidgetTester tester, String label) async {
+      await tester.tap(find.byTooltip('More actions for file-11.png'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(label));
+      await tester.pumpAndSettle();
+    }
+
+    void expectFirstFilesPage() {
+      expect(find.text('No files'), findsNothing);
+      expect(find.text('file-11.png'), findsNothing);
+      expect(find.text('file-1.png'), findsOneWidget);
+      expect(find.text('file-10.png'), findsOneWidget);
+      // One page is left, so there is nothing to page through.
+      expect(find.byTooltip('Previous page'), findsNothing);
+    }
+
+    Future<void> clearSnackBar(WidgetTester tester) async {
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('deleting it goes back to the page that is now last', (
+      tester,
+    ) async {
+      final repository = _PagedFilesRepository();
+      await pumpTall(tester, repository);
+      await openLastFilesPage(tester);
+
+      await chooseOnLastFile(tester, 'Delete');
+      await tester.tap(find.widgetWithText(FilledButton, 'Delete'));
+      await tester.pumpAndSettle();
+
+      expect(repository.deletes, [('p-11', false)]);
+      expectFirstFilesPage();
+      expect(repository.queries.last.page, 1);
+      await clearSnackBar(tester);
+    });
+
+    testWidgets('moving it into a folder goes back a page', (tester) async {
+      final repository = _PagedFilesRepository();
+      await pumpTall(tester, repository);
+      await openLastFilesPage(tester);
+
+      await chooseOnLastFile(tester, 'Move');
+      await tester.tap(
+        find.descendant(
+          of: find.byType(MoveFileDialog),
+          matching: find.text('folder-1'),
+        ),
+      );
+      await tester.pump();
+      await tester.tap(find.widgetWithText(FilledButton, 'Move'));
+      await tester.pumpAndSettle();
+
+      expect(repository.moves, [('p-11', 'folder-1')]);
+      expectFirstFilesPage();
+      await clearSnackBar(tester);
+    });
+
+    testWidgets('deleting it for good in Deleted files goes back a page', (
+      tester,
+    ) async {
+      final repository = _PagedFilesRepository();
+      await pumpTall(tester, repository);
+      await tester.tap(find.text('Deleted files'));
+      await tester.pumpAndSettle();
+      await openLastFilesPage(tester);
+
+      await chooseOnLastFile(tester, 'Delete permanently');
+      await tester.tap(find.widgetWithText(FilledButton, 'Delete'));
+      await tester.pumpAndSettle();
+
+      expect(repository.deletes, [('p-11', true)]);
+      expectFirstFilesPage();
+      await clearSnackBar(tester);
+    });
+
+    testWidgets('No files still shows when the list is really empty', (
+      tester,
+    ) async {
+      final repository = _PagedFilesRepository(files: 1);
+      await pumpTall(tester, repository);
+      await openFilesTab(tester);
+
+      await tester.tap(find.byTooltip('More actions for file-1.png'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Delete'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Delete'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('No files'), findsOneWidget);
+      await clearSnackBar(tester);
+    });
+
+    testWidgets('deleting the last folder on the last page goes back a page', (
+      tester,
+    ) async {
+      final repository = _PagedFilesRepository(folders: 11);
+      await pumpTall(tester, repository);
+      await tester.tap(find.byTooltip('Next page'));
+      await tester.pumpAndSettle();
+      expect(find.text('folder-11'), findsOneWidget);
+
+      await tester.tap(find.byTooltip('Delete folder'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Delete'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('No folders'), findsNothing);
+      expect(find.text('folder-11'), findsNothing);
+      expect(find.text('folder-1'), findsOneWidget);
+      await clearSnackBar(tester);
+    });
   });
 }
