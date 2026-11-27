@@ -176,6 +176,10 @@ class FakeBuzzCallService implements BuzzCallService {
   Future<void> stopScreenShare() async => calls.add('stop-share');
 
   @override
+  Widget? remoteScreenView(int remoteUid) =>
+      SizedBox(key: ValueKey('remote-screen-$remoteUid'));
+
+  @override
   Future<void> leave() async => calls.add('leave');
 
   @override

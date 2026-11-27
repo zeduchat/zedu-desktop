@@ -574,6 +574,18 @@ class ActiveCallNotifier extends ChangeNotifier {
     _set(_state.copyWith(isSharingScreen: false, sharedSourceName: null));
   }
 
+  /// The screen someone else is sharing, or null when nobody else shares.
+  Widget? remoteScreenView() {
+    final sharer = _state.remoteScreenSharerId;
+    final media = _media;
+    if (_disposed || sharer == null || media == null) return null;
+    final account = buzzScreenShareAccount(sharer);
+    for (final entry in _remoteAccounts.entries) {
+      if (entry.value == account) return media.remoteScreenView(entry.key);
+    }
+    return null;
+  }
+
   /// Sends one of [kBuzzQuickReactions]. Returns whether the server took it.
   Future<bool> sendReaction(String emoji) async {
     final buzzId = _state.buzzId;
