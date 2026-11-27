@@ -9,7 +9,8 @@ class _Shortcut {
 
 /// Lists the keyboard shortcuts the app supports, grouped by where they work.
 /// Keep this in step with the key handlers: `QuickSwitcherShortcut`,
-/// `QuickSwitcherDialog`, `DmMessageComposer`, `DmChatArea` and `SearchPanel`.
+/// `QuickSwitcherDialog`, `AppZoomShortcut`, `DmMessageComposer`, `DmChatArea`
+/// and `SearchPanel`.
 class KeyboardShortcutsDialog extends StatelessWidget {
   const KeyboardShortcutsDialog({super.key});
 
@@ -17,6 +18,11 @@ class KeyboardShortcutsDialog extends StatelessWidget {
     'Anywhere': [
       _Shortcut([modifier, 'K'], 'Jump to a channel or conversation'),
       _Shortcut([modifier, '/'], 'Show keyboard shortcuts'),
+      const _Shortcut(['Alt', 'Up'], 'Previous conversation'),
+      const _Shortcut(['Alt', 'Down'], 'Next conversation'),
+      _Shortcut([modifier, '+'], 'Zoom in'),
+      _Shortcut([modifier, '-'], 'Zoom out'),
+      _Shortcut([modifier, '0'], 'Reset zoom'),
     ],
     'Jumping to a conversation': const [
       _Shortcut(['Up', 'Down'], 'Move through the results'),
@@ -28,6 +34,7 @@ class KeyboardShortcutsDialog extends StatelessWidget {
       const _Shortcut(['Shift', 'Enter'], 'New line'),
       _Shortcut([modifier, 'B'], 'Bold'),
       _Shortcut([modifier, 'I'], 'Italic'),
+      _Shortcut([modifier, 'Shift', 'E'], 'Emoji picker'),
       const _Shortcut(['Up'], 'Edit your last message, when the box is empty'),
       const _Shortcut(['Esc'], 'Cancel editing'),
       _Shortcut([modifier, 'F'], 'Search this conversation'),
@@ -35,6 +42,7 @@ class KeyboardShortcutsDialog extends StatelessWidget {
     ],
     'Channels and group chats': [
       _Shortcut([modifier, 'Enter'], 'Send'),
+      _Shortcut([modifier, 'Shift', 'E'], 'Emoji picker'),
     ],
   };
 
