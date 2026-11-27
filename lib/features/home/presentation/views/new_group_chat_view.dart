@@ -125,6 +125,10 @@ class _NewGroupChatViewState extends ConsumerState<NewGroupChatView> {
       _errorMessage = null;
     });
 
+    // createGroupDm adds a brand-new group to the list before returning it, so
+    // whether the group already existed has to be read before the call.
+    final existingGroupIds = ref.read(groupDmProvider).map((g) => g.id).toSet();
+
     final result = await ref
         .read(groupDmProvider.notifier)
         .createGroupDm(_selectedMembers);
@@ -138,15 +142,8 @@ class _NewGroupChatViewState extends ConsumerState<NewGroupChatView> {
     switch (result) {
       case Success<GroupDM>():
         final newGroup = result.value;
-        // Check if this was a duplicate group that already existed
-        final selectedIds = _selectedMembers.map((m) => m.id).toSet();
-        final groupIds = newGroup.members.map((m) => m.id).toSet();
-        final isDuplicate =
-            groupIds.length == selectedIds.length &&
-            groupIds.containsAll(selectedIds);
 
-        if (isDuplicate &&
-            ref.read(groupDmProvider).any((g) => g.id == newGroup.id)) {
+        if (existingGroupIds.contains(newGroup.id)) {
           // If the group DM was already in the sidebar list, we show a SnackBar and open it
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
