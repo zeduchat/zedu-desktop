@@ -64,17 +64,24 @@ void main() {
           ),
         );
 
-        final results = await service.search(
+        final page = await service.search(
           orgId: 'org-1',
           query: 'deploy from:Ada',
         );
+        final results = page.results;
 
         verify(
           () => api.get<Map<String, dynamic>>(
             path: '/search/organisation/org-1',
-            queryParameters: {'query': 'deploy from:Ada', 'sortBy': 'newest'},
+            queryParameters: {
+              'query': 'deploy from:Ada',
+              'sortby': 'newest',
+              'page': 1,
+              'limit': 20,
+            },
           ),
         ).called(1);
+        expect(page.hasMore, isFalse);
         expect(results.map((r) => r.id), ['m2', 'm1', 'm3']);
         final ada = results[1];
         expect(ada.content, 'Deploy & ship');
@@ -94,7 +101,9 @@ void main() {
         ),
       ).thenThrow(const ApiFailure(message: 'Not found', statusCode: 404));
 
-      expect(await service.search(orgId: 'org-1', query: 'x'), isEmpty);
+      final page = await service.search(orgId: 'org-1', query: 'x');
+      expect(page.results, isEmpty);
+      expect(page.hasMore, isFalse);
     });
 
     test('passes other failures on', () async {
@@ -111,9 +120,60 @@ void main() {
       );
     });
 
+    test(
+      'asks for the page and reports whether more follow (#12405)',
+      () async {
+        when(
+          () => api.get<Map<String, dynamic>>(
+            path: any(named: 'path'),
+            queryParameters: any(named: 'queryParameters'),
+          ),
+        ).thenAnswer((invocation) async {
+          final params =
+              invocation.namedArguments[#queryParameters]
+                  as Map<String, dynamic>;
+          return ApiResponseModel<Map<String, dynamic>>(
+            data: {
+              ...payload,
+              'pagination': {
+                'current_page': params['page'],
+                'page_count': 20,
+                'total_pages_count': 2,
+              },
+            },
+            statusCode: 200,
+          );
+        });
+
+        final first = await service.search(orgId: 'org-1', query: 'deploy');
+        final second = await service.search(
+          orgId: 'org-1',
+          query: 'deploy',
+          page: 2,
+        );
+
+        expect(first.hasMore, isTrue);
+        expect(second.hasMore, isFalse);
+        verify(
+          () => api.get<Map<String, dynamic>>(
+            path: '/search/organisation/org-1',
+            queryParameters: {
+              'query': 'deploy',
+              'sortby': 'newest',
+              'page': 2,
+              'limit': 20,
+            },
+          ),
+        ).called(1);
+      },
+    );
+
     test('asks nothing without a workspace or a query', () async {
-      expect(await service.search(orgId: '', query: 'x'), isEmpty);
-      expect(await service.search(orgId: 'org-1', query: '  '), isEmpty);
+      expect((await service.search(orgId: '', query: 'x')).results, isEmpty);
+      expect(
+        (await service.search(orgId: 'org-1', query: '  ')).results,
+        isEmpty,
+      );
       verifyNever(
         () => api.get<Map<String, dynamic>>(
           path: any(named: 'path'),

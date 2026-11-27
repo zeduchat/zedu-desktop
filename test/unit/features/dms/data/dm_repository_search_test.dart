@@ -44,7 +44,7 @@ void main() {
       verify(
         () => api.get<Map<String, dynamic>>(
           path: '/search/channel/chat-1',
-          queryParameters: {'query': 'budget', 'sortBy': 'relevance'},
+          queryParameters: {'query': 'budget', 'sortby': 'relevance'},
         ),
       ).called(1);
       expect(hits.single.messageId, 'm1');
