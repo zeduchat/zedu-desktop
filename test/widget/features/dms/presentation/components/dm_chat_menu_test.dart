@@ -174,9 +174,11 @@ void main() {
         find.descendant(of: dialog, matching: find.text('Menu Tester')),
         findsOneWidget,
       );
+      // No participant record is loaded, so there is no real username to
+      // show, and no handle is made up from the display name (Ziki #6342).
       expect(
         find.descendant(of: dialog, matching: find.text('@Menu_Tester')),
-        findsOneWidget,
+        findsNothing,
       );
       expect(
         find.descendant(of: dialog, matching: find.text('M')),
