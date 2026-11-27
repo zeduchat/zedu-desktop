@@ -99,6 +99,24 @@ void main() {
       expect(find.text('Create a channel'), findsOneWidget);
     });
 
+    for (final empty in ['', '   ']) {
+      testWidgets('a client failure with message "$empty" shows the fallback', (
+        tester,
+      ) async {
+        await openModal(tester);
+        notifier.result = Failure(
+          ApiFailure(message: empty, kind: ApiFailureKind.client),
+        );
+        await submit(tester);
+
+        expect(
+          find.text('Could not create the channel. Please try again.'),
+          findsOneWidget,
+        );
+        expect(find.text('Create a channel'), findsOneWidget);
+      });
+    }
+
     for (final (kind, expected) in [
       (
         ApiFailureKind.network,

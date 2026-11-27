@@ -57,12 +57,14 @@ class _CreateChannelModalState extends ConsumerState<CreateChannelModal> {
           message: 'Channel created',
         );
       case Failure<Channel>(:final error):
+        const fallback = 'Could not create the channel. Please try again.';
+        // An empty server message would leave the dialog silent.
+        final message = error.friendlyMessage.trim();
         setState(() {
           _isCreating = false;
           _errorMessage = switch (error.kind) {
-            ApiFailureKind.unknown || ApiFailureKind.parsing =>
-              'Could not create the channel. Please try again.',
-            _ => error.friendlyMessage,
+            ApiFailureKind.unknown || ApiFailureKind.parsing => fallback,
+            _ => message.isEmpty ? fallback : message,
           };
         });
     }
