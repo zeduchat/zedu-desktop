@@ -222,7 +222,7 @@ void main() {
     });
 
     test(
-      'calls the repository and removes the channel from the list',
+      'calls the repository and keeps a public channel as not joined',
       () async {
         when(
           () => repository.leaveChannel(any()),
@@ -235,12 +235,33 @@ void main() {
 
         expect(result, isA<Success<void>>());
         verify(() => repository.leaveChannel('channel-random')).called(1);
-        expect(
-          container.read(channelProvider).requireValue.map((c) => c.name),
-          ['general'],
-        );
+        final channels = container.read(channelProvider).requireValue;
+        expect(channels.map((c) => c.name), ['general', 'random']);
+        expect(channels.last.hasAccess, isFalse);
+        expect(channels.first.hasAccess, isTrue);
       },
     );
+
+    test('removes a private channel from the list', () async {
+      when(() => repository.fetchChannels(any())).thenAnswer(
+        (_) async => Success<List<Channel>>([
+          _channel('general'),
+          _channel('secret').copyWith(isPrivate: true),
+        ]),
+      );
+      when(
+        () => repository.leaveChannel(any()),
+      ).thenAnswer((_) async => const Success<void>(null));
+      await container.read(channelProvider.future);
+
+      await container
+          .read(channelProvider.notifier)
+          .leaveChannel('channel-secret');
+
+      expect(container.read(channelProvider).requireValue.map((c) => c.name), [
+        'general',
+      ]);
+    });
 
     test('keeps the list and returns the error when leaving fails', () async {
       when(() => repository.leaveChannel(any())).thenAnswer(

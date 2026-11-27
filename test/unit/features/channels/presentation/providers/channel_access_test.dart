@@ -90,7 +90,7 @@ void main() {
       addTearDown(container.dispose);
     });
 
-    test('leaveChannel removes the channel from state', () async {
+    test('leaveChannel keeps a public channel as not joined', () async {
       when(
         () => repository.leaveChannel('c-general'),
       ).thenAnswer((_) async => const Success(null));
@@ -107,7 +107,10 @@ void main() {
       expect(result, isA<Success<void>>());
 
       final channelsAfter = container.read(channelProvider).value!;
-      expect(channelsAfter.any((c) => c.id == 'c-general'), isFalse);
+      expect(
+        channelsAfter.firstWhere((c) => c.id == 'c-general').hasAccess,
+        isFalse,
+      );
     });
 
     test('joinChannel marks the channel hasAccess as true in state', () async {

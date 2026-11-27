@@ -44,7 +44,44 @@ Future<void> _pump(WidgetTester tester, List<List<Channel>?> results) async {
   await tester.pumpAndSettle();
 }
 
+class _MockChannelRepository extends Mock implements ChannelRepository {}
+
 void main() {
+  testWidgets('a left public channel stays listed with Join (Ziki #2922)', (
+    tester,
+  ) async {
+    final repository = _MockChannelRepository();
+    when(
+      () => repository.leaveChannel(any()),
+    ).thenAnswer((_) async => const Success<void>(null));
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          channelProvider.overrideWith(
+            () => _FakeChannelNotifier([
+              [_general],
+            ]),
+          ),
+          channelRepositoryProvider.overrideWithValue(repository),
+        ],
+        child: buildTestMaterialApp(
+          const Scaffold(body: ChannelDirectoryView()),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Join'), findsNothing);
+
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(ChannelDirectoryView)),
+    );
+    await container.read(channelProvider.notifier).leaveChannel('c-1');
+    await tester.pumpAndSettle();
+
+    expect(find.text('general'), findsOneWidget);
+    expect(find.widgetWithText(OutlinedButton, 'Join'), findsOneWidget);
+  });
+
   testWidgets('shows an error and Retry when the channels fail to load', (
     tester,
   ) async {
