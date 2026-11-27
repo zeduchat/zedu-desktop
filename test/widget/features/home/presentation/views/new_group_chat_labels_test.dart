@@ -8,6 +8,16 @@ class _FakeUserProfileNotifier extends UserProfileNotifier {
   UserProfileState build() => const UserProfileState();
 }
 
+class _NoChannelsNotifier extends ChannelNotifier {
+  @override
+  Future<List<Channel>> build() async => const [];
+}
+
+class _FakeAuthNotifier extends AuthNotifier {
+  @override
+  AuthState build() => const AuthState(status: AuthStatus.unauthenticated);
+}
+
 void main() {
   testWidgets('labels the page New message and the recipients To', (
     tester,
@@ -23,6 +33,8 @@ void main() {
           userProfileNotifierProvider.overrideWith(
             _FakeUserProfileNotifier.new,
           ),
+          channelProvider.overrideWith(_NoChannelsNotifier.new),
+          authNotifierProvider.overrideWith(_FakeAuthNotifier.new),
         ],
         child: buildTestMaterialApp(const Scaffold(body: NewGroupChatView())),
       ),

@@ -1,6 +1,15 @@
 import 'package:zedu/core/core.dart';
 import 'package:zedu/features/features.dart';
 
+/// One row under the recipient field: a person to add, or a channel to open.
+class _Suggestion {
+  const _Suggestion.member(TeamMember this.member) : channel = null;
+  const _Suggestion.channel(Channel this.channel) : member = null;
+
+  final TeamMember? member;
+  final Channel? channel;
+}
+
 class NewGroupChatView extends ConsumerStatefulWidget {
   const NewGroupChatView({super.key});
 
@@ -19,9 +28,11 @@ class _NewGroupChatViewState extends ConsumerState<NewGroupChatView> {
   /// until then and only turns red for an incomplete selection afterwards.
   bool _touched = false;
 
-  // Filtered members list
-  List<TeamMember> _filteredMembers = [];
   bool _showDropdown = false;
+
+  /// The suggestion Up/Down moved to, which Enter picks.
+  int _highlighted = 0;
+  final GlobalKey _highlightedRowKey = GlobalKey();
 
   @override
   void initState() {
@@ -40,41 +51,78 @@ class _NewGroupChatViewState extends ConsumerState<NewGroupChatView> {
   }
 
   void _onSearchChanged() {
-    final query = _searchController.text.trim().toLowerCase();
-    final allMembers = ref.read(userProfileNotifierProvider).teamMembers;
-    final currentUserId = ref.read(authNotifierProvider).user?.id;
-
-    setState(() {
-      if (query.isEmpty) {
-        // Show all members that are not already selected and not the current user
-        _filteredMembers = allMembers
-            .where(
-              (m) =>
-                  m.id != currentUserId &&
-                  !_selectedMembers.any((s) => s.id == m.id),
-            )
-            .toList();
-      } else {
-        _filteredMembers = allMembers.where((m) {
-          if (m.id == currentUserId) return false;
-          final isSelected = _selectedMembers.any((s) => s.id == m.id);
-          if (isSelected) return false;
-
-          final name = (m.name ?? '').toLowerCase();
-          final email = m.email.toLowerCase();
-          return name.contains(query) || email.contains(query);
-        }).toList();
-      }
-    });
+    setState(() => _highlighted = 0);
   }
 
   void _onFocusChanged() {
     setState(() {
       _showDropdown = _focusNode.hasFocus;
-      if (_showDropdown) {
-        _onSearchChanged(); // Refresh items
+    });
+  }
+
+  /// People (not you, not already picked) and channels matching the typed
+  /// text. A leading @ looks for people only, a leading # for channels only.
+  List<_Suggestion> _suggestions(
+    List<TeamMember> members,
+    List<Channel> channels,
+  ) {
+    var query = _searchController.text.trim().toLowerCase();
+    var wantPeople = true;
+    var wantChannels = true;
+    if (query.startsWith('@')) {
+      wantChannels = false;
+      query = query.substring(1);
+    } else if (query.startsWith('#')) {
+      wantPeople = false;
+      query = query.substring(1);
+    }
+    final currentUserId = ref.read(authNotifierProvider).user?.id;
+
+    return [
+      if (wantPeople)
+        for (final m in members)
+          if (m.id != currentUserId &&
+              !_selectedMembers.any((s) => s.id == m.id) &&
+              ((m.name ?? '').toLowerCase().contains(query) ||
+                  m.email.toLowerCase().contains(query)))
+            _Suggestion.member(m),
+      if (wantChannels)
+        for (final c in channels)
+          if (!c.archived && c.name.toLowerCase().contains(query))
+            _Suggestion.channel(c),
+    ];
+  }
+
+  void _moveHighlight(int delta, int count) {
+    if (count == 0) return;
+    setState(() {
+      _highlighted = (_highlighted + delta).clamp(0, count - 1);
+    });
+    // Keep the highlighted row inside the list's scroll view.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final rowContext = _highlightedRowKey.currentContext;
+      if (rowContext != null) {
+        Scrollable.ensureVisible(
+          rowContext,
+          alignmentPolicy: delta > 0
+              ? ScrollPositionAlignmentPolicy.keepVisibleAtEnd
+              : ScrollPositionAlignmentPolicy.keepVisibleAtStart,
+        );
       }
     });
+  }
+
+  void _pick(_Suggestion suggestion) {
+    final member = suggestion.member;
+    if (member != null) {
+      _toggleMemberSelection(member);
+      return;
+    }
+    // A channel isn't a DM recipient, so picking one opens it.
+    final channel = suggestion.channel!;
+    ref
+        .read(activeChatProvider.notifier)
+        .selectChannel(channel.name, channelId: channel.id);
   }
 
   void _toggleMemberSelection(TeamMember member) {
@@ -86,7 +134,7 @@ class _NewGroupChatViewState extends ConsumerState<NewGroupChatView> {
         _selectedMembers.add(member);
       }
       _searchController.clear();
-      _onSearchChanged(); // Refresh
+      _highlighted = 0;
     });
   }
 
@@ -191,6 +239,18 @@ class _NewGroupChatViewState extends ConsumerState<NewGroupChatView> {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
+    final profile = ref.watch(userProfileNotifierProvider);
+    final channels = ref.watch(channelProvider);
+    final suggestions = _suggestions(
+      profile.teamMembers,
+      channels.value ?? const [],
+    );
+    final isLoadingSuggestions =
+        (profile.isLoading && profile.teamMembers.isEmpty) ||
+        (channels.isLoading && !channels.hasValue);
+    final highlighted = suggestions.isEmpty
+        ? -1
+        : _highlighted.clamp(0, suggestions.length - 1);
 
     return Container(
       color: colors.background,
@@ -213,7 +273,11 @@ class _NewGroupChatViewState extends ConsumerState<NewGroupChatView> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             // Input container
-                            _buildSearchInputContainer(colors),
+                            _buildSearchInputContainer(
+                              colors,
+                              suggestions,
+                              highlighted,
+                            ),
                             const SizedBox(height: 12),
 
                             // Selected Member Chips
@@ -275,7 +339,7 @@ class _NewGroupChatViewState extends ConsumerState<NewGroupChatView> {
                         ),
 
                         // Suggestions Dropdown Card (Inline Layer overlay)
-                        if (_showDropdown && _filteredMembers.isNotEmpty)
+                        if (_showDropdown)
                           Positioned(
                             top: 60,
                             left: 0,
@@ -299,88 +363,11 @@ class _NewGroupChatViewState extends ConsumerState<NewGroupChatView> {
                                     borderRadius: BorderRadius.circular(8),
                                     border: Border.all(color: colors.divider),
                                   ),
-                                  child: ListView.builder(
-                                    shrinkWrap: true,
-                                    itemCount: _filteredMembers.length,
-                                    itemBuilder: (context, index) {
-                                      final member = _filteredMembers[index];
-                                      final name = _getMemberDisplayName(
-                                        member,
-                                      );
-                                      final initials = _getMemberInitials(name);
-                                      return InkWell(
-                                        onTap: () =>
-                                            _toggleMemberSelection(member),
-                                        child: Container(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 16,
-                                            vertical: 12,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            border: Border(
-                                              bottom: BorderSide(
-                                                color: colors.divider,
-                                                width: 0.5,
-                                              ),
-                                            ),
-                                          ),
-                                          child: Row(
-                                            children: [
-                                              // Avatar
-                                              CircleAvatar(
-                                                radius: 16,
-                                                backgroundColor: colors.primary
-                                                    .withValues(alpha: 0.1),
-                                                child: Text(
-                                                  initials,
-                                                  style: TextStyle(
-                                                    color: colors.primary,
-                                                    fontSize: 12,
-                                                    fontWeight: FontWeight.bold,
-                                                  ),
-                                                ),
-                                              ),
-                                              const SizedBox(width: 12),
-
-                                              // Text
-                                              Expanded(
-                                                child: Column(
-                                                  crossAxisAlignment:
-                                                      CrossAxisAlignment.start,
-                                                  children: [
-                                                    Text(
-                                                      name,
-                                                      style: TextStyle(
-                                                        color:
-                                                            colors.textPrimary,
-                                                        fontWeight:
-                                                            FontWeight.bold,
-                                                        fontSize: 14,
-                                                      ),
-                                                    ),
-                                                    const SizedBox(height: 2),
-                                                    Text(
-                                                      member.email,
-                                                      style: TextStyle(
-                                                        color: colors.textHint,
-                                                        fontSize: 12,
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-
-                                              // Checkbox / Add icon
-                                              Icon(
-                                                Icons.add_circle_outline,
-                                                color: colors.primary,
-                                                size: 20,
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      );
-                                    },
+                                  child: _buildSuggestions(
+                                    colors,
+                                    suggestions,
+                                    highlighted,
+                                    isLoading: isLoadingSuggestions,
                                   ),
                                 ),
                               ),
@@ -531,7 +518,191 @@ class _NewGroupChatViewState extends ConsumerState<NewGroupChatView> {
     );
   }
 
-  Widget _buildSearchInputContainer(AppPalette colors) {
+  Widget _buildSuggestions(
+    AppPalette colors,
+    List<_Suggestion> suggestions,
+    int highlighted, {
+    required bool isLoading,
+  }) {
+    if (suggestions.isEmpty) {
+      final query = _searchController.text.trim();
+      final String text;
+      if (isLoading) {
+        text = 'Loading people and channels...';
+      } else if (query.isEmpty) {
+        text = 'No people or channels to suggest yet';
+      } else {
+        text = 'No people or channels match "$query"';
+      }
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(
+          children: [
+            if (isLoading) ...[
+              SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: colors.primary,
+                ),
+              ),
+              const SizedBox(width: 12),
+            ],
+            Expanded(
+              child: Text(
+                text,
+                style: TextStyle(color: colors.textSecondary, fontSize: 13),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    return ListView.builder(
+      shrinkWrap: true,
+      itemCount: suggestions.length,
+      itemBuilder: (context, index) {
+        final suggestion = suggestions[index];
+        final isHighlighted = index == highlighted;
+        final member = suggestion.member;
+        final row = member != null
+            ? _buildMemberRow(colors, member, onTap: () => _pick(suggestion))
+            : _buildChannelRow(
+                colors,
+                suggestion.channel!,
+                onTap: () => _pick(suggestion),
+              );
+        return Container(
+          key: isHighlighted ? _highlightedRowKey : null,
+          color: isHighlighted ? colors.primary.withValues(alpha: 0.08) : null,
+          child: row,
+        );
+      },
+    );
+  }
+
+  Widget _buildChannelRow(
+    AppPalette colors,
+    Channel channel, {
+    required VoidCallback onTap,
+  }) {
+    final description = channel.description.trim();
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          border: Border(bottom: BorderSide(color: colors.divider, width: 0.5)),
+        ),
+        child: Row(
+          children: [
+            CircleAvatar(
+              radius: 16,
+              backgroundColor: colors.primary.withValues(alpha: 0.1),
+              child: Icon(
+                channel.isPrivate ? Icons.lock_outline : Icons.tag,
+                size: 16,
+                color: colors.primary,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '#${channel.name}',
+                    style: TextStyle(
+                      color: colors.textPrimary,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    description.isEmpty ? 'Channel' : description,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(color: colors.textHint, fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+            // Picking a channel opens it rather than adding it.
+            Icon(Icons.arrow_forward, color: colors.primary, size: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMemberRow(
+    AppPalette colors,
+    TeamMember member, {
+    required VoidCallback onTap,
+  }) {
+    final name = _getMemberDisplayName(member);
+    final initials = _getMemberInitials(name);
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          border: Border(bottom: BorderSide(color: colors.divider, width: 0.5)),
+        ),
+        child: Row(
+          children: [
+            // Avatar
+            CircleAvatar(
+              radius: 16,
+              backgroundColor: colors.primary.withValues(alpha: 0.1),
+              child: Text(
+                initials,
+                style: TextStyle(
+                  color: colors.primary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+
+            // Text
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    name,
+                    style: TextStyle(
+                      color: colors.textPrimary,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    member.email,
+                    style: TextStyle(color: colors.textHint, fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+
+            // Checkbox / Add icon
+            Icon(Icons.add_circle_outline, color: colors.primary, size: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSearchInputContainer(
+    AppPalette colors,
+    List<_Suggestion> suggestions,
+    int highlighted,
+  ) {
     return Container(
       decoration: BoxDecoration(
         border: Border(bottom: BorderSide(color: colors.divider, width: 1)),
@@ -548,17 +719,31 @@ class _NewGroupChatViewState extends ConsumerState<NewGroupChatView> {
             ),
           ),
           Expanded(
-            child: TextField(
-              controller: _searchController,
-              focusNode: _focusNode,
-              decoration: InputDecoration(
-                hintText: '#a-channel, @somebody, or somebody',
-                hintStyle: TextStyle(color: colors.textHint),
-                border: InputBorder.none,
-                isDense: true,
-                contentPadding: const EdgeInsets.symmetric(vertical: 8),
+            // Up and Down move through the suggestions and Enter picks the
+            // highlighted one.
+            child: CallbackShortcuts(
+              bindings: {
+                const SingleActivator(LogicalKeyboardKey.arrowDown): () =>
+                    _moveHighlight(1, suggestions.length),
+                const SingleActivator(LogicalKeyboardKey.arrowUp): () =>
+                    _moveHighlight(-1, suggestions.length),
+                const SingleActivator(LogicalKeyboardKey.enter): () {
+                  if (highlighted >= 0) _pick(suggestions[highlighted]);
+                },
+              },
+              child: TextField(
+                controller: _searchController,
+                focusNode: _focusNode,
+                autofocus: true,
+                decoration: InputDecoration(
+                  hintText: '#a-channel, @somebody, or somebody',
+                  hintStyle: TextStyle(color: colors.textHint),
+                  border: InputBorder.none,
+                  isDense: true,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 8),
+                ),
+                style: TextStyle(color: colors.textPrimary, fontSize: 15),
               ),
-              style: TextStyle(color: colors.textPrimary, fontSize: 15),
             ),
           ),
           const SizedBox(width: 12),
