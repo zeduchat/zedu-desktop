@@ -63,7 +63,10 @@ class _CreditsPaymentDeepLinkListenerState
   }
 
   Future<void> _handleUri(Uri uri) async {
-    final sessionId = CreditsPaymentDeepLinkParser.extractSessionId(uri);
+    final sessionId = CreditsPaymentDeepLinkParser.extractSessionId(
+      uri,
+      trustedWebHosts: trustedWebHosts(locator<AppConfig>()),
+    );
     if (sessionId != null) await _verifySession(sessionId);
   }
 

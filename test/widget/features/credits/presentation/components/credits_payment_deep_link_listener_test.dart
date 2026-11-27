@@ -55,6 +55,13 @@ void main() {
     setUp(() {
       mockAppLinks = MockAppLinks();
       linkController = StreamController<Uri>.broadcast();
+      locator.registerSingleton<AppConfig>(
+        const AppConfig(
+          apiBaseUrl: 'https://api.zedu.chat/api/v1/',
+          usesMockData: false,
+          webAppUrl: 'https://zedu.chat',
+        ),
+      );
       when(
         () => mockAppLinks.uriLinkStream,
       ).thenAnswer((_) => linkController.stream);
@@ -62,6 +69,7 @@ void main() {
 
     tearDown(() async {
       await linkController.close();
+      await locator.unregister<AppConfig>();
     });
 
     Future<void> pumpPaymentLink(
