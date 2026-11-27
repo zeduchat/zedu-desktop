@@ -142,16 +142,31 @@ void main() {
       expect(find.byType(NotificationsDialog), findsNothing);
     });
 
-    testWidgets('sidebar bell opens the panel', (tester) async {
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [dmListProvider.overrideWith(() => _Dms(const []))],
-          child: buildTestMaterialApp(
-            const Scaffold(
+    // The bell now opens the full Notifications page (Ziki #33700).
+    testWidgets('sidebar bell opens the Notifications page', (tester) async {
+      final router = GoRouter(
+        routes: [
+          GoRoute(
+            path: '/',
+            builder: (_, _) => const Scaffold(
               body: Row(
                 children: [AppSidebarRail(activeType: HomeSidebarType.home)],
               ),
             ),
+          ),
+          GoRoute(
+            path: AppRouter.notifications,
+            builder: (_, _) => const Text('notifications page'),
+          ),
+        ],
+      );
+      addTearDown(router.dispose);
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [dmListProvider.overrideWith(() => _Dms(const []))],
+          child: MaterialApp.router(
+            theme: AppTheme.light,
+            routerConfig: router,
           ),
         ),
       );
@@ -159,7 +174,8 @@ void main() {
       await tester.tap(find.byTooltip('Notifications'));
       await tester.pumpAndSettle();
 
-      expect(find.byType(NotificationsDialog), findsOneWidget);
+      expect(find.text('notifications page'), findsOneWidget);
+      expect(find.byType(NotificationsDialog), findsNothing);
     });
   });
 }

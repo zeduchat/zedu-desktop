@@ -9,6 +9,7 @@ class AppSidebarRail extends ConsumerStatefulWidget {
     this.settingsSelected = false,
     this.threadsSelected = false,
     this.laterSelected = false,
+    this.notificationsSelected = false,
   });
 
   static const double width = 50;
@@ -18,6 +19,9 @@ class AppSidebarRail extends ConsumerStatefulWidget {
   final bool settingsSelected;
   final bool threadsSelected;
   final bool laterSelected;
+
+  /// Whether the Notifications page is open (its bell is highlighted).
+  final bool notificationsSelected;
 
   @override
   ConsumerState<AppSidebarRail> createState() => _AppSidebarRailState();
@@ -72,6 +76,7 @@ class _AppSidebarRailState extends ConsumerState<AppSidebarRail> {
           conversation.unreadCount > 0 &&
           !deletedConversationIds.contains(conversation.channelId),
     );
+    final unreadNotifications = ref.watch(unreadNotificationCountProvider);
     return Container(
       width: AppSidebarRail.width,
       decoration: BoxDecoration(
@@ -151,15 +156,11 @@ class _AppSidebarRailState extends ConsumerState<AppSidebarRail> {
           ),
           _RailBottomIcon(
             icon: Icons.notifications_none_outlined,
-            hasNotification: hasUnreadDms,
+            hasNotification: hasUnreadDms || unreadNotifications > 0,
+            selected: widget.notificationsSelected,
             tooltip: 'Notifications',
-            onTap: () {
-              showDialog<void>(
-                context: context,
-                barrierColor: Colors.black.withValues(alpha: 0.3),
-                builder: (context) => const NotificationsDialog(),
-              );
-            },
+            // A full page, as on zedu-fe, instead of the old unread-DMs popup.
+            onTap: () => context.go(AppRouter.notifications),
           ),
           _RailBottomIcon(
             icon: Icons.settings_outlined,

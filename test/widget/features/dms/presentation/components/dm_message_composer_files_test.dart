@@ -15,6 +15,13 @@ void main() {
   testWidgets('an unreadable file is rejected and the readable ones are kept', (
     tester,
   ) async {
+    // The composer creates a voice recorder; stub its channel as the attach
+    // test does, so this test doesn't depend on another file having done it.
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          const MethodChannel('com.llfbandit.record/messages'),
+          (call) async => null,
+        );
     final storage = _MockSecureStorageService();
     when(() => storage.readData(any())).thenAnswer((_) async => null);
     final key = GlobalKey<DmMessageComposerState>();

@@ -13,3 +13,4 @@ export 'buzz/buzz.dart';
 export 'inbox/inbox.dart';
 export 'threads/threads.dart';
 export 'later/later.dart';
+export 'notification_center/notification_center.dart';
