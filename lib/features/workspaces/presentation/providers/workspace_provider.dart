@@ -16,8 +16,13 @@ class WorkspaceNotifier extends Notifier<WorkspaceState> {
   /// has changed it; null until then.
   String? _serverOrgId;
 
+  /// Bumped on every build, so a fetch started before a sign-out and sign-in
+  /// can tell its response belongs to an earlier session.
+  int _generation = 0;
+
   @override
   WorkspaceState build() {
+    _generation++;
     Future.microtask(fetchWorkspaces);
     return const WorkspaceState(isLoading: true);
   }
@@ -33,11 +38,14 @@ class WorkspaceNotifier extends Notifier<WorkspaceState> {
       selectedWorkspace: state.selectedWorkspace,
       isLoading: true,
     );
+    final generation = _generation;
+    bool isStale() => !ref.mounted || generation != _generation;
     try {
       final api = locator<ApiBaseService>();
       final response = await api.get<Map<String, dynamic>>(
         path: '/users/organisations',
       );
+      if (isStale()) return;
       final data = response.data['data'] as List<dynamic>? ?? [];
 
       final List<Workspace> workspaces = [];
@@ -83,6 +91,7 @@ class WorkspaceNotifier extends Notifier<WorkspaceState> {
         selectedWorkspace: selected,
       );
     } catch (e, stackTrace) {
+      if (isStale()) return;
       AppLogger.e(
         'Failed to load organisations',
         tag: 'WorkspaceNotifier',
