@@ -60,7 +60,16 @@ class _AuthDeepLinkListenerState extends ConsumerState<AuthDeepLinkListener> {
     // settled; otherwise the same token would kick off parallel verifications.
     if (_verifyingToken != null) return;
     _verifyingToken = token;
+    // Every way out of the attempt (declined, unmounted, finished) must clear
+    // the guard, or every later link is dropped.
+    try {
+      await _verifyToken(token);
+    } finally {
+      _verifyingToken = null;
+    }
+  }
 
+  Future<void> _verifyToken(String token) async {
     // A link that opens the app arrives while the saved session is still
     // being restored, so wait to know whether someone is signed in.
     final status = await _settledAuthStatus();
@@ -82,13 +91,7 @@ class _AuthDeepLinkListenerState extends ConsumerState<AuthDeepLinkListener> {
     }
 
     AppLogger.i('Processing magic link deep link', tag: _tag);
-    try {
-      await ref
-          .read(authNotifierProvider.notifier)
-          .verifyMagicLink(token: token);
-    } finally {
-      _verifyingToken = null;
-    }
+    await ref.read(authNotifierProvider.notifier).verifyMagicLink(token: token);
     // Only remember a token that actually succeeded, so a failed attempt (for
     // example a stale link opened while logged out) can be retried.
     final authState = ref.read(authNotifierProvider);
