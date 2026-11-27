@@ -12,8 +12,8 @@ import 'package:zedu/features/features.dart';
 /// [notificationServiceProvider.handleIncomingMessage].
 class DmNotificationPollerNotifier extends Notifier<void> {
   /// Seen message IDs per channel, so we don't re-fire a notification on every
-  /// poll cycle. Initialised on the first poll so existing messages don't
-  /// trigger notifications.
+  /// poll cycle. A channel has no entry until its first poll, which records the
+  /// existing messages without notifying so old history never pops up.
   final Map<String, Set<String>> _seenIds = {};
 
   /// Active per-conversation poll timers.
@@ -21,6 +21,12 @@ class DmNotificationPollerNotifier extends Notifier<void> {
 
   @override
   void build() {
+    ref.onDispose(() {
+      for (final channelId in _pollingTimers.keys.toList()) {
+        _stopPoller(channelId);
+      }
+    });
+
     // Start/stop per-conversation pollers whenever the DM list changes.
     ref.listen(dmListProvider, (previous, next) {
       next.whenData((conversations) {
@@ -51,7 +57,6 @@ class DmNotificationPollerNotifier extends Notifier<void> {
   }
 
   void _startPoller(String channelId) {
-    _seenIds.putIfAbsent(channelId, () => <String>{});
     _pollingTimers[channelId] =
         Stream<int>.periodic(const Duration(seconds: 10), (i) => i).listen((_) {
           unawaited(_checkForNewMessages(channelId));
@@ -69,7 +74,18 @@ class DmNotificationPollerNotifier extends Notifier<void> {
       final repository = ref.read(dmRepositoryProvider);
       final fresh = await repository.getMessages(channelId, page: 1);
 
-      final seen = _seenIds[channelId] ?? <String>{};
+      // The poller may have been stopped while the request was in flight.
+      if (!_pollingTimers.containsKey(channelId)) return;
+
+      final seen = _seenIds[channelId];
+      if (seen == null) {
+        // First poll: everything returned is history the user already has.
+        _seenIds[channelId] = fresh
+            .map((msg) => msg['id']?.toString())
+            .whereType<String>()
+            .toSet();
+        return;
+      }
 
       for (final msg in fresh) {
         final id = msg['id']?.toString();
@@ -89,8 +105,6 @@ class DmNotificationPollerNotifier extends Notifier<void> {
             .read(notificationServiceProvider)
             .handleIncomingMessage(msg, channelId, senderName);
       }
-
-      _seenIds[channelId] = seen;
     } catch (_) {
       // Silent — polling failures should not surface to the UI.
     }
