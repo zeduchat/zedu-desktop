@@ -158,6 +158,29 @@ void main() {
       expect(find.text('Sign in again to join a meeting.'), findsNothing);
     });
 
+    testWidgets('a launcher error shows a toast instead of escaping', (
+      tester,
+    ) async {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(_urlLauncherChannel, (call) async {
+            if (call.method == 'launch') {
+              throw PlatformException(code: 'ACTIVITY_NOT_FOUND');
+            }
+            return true;
+          });
+      await _pump(tester, _FakeRepository(const Success('abc')));
+
+      await join(tester);
+      await tester.pump();
+
+      expect(tester.takeException(), isNull);
+      expect(
+        find.text("Couldn't open the meeting in your browser."),
+        findsOneWidget,
+      );
+      await drainToastTimer(tester);
+    });
+
     testWidgets('signed in without a workspace slug explains the workspace '
         'is missing', (tester) async {
       await _pump(tester, _FakeRepository(const Success('abc')), slug: '');
