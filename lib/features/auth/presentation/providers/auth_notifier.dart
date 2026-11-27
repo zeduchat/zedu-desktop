@@ -12,6 +12,15 @@ class AuthNotifier extends Notifier<AuthState> {
   /// up and clearing the loading state.
   Duration googleSignInWait = const Duration(minutes: 5);
 
+  /// How long [logout] waits for the backend to revoke the session before
+  /// signing out locally anyway, so sign-out never hangs while offline.
+  Duration logoutRequestTimeout = const Duration(seconds: 5);
+
+  /// True while [logout] is asking the backend to revoke the session. A 401
+  /// from that request means the token was already dead; the user is signing
+  /// out on purpose, so it must not be reported as an expired session.
+  bool _loggingOut = false;
+
   /// Guards against overlapping presence-toggle requests (rapid clicks,
   /// reopening the menu while a request is pending).
   bool _presenceToggleInFlight = false;
@@ -168,6 +177,7 @@ class AuthNotifier extends Notifier<AuthState> {
 
     _interceptor.onUnauthorized = () {
       if (_disposed || !ref.mounted) return;
+      if (_loggingOut) return;
       AppLogger.w('Unauthorized — clearing session', tag: _tag);
       // Only a session that was signed in expired: a 401 from a login attempt
       // or a session restore is not one, and further 401s from requests that
@@ -423,6 +433,9 @@ class AuthNotifier extends Notifier<AuthState> {
 
   Future<void> logout() async {
     AppLogger.i('Logout — clearing session', tag: _tag);
+    // Revoke the token on the backend first: the auth interceptor needs it
+    // to authenticate the request, so it must still be stored.
+    await _revokeBackendSession();
     // Unsent DM drafts are private: don't leave them on a shared computer.
     final userId = state.user?.id;
     if (userId != null && userId.isNotEmpty) {
@@ -436,6 +449,39 @@ class AuthNotifier extends Notifier<AuthState> {
     _bumpSession();
     ref.read(userMenuStateProvider.notifier).reset();
     state = const AuthState(status: AuthStatus.unauthenticated);
+  }
+
+  /// Asks the backend to revoke the current session, so a copied token stops
+  /// working. Best effort: a failure, an error or a slow network is logged and
+  /// the local sign-out goes ahead regardless.
+  Future<void> _revokeBackendSession() async {
+    String? token;
+    try {
+      token = await _storage.getAccessToken();
+    } catch (error) {
+      AppLogger.w('Could not read the token on logout - $error', tag: _tag);
+    }
+    if (token == null || token.isEmpty) return;
+
+    _loggingOut = true;
+    try {
+      final result = await _repository.logout().timeout(logoutRequestTimeout);
+      if (result case Failure(:final error)) {
+        AppLogger.w(
+          'Backend logout failed, signing out locally - ${error.message}',
+          tag: _tag,
+        );
+      }
+    } on TimeoutException {
+      AppLogger.w('Backend logout timed out, signing out locally', tag: _tag);
+    } catch (error) {
+      AppLogger.w(
+        'Backend logout failed, signing out locally - $error',
+        tag: _tag,
+      );
+    } finally {
+      _loggingOut = false;
+    }
   }
 
   Future<void> signUp({

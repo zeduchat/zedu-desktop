@@ -40,4 +40,7 @@ abstract interface class AuthRepository {
     required bool online,
   });
   Future<Result<void>> setPresence({required bool online});
+
+  /// Ends the current session on the backend, revoking its access token.
+  Future<Result<void>> logout();
 }
