@@ -39,9 +39,19 @@ void main() {
   setUp(() {
     links = StreamController<Uri>.broadcast();
     calls = [];
+    locator.registerSingleton<AppConfig>(
+      const AppConfig(
+        apiBaseUrl: 'https://api.zedu.chat/api/v1/',
+        usesMockData: false,
+        webAppUrl: 'https://zedu.chat',
+      ),
+    );
   });
 
-  tearDown(() async => links.close());
+  tearDown(() async {
+    await links.close();
+    await locator.unregister<AppConfig>();
+  });
 
   Future<ProviderContainer> mount(
     WidgetTester tester, {
@@ -127,6 +137,41 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(calls, [('cs-1', 'org-restored'), ('cs-2', 'org-restored')]);
+  });
+
+  testWidgets('verifies a payment link from the trusted web host', (
+    tester,
+  ) async {
+    await mount(
+      tester,
+      initialLink: Uri.parse(
+        'https://zedu.chat/credits/payment-success?session_id=cs-web',
+      ),
+    );
+
+    expect(calls, [('cs-web', 'org-1')]);
+  });
+
+  testWidgets('does not verify a payment link from an untrusted host', (
+    tester,
+  ) async {
+    await mount(
+      tester,
+      initialLink: Uri.parse(
+        'https://evil.example/credits/payment-success?session_id=cs-evil',
+      ),
+    );
+    links.add(
+      Uri.parse(
+        'https://zedu.chat.evil.example/credits/payment-success?session_id=cs-x',
+      ),
+    );
+    links.add(
+      Uri.parse('http://zedu.chat/credits/payment-success?session_id=cs-y'),
+    );
+    await tester.pumpAndSettle();
+
+    expect(calls, isEmpty);
   });
 
   testWidgets('allows redelivery after verification returns false', (
