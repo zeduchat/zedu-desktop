@@ -19,6 +19,8 @@ class UserManagementSection extends StatefulWidget {
     required this.onUpdate,
     required this.onRemove,
     this.invites,
+    this.membersError,
+    this.onRetry,
   });
 
   final List<TeamMember> members;
@@ -28,6 +30,11 @@ class UserManagementSection extends StatefulWidget {
   final ValueChanged<TeamMember> onUpdate;
   final ValueChanged<String> onRemove;
   final List<TeamMember>? invites;
+
+  /// Set when the members couldn't be loaded; shown with [onRetry] in place
+  /// of the empty state.
+  final String? membersError;
+  final VoidCallback? onRetry;
 
   @override
   State<UserManagementSection> createState() => _UserManagementSectionState();
@@ -232,7 +239,9 @@ class _UserManagementSectionState extends State<UserManagementSection> {
                     },
                   ),
                 ),
-                if (filtered.isEmpty)
+                if (widget.membersError case final error?)
+                  _MembersLoadError(message: error, onRetry: widget.onRetry)
+                else if (filtered.isEmpty)
                   Padding(
                     padding: const EdgeInsets.symmetric(
                       vertical: 48,
@@ -734,6 +743,59 @@ class _MemberIdentity extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Shown in place of the member table when the members couldn't be loaded,
+/// so a failed request never looks like an empty team (Ziki #2918).
+class _MembersLoadError extends StatelessWidget {
+  const _MembersLoadError({required this.message, required this.onRetry});
+
+  final String message;
+  final VoidCallback? onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 48, horizontal: 24),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.error_outline_rounded,
+              size: 32,
+              color: context.colors.error,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              "We couldn't load your team members.",
+              style: context.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: context.colors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: context.textTheme.bodySmall?.copyWith(
+                color: context.colors.textSecondary,
+              ),
+            ),
+            if (onRetry != null) ...[
+              const SizedBox(height: 16),
+              AppButton.outlined(
+                label: 'Retry',
+                expand: false,
+                height: 40,
+                onPressed: onRetry,
+              ),
+            ],
+          ],
+        ),
+      ),
     );
   }
 }

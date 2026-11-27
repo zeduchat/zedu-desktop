@@ -806,6 +806,11 @@ class UserProfileNotifier extends Notifier<UserProfileState> {
       securitySessions: _valueOrNull(securityResult) ?? const [],
       organization: organization,
       teamMembers: loadedTeamMembers,
+      teamMembersError: switch (teamResult) {
+        Failure<List<TeamMember>>() => teamResult.error.friendlyMessage,
+        Success<List<TeamMember>>() => null,
+      },
+      clearTeamMembersError: teamResult is Success<List<TeamMember>>,
       rolesAndPermissions: _valueOrNull(rolesResult) ?? const [],
       billing: _valueOrNull(billingResult),
       isLoading: false,

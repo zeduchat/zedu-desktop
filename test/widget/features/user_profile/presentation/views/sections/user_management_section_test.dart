@@ -523,4 +523,51 @@ void main() {
       },
     );
   });
+
+  group('members load error (Ziki #2918)', () {
+    Widget build({String? error, VoidCallback? onRetry}) {
+      return ProviderScope(
+        child: MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: UserManagementSection(
+                members: const [],
+                isSaving: false,
+                onInvite: ({required email, required role}) async {},
+                onUpdate: (_) {},
+                onRemove: (_) {},
+                membersError: error,
+                onRetry: onRetry,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    testWidgets('shows the error and Retry instead of "No members found."', (
+      tester,
+    ) async {
+      var retries = 0;
+      await tester.pumpWidget(
+        build(error: 'Check your connection.', onRetry: () => retries++),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text("We couldn't load your team members."), findsOneWidget);
+      expect(find.text('Check your connection.'), findsOneWidget);
+      expect(find.text('No members found.'), findsNothing);
+
+      await tester.tap(find.text('Retry'));
+      expect(retries, 1);
+    });
+
+    testWidgets('without an error an empty team still says so', (tester) async {
+      await tester.pumpWidget(build());
+      await tester.pumpAndSettle();
+
+      expect(find.text('No members found.'), findsOneWidget);
+      expect(find.text('Retry'), findsNothing);
+    });
+  });
 }

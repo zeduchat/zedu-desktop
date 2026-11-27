@@ -75,6 +75,24 @@ void main() {
       ).called(1);
       expect(members.map((m) => m.name), ['Alice Ade', 'bobby', 'carol']);
     });
+
+    test('reports a failed request instead of no members (Ziki #2918)', () {
+      final mockApi = MockApiBaseService();
+      final datasource = UserProfileRemoteDataSourceImpl(
+        config: const AppConfig(apiBaseUrl: '', usesMockData: false),
+        apiBaseService: mockApi,
+      );
+      when(
+        () => mockApi.get<Map<String, dynamic>>(path: any(named: 'path')),
+      ).thenThrow(
+        const ApiFailure(message: 'Server error', kind: ApiFailureKind.server),
+      );
+
+      expect(
+        datasource.getTeamMembers(orgId: 'org-1'),
+        throwsA(isA<ApiFailure>()),
+      );
+    });
   });
 
   group('UserProfileRemoteDataSourceImpl.getRolesAndPermissions (#720)', () {

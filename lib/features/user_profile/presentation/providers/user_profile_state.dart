@@ -21,6 +21,7 @@ class UserProfileState {
     this.organization,
     this.securitySessions = const [],
     this.teamMembers = const [],
+    this.teamMembersError,
     this.rolesAndPermissions = const [],
     this.billing,
     this.isLoading = false,
@@ -35,6 +36,9 @@ class UserProfileState {
   final OrganizationProfile? organization;
   final List<SecuritySession> securitySessions;
   final List<TeamMember> teamMembers;
+
+  /// Why the team members couldn't be loaded, or null when they could.
+  final String? teamMembersError;
   final List<RolePermission> rolesAndPermissions;
   final BillingInfo? billing;
   final bool isLoading;
@@ -49,6 +53,7 @@ class UserProfileState {
     OrganizationProfile? organization,
     List<SecuritySession>? securitySessions,
     List<TeamMember>? teamMembers,
+    String? teamMembersError,
     List<RolePermission>? rolesAndPermissions,
     BillingInfo? billing,
     bool? isLoading,
@@ -59,6 +64,7 @@ class UserProfileState {
     bool clearSuccess = false,
     bool clearNotifications = false,
     bool clearOrganization = false,
+    bool clearTeamMembersError = false,
   }) {
     return UserProfileState(
       section: section ?? this.section,
@@ -71,6 +77,9 @@ class UserProfileState {
           : (organization ?? this.organization),
       securitySessions: securitySessions ?? this.securitySessions,
       teamMembers: teamMembers ?? this.teamMembers,
+      teamMembersError: clearTeamMembersError
+          ? null
+          : (teamMembersError ?? this.teamMembersError),
       rolesAndPermissions: rolesAndPermissions ?? this.rolesAndPermissions,
       billing: billing ?? this.billing,
       isLoading: isLoading ?? this.isLoading,
