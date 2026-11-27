@@ -19,7 +19,7 @@ class _PeopleViewState extends ConsumerState<PeopleView> {
     final members = ref.watch(peopleListProvider(_search));
 
     return Container(
-      color: colors.onPrimary,
+      color: colors.background,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -239,7 +239,7 @@ class _MemberCard extends StatelessWidget {
     );
 
     return Material(
-      color: colors.onPrimary,
+      color: colors.background,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(8),
         side: BorderSide(color: colors.divider),

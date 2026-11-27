@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:zedu/core/core.dart';
 import 'package:zedu/features/features.dart';
 
@@ -52,8 +54,9 @@ class _FakePeopleRepository implements PeopleRepository {
 
 Future<MockDmRepository> _pump(
   WidgetTester tester,
-  _FakePeopleRepository people,
-) async {
+  _FakePeopleRepository people, {
+  ThemeData? theme,
+}) async {
   tester.view.physicalSize = const Size(1600, 1000);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.resetPhysicalSize);
@@ -68,12 +71,15 @@ Future<MockDmRepository> _pump(
         dmRepositoryProvider.overrideWithValue(dms),
       ],
       child: buildTestMaterialApp(
-        const Scaffold(
-          body: Row(
-            children: [
-              PeopleSidebar(),
-              Expanded(child: PeopleView()),
-            ],
+        Theme(
+          data: theme ?? AppTheme.light,
+          child: const Scaffold(
+            body: Row(
+              children: [
+                PeopleSidebar(),
+                Expanded(child: PeopleView()),
+              ],
+            ),
           ),
         ),
       ),
@@ -153,4 +159,43 @@ void main() {
     expect(find.text('Could not load members.'), findsOneWidget);
     expect(find.text('Retry'), findsNWidgets(2));
   });
+
+  for (final (name, theme, palette) in [
+    ('light', AppTheme.light, AppPalette.light),
+    ('dark', AppTheme.dark, AppPalette.dark),
+  ]) {
+    testWidgets('page and member cards use the $name background', (
+      tester,
+    ) async {
+      await _pump(tester, _FakePeopleRepository(), theme: theme);
+
+      final page = tester.widget<Container>(
+        find
+            .descendant(
+              of: find.byType(PeopleView),
+              matching: find.byType(Container),
+            )
+            .first,
+      );
+      expect(page.color, palette.background);
+
+      final cardName = find.text('Grace Hopper').last;
+      final card = tester.widget<Material>(
+        find.ancestor(of: cardName, matching: find.byType(Material)).first,
+      );
+      expect(card.color, palette.background);
+
+      final nameColor = tester.widget<Text>(cardName).style!.color!;
+      expect(nameColor, palette.textPrimary);
+      expect(_contrast(nameColor, card.color!), greaterThanOrEqualTo(4.5));
+      final status = tester.widget<Text>(find.text('Offline')).style!.color!;
+      expect(_contrast(status, card.color!), greaterThanOrEqualTo(4.5));
+    });
+  }
+}
+
+double _contrast(Color a, Color b) {
+  final la = a.computeLuminance();
+  final lb = b.computeLuminance();
+  return (max(la, lb) + 0.05) / (min(la, lb) + 0.05);
 }
