@@ -1,7 +1,78 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mocktail/mocktail.dart';
 import 'package:zedu/core/core.dart';
 
+class _MockDio extends Mock implements Dio {}
+
 void main() {
+  group('apiReachabilityChecker (#12382)', () {
+    const baseUrl = 'https://api.example.test/api/v1/';
+    late _MockDio client;
+
+    setUpAll(() => registerFallbackValue(Options()));
+
+    setUp(() => client = _MockDio());
+
+    void answer(int statusCode) {
+      when(
+        () => client.head<void>(any(), options: any(named: 'options')),
+      ).thenAnswer(
+        (_) async => Response<void>(
+          requestOptions: RequestOptions(path: baseUrl),
+          statusCode: statusCode,
+        ),
+      );
+    }
+
+    void fail(DioExceptionType type, {int? statusCode}) {
+      final request = RequestOptions(path: baseUrl);
+      when(
+        () => client.head<void>(any(), options: any(named: 'options')),
+      ).thenThrow(
+        DioException(
+          requestOptions: request,
+          type: type,
+          response: statusCode == null
+              ? null
+              : Response<void>(requestOptions: request, statusCode: statusCode),
+        ),
+      );
+    }
+
+    Future<bool> check() =>
+        NetworkStatusNotifier.apiReachabilityChecker(baseUrl, client: client);
+
+    test('asks the API host', () async {
+      answer(200);
+
+      expect(await check(), isTrue);
+      verify(
+        () => client.head<void>(baseUrl, options: any(named: 'options')),
+      ).called(1);
+    });
+
+    test('any HTTP response is online, even an error status', () async {
+      for (final status in [404, 500]) {
+        answer(status);
+        expect(await check(), isTrue, reason: '$status');
+      }
+      fail(DioExceptionType.badResponse, statusCode: 503);
+      expect(await check(), isTrue);
+    });
+
+    test('a connection error or a timeout is offline', () async {
+      for (final type in [
+        DioExceptionType.connectionError,
+        DioExceptionType.connectionTimeout,
+        DioExceptionType.receiveTimeout,
+        DioExceptionType.unknown,
+      ]) {
+        fail(type);
+        expect(await check(), isFalse, reason: '$type');
+      }
+    });
+  });
+
   group('NetworkStatusNotifier', () {
     test(
       'initializes as online and updates to offline when reachability fails',
