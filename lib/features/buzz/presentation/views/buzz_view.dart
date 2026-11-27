@@ -72,7 +72,7 @@ class _BuzzViewState extends ConsumerState<BuzzView> {
     final canJoin = buzzMeetingCode(_codeController.text).isNotEmpty;
 
     return Container(
-      color: colors.onPrimary,
+      color: colors.background,
       child: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 48),
@@ -204,7 +204,7 @@ class _NewMeetingButton extends StatelessWidget {
 
     return MenuAnchor(
       style: MenuStyle(
-        backgroundColor: WidgetStatePropertyAll(colors.onPrimary),
+        backgroundColor: WidgetStatePropertyAll(colors.background),
       ),
       menuChildren: [
         MenuItemButton(

@@ -23,6 +23,7 @@ Future<void> _pump(
   _FakeRepository repository, {
   String slug = 'acme',
   bool signedIn = true,
+  ThemeData? theme,
 }) async {
   tester.view.physicalSize = const Size(1400, 900);
   tester.view.devicePixelRatio = 1;
@@ -42,7 +43,12 @@ Future<void> _pump(
           ),
         ),
       ],
-      child: buildTestMaterialApp(const Scaffold(body: BuzzView())),
+      child: buildTestMaterialApp(
+        Theme(
+          data: theme ?? AppTheme.light,
+          child: const Scaffold(body: BuzzView()),
+        ),
+      ),
     ),
   );
   await tester.pumpAndSettle();
@@ -61,6 +67,35 @@ void main() {
     expect(find.text('New meeting'), findsOneWidget);
     expect(find.text('Enter a code or link'), findsOneWidget);
   });
+
+  for (final (name, theme, palette) in [
+    ('light', AppTheme.light, AppPalette.light),
+    ('dark', AppTheme.dark, AppPalette.dark),
+  ]) {
+    testWidgets('page and menu use the $name background', (tester) async {
+      await _pump(tester, _FakeRepository(const Success('abc')), theme: theme);
+
+      final page = tester.widget<Container>(
+        find
+            .descendant(
+              of: find.byType(BuzzView),
+              matching: find.byType(Container),
+            )
+            .first,
+      );
+      expect(page.color, palette.background);
+
+      final headline = tester.widget<Text>(
+        find.text(
+          'Seamless video calls and meetings for every learning community.',
+        ),
+      );
+      expect(headline.style?.color, palette.textPrimary);
+
+      final menu = tester.widget<MenuAnchor>(find.byType(MenuAnchor));
+      expect(menu.style?.backgroundColor?.resolve({}), palette.background);
+    });
+  }
 
   testWidgets('Join is enabled once a code is typed', (tester) async {
     await _pump(tester, _FakeRepository(const Success('abc')));
