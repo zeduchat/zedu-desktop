@@ -152,6 +152,10 @@ List<InlineSpan> _inlineSpans(
     } else if (keepMarkers) {
       // Empty italic (`**`): nothing to show but the hidden markers.
       spans.add(TextSpan(text: match.group(0), style: hiddenStyle));
+    } else {
+      // A lone `**` in a message formats nothing, so it is literal text, as
+      // in `2 ** 3` or `**/*.dart` (Ziki #2879).
+      spans.add(plainText(match.group(0)!, style));
     }
 
     lastEnd = match.end;

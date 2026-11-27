@@ -134,6 +134,32 @@ void main() {
       }
     });
 
+    test('a lone ** in a message keeps its asterisks (#2879)', () {
+      for (final text in ['2 ** 3 = 8', '**', 'glob: **/*.dart', 'a ** b']) {
+        final span = buildInlineMarkdownSpan(text, _base);
+        expect(_visibleText(span), text, reason: text);
+        expect(
+          _visible(span).any((r) => _isBold(r.$2) || _isItalic(r.$2)),
+          isFalse,
+          reason: text,
+        );
+      }
+    });
+
+    test('code keeps its asterisks', () {
+      final span = buildInlineMarkdownSpan('run `2 ** 3` now', _base);
+      expect(_visibleText(span), 'run 2 ** 3 now');
+    });
+
+    test('valid formatting next to a lone ** still formats', () {
+      final span = buildInlineMarkdownSpan('**bold** then ** and *it*', _base);
+      expect(_visibleText(span), 'bold then ** and it');
+      final runs = _visible(span);
+      expect(_isBold(runs.firstWhere((r) => r.$1 == 'bold').$2), isTrue);
+      expect(_isItalic(runs.firstWhere((r) => r.$1 == 'it').$2), isTrue);
+      expect(_visibleText(buildInlineMarkdownSpan('***x***', _base)), 'x');
+    });
+
     test('empty text gives an empty span', () {
       expect(buildInlineMarkdownSpan('', _base).toPlainText(), '');
     });
