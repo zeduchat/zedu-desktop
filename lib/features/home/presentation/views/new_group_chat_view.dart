@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:zedu/core/core.dart';
 import 'package:zedu/features/features.dart';
 
@@ -19,8 +21,9 @@ class _NewGroupChatViewState extends ConsumerState<NewGroupChatView> {
   /// until then and only turns red for an incomplete selection afterwards.
   bool _touched = false;
 
-  // Filtered members list
-  List<TeamMember> _filteredMembers = [];
+  /// The search sent to the server, set once typing pauses. '' lists everyone.
+  String _query = '';
+  Timer? _searchDebounce;
   bool _showDropdown = false;
 
   @override
@@ -32,6 +35,7 @@ class _NewGroupChatViewState extends ConsumerState<NewGroupChatView> {
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     _searchController.removeListener(_onSearchChanged);
     _focusNode.removeListener(_onFocusChanged);
     _searchController.dispose();
@@ -40,41 +44,39 @@ class _NewGroupChatViewState extends ConsumerState<NewGroupChatView> {
   }
 
   void _onSearchChanged() {
-    final query = _searchController.text.trim().toLowerCase();
-    final allMembers = ref.read(userProfileNotifierProvider).teamMembers;
-    final currentUserId = ref.read(authNotifierProvider).user?.id;
-
-    setState(() {
-      if (query.isEmpty) {
-        // Show all members that are not already selected and not the current user
-        _filteredMembers = allMembers
-            .where(
-              (m) =>
-                  m.id != currentUserId &&
-                  !_selectedMembers.any((s) => s.id == m.id),
-            )
-            .toList();
-      } else {
-        _filteredMembers = allMembers.where((m) {
-          if (m.id == currentUserId) return false;
-          final isSelected = _selectedMembers.any((s) => s.id == m.id);
-          if (isSelected) return false;
-
-          final name = (m.name ?? '').toLowerCase();
-          final email = m.email.toLowerCase();
-          return name.contains(query) || email.contains(query);
-        }).toList();
-      }
+    final query = _searchController.text.trim();
+    _searchDebounce?.cancel();
+    if (query == _query) return;
+    if (query.isEmpty) {
+      setState(() => _query = '');
+      return;
+    }
+    // Members are searched on the server, as on the People page.
+    _searchDebounce = Timer(const Duration(milliseconds: 300), () {
+      if (mounted) setState(() => _query = query);
     });
   }
 
   void _onFocusChanged() {
     setState(() {
       _showDropdown = _focusNode.hasFocus;
-      if (_showDropdown) {
-        _onSearchChanged(); // Refresh items
-      }
     });
+  }
+
+  /// The group DM and the chips work with [TeamMember]s.
+  static TeamMember _teamMemberFrom(OrgMember member) {
+    final name = member.name.isNotEmpty ? member.name : member.username;
+    return TeamMember(
+      id: member.id,
+      email: member.email,
+      role: 'member',
+      dateJoined: '',
+      status: member.deactivated
+          ? TeamMemberStatus.inactive
+          : TeamMemberStatus.active,
+      name: name.isEmpty ? null : name,
+      avatarUrl: member.photoUrl.isEmpty ? null : member.photoUrl,
+    );
   }
 
   void _toggleMemberSelection(TeamMember member) {
@@ -86,7 +88,6 @@ class _NewGroupChatViewState extends ConsumerState<NewGroupChatView> {
         _selectedMembers.add(member);
       }
       _searchController.clear();
-      _onSearchChanged(); // Refresh
     });
   }
 
@@ -191,6 +192,8 @@ class _NewGroupChatViewState extends ConsumerState<NewGroupChatView> {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
+    // Watched from the start so the members load as the page opens.
+    final members = ref.watch(peopleListProvider(_query));
 
     return Container(
       color: colors.background,
@@ -275,7 +278,7 @@ class _NewGroupChatViewState extends ConsumerState<NewGroupChatView> {
                         ),
 
                         // Suggestions Dropdown Card (Inline Layer overlay)
-                        if (_showDropdown && _filteredMembers.isNotEmpty)
+                        if (_showDropdown)
                           Positioned(
                             top: 60,
                             left: 0,
@@ -299,89 +302,7 @@ class _NewGroupChatViewState extends ConsumerState<NewGroupChatView> {
                                     borderRadius: BorderRadius.circular(8),
                                     border: Border.all(color: colors.divider),
                                   ),
-                                  child: ListView.builder(
-                                    shrinkWrap: true,
-                                    itemCount: _filteredMembers.length,
-                                    itemBuilder: (context, index) {
-                                      final member = _filteredMembers[index];
-                                      final name = _getMemberDisplayName(
-                                        member,
-                                      );
-                                      final initials = _getMemberInitials(name);
-                                      return InkWell(
-                                        onTap: () =>
-                                            _toggleMemberSelection(member),
-                                        child: Container(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 16,
-                                            vertical: 12,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            border: Border(
-                                              bottom: BorderSide(
-                                                color: colors.divider,
-                                                width: 0.5,
-                                              ),
-                                            ),
-                                          ),
-                                          child: Row(
-                                            children: [
-                                              // Avatar
-                                              CircleAvatar(
-                                                radius: 16,
-                                                backgroundColor: colors.primary
-                                                    .withValues(alpha: 0.1),
-                                                child: Text(
-                                                  initials,
-                                                  style: TextStyle(
-                                                    color: colors.primary,
-                                                    fontSize: 12,
-                                                    fontWeight: FontWeight.bold,
-                                                  ),
-                                                ),
-                                              ),
-                                              const SizedBox(width: 12),
-
-                                              // Text
-                                              Expanded(
-                                                child: Column(
-                                                  crossAxisAlignment:
-                                                      CrossAxisAlignment.start,
-                                                  children: [
-                                                    Text(
-                                                      name,
-                                                      style: TextStyle(
-                                                        color:
-                                                            colors.textPrimary,
-                                                        fontWeight:
-                                                            FontWeight.bold,
-                                                        fontSize: 14,
-                                                      ),
-                                                    ),
-                                                    const SizedBox(height: 2),
-                                                    Text(
-                                                      member.email,
-                                                      style: TextStyle(
-                                                        color: colors.textHint,
-                                                        fontSize: 12,
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-
-                                              // Checkbox / Add icon
-                                              Icon(
-                                                Icons.add_circle_outline,
-                                                color: colors.primary,
-                                                size: 20,
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      );
-                                    },
-                                  ),
+                                  child: _buildSuggestions(colors, members),
                                 ),
                               ),
                             ),
@@ -503,6 +424,176 @@ class _NewGroupChatViewState extends ConsumerState<NewGroupChatView> {
               ),
             ),
         ],
+      ),
+    );
+  }
+
+  /// Workspace members matching [_query], without yourself or anyone already
+  /// selected, paged in as the list scrolls.
+  Widget _buildSuggestions(
+    AppPalette colors,
+    AsyncValue<PeopleListState> members,
+  ) {
+    return members.when(
+      loading: () => _buildSuggestionMessage(
+        colors,
+        'Loading members...',
+        leading: SizedBox(
+          width: 16,
+          height: 16,
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            color: colors.primary,
+          ),
+        ),
+      ),
+      error: (_, _) => _buildSuggestionMessage(
+        colors,
+        'Could not load members',
+        action: TextButton(
+          onPressed: () => ref.invalidate(peopleListProvider(_query)),
+          child: const Text('Retry'),
+        ),
+      ),
+      data: (list) {
+        final currentUserId = ref.read(authNotifierProvider).user?.id;
+        final visible = [
+          for (final m in list.members)
+            if (m.id != currentUserId &&
+                !_selectedMembers.any((s) => s.id == m.id))
+              m,
+        ];
+        final showFooter = list.hasMore || list.isLoadingMore;
+        if (visible.isEmpty && !showFooter) {
+          return _buildSuggestionMessage(colors, 'No members found');
+        }
+        return NotificationListener<ScrollNotification>(
+          onNotification: (notification) {
+            if (notification.metrics.extentAfter < 200) {
+              ref.read(peopleListProvider(_query).notifier).loadMore();
+            }
+            return false;
+          },
+          child: ListView.builder(
+            shrinkWrap: true,
+            itemCount: visible.length + (showFooter ? 1 : 0),
+            itemBuilder: (context, index) {
+              if (index == visible.length) {
+                return _buildSuggestionsFooter(colors, list);
+              }
+              return _buildMemberRow(colors, visible[index]);
+            },
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildSuggestionsFooter(AppPalette colors, PeopleListState list) {
+    return Padding(
+      padding: const EdgeInsets.all(12),
+      child: Center(
+        child: list.isLoadingMore
+            ? SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: colors.primary,
+                ),
+              )
+            // Scrolling near the end loads more; the button also covers a
+            // page too short to scroll.
+            : TextButton(
+                onPressed: () =>
+                    ref.read(peopleListProvider(_query).notifier).loadMore(),
+                child: Text(
+                  list.loadMoreFailed
+                      ? 'Could not load more. Retry'
+                      : 'Load more',
+                ),
+              ),
+      ),
+    );
+  }
+
+  Widget _buildSuggestionMessage(
+    AppPalette colors,
+    String text, {
+    Widget? leading,
+    Widget? action,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Row(
+        children: [
+          if (leading != null) ...[leading, const SizedBox(width: 12)],
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(color: colors.textSecondary, fontSize: 13),
+            ),
+          ),
+          ?action,
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMemberRow(AppPalette colors, OrgMember orgMember) {
+    final member = _teamMemberFrom(orgMember);
+    final name = _getMemberDisplayName(member);
+    final initials = _getMemberInitials(name);
+    return InkWell(
+      onTap: () => _toggleMemberSelection(member),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          border: Border(bottom: BorderSide(color: colors.divider, width: 0.5)),
+        ),
+        child: Row(
+          children: [
+            // Avatar
+            CircleAvatar(
+              radius: 16,
+              backgroundColor: colors.primary.withValues(alpha: 0.1),
+              child: Text(
+                initials,
+                style: TextStyle(
+                  color: colors.primary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+
+            // Text
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    name,
+                    style: TextStyle(
+                      color: colors.textPrimary,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    member.email,
+                    style: TextStyle(color: colors.textHint, fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+
+            // Checkbox / Add icon
+            Icon(Icons.add_circle_outline, color: colors.primary, size: 20),
+          ],
+        ),
       ),
     );
   }
