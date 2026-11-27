@@ -64,6 +64,61 @@ void main() {
         {'id': 'm-2', 'content': 'Threaded hello'},
       ]);
     });
+
+    test('reads a top-level messages list from the DM thread route', () async {
+      when(
+        () => api.get<Map<String, dynamic>>(
+          path: '/dms/channels/ch-1/threads',
+          queryParameters: {'page': 1, 'limit': DmRepository.pageSize},
+        ),
+      ).thenAnswer(
+        (_) async => const ApiResponseModel<Map<String, dynamic>>(
+          statusCode: 200,
+          data: {
+            'messages': [
+              {'id': 'm-3', 'content': 'Top-level hello'},
+            ],
+          },
+        ),
+      );
+
+      final messages = await repository.getMessages('ch-1');
+
+      expect(messages, [
+        {'id': 'm-3', 'content': 'Top-level hello'},
+      ]);
+    });
+
+    test(
+      'reads deeply nested data and threads without dropping messages',
+      () async {
+        when(
+          () => api.get<Map<String, dynamic>>(
+            path: '/dms/channels/ch-1/threads',
+            queryParameters: {'page': 1, 'limit': DmRepository.pageSize},
+          ),
+        ).thenAnswer(
+          (_) async => const ApiResponseModel<Map<String, dynamic>>(
+            statusCode: 200,
+            data: {
+              'data': {
+                'items': {
+                  'threads': [
+                    {'id': 'm-4', 'content': 'Nested hello'},
+                  ],
+                },
+              },
+            },
+          ),
+        );
+
+        final messages = await repository.getMessages('ch-1');
+
+        expect(messages, [
+          {'id': 'm-4', 'content': 'Nested hello'},
+        ]);
+      },
+    );
   });
 
   group('DmRepository.sendMessage', () {
