@@ -680,7 +680,6 @@ class AuthNotifier extends Notifier<AuthState> {
         'scope': 'openid profile email',
         'access_type': 'offline',
         'prompt': 'consent',
-        'application_type': 'desktop',
       });
 
       AppLogger.d('Launching Google Auth URL in browser', tag: _tag);

@@ -294,7 +294,12 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       }
 
       AppLogger.d('POST /auth/google', tag: _tag);
-      final data = <String, dynamic>{'grant_code': grantCode};
+      // The code comes from the desktop OAuth client, so the backend must
+      // redeem it with the desktop client credentials and loopback redirect.
+      final data = <String, dynamic>{
+        'grant_code': grantCode,
+        'application_type': 'desktop',
+      };
       if (redirectUri != null) {
         data['redirect_uri'] = redirectUri;
       }

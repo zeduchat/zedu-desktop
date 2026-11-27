@@ -78,6 +78,8 @@ void main() {
         throw StateError('Unexpected URL launcher method: ${call.method}');
       }
       final authUrl = Uri.parse((call.arguments as Map)['url'] as String);
+      // application_type is a backend field; Google ignores it on consent.
+      expect(authUrl.queryParameters, isNot(contains('application_type')));
       final redirect = Uri.parse(authUrl.queryParameters['redirect_uri']!);
       // Return from launch before waiting for the notifier's HTTP response.
       unawaited(() async {
