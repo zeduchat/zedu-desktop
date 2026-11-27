@@ -24,6 +24,9 @@ class _BuzzMeetingViewState extends ConsumerState<BuzzMeetingView> {
 
     final bool isFullPage = activeCall.state.isFullPage;
     final remoteName = activeCall.state.remoteUserName ?? 'Unknown';
+    // The remote participants plus this user.
+    final participantLabel = (activeCall.state.participants.length + 1)
+        .countLabel('participant');
 
     if (!isFullPage) {
       return Positioned(
@@ -70,7 +73,7 @@ class _BuzzMeetingViewState extends ConsumerState<BuzzMeetingView> {
                             ),
                           ),
                           Text(
-                            '2 participants',
+                            participantLabel,
                             style: TextStyle(
                               fontSize: 11,
                               color: colors.textHint,
@@ -199,7 +202,7 @@ class _BuzzMeetingViewState extends ConsumerState<BuzzMeetingView> {
                 Icon(Icons.people_outline, size: 16, color: colors.textHint),
                 const SizedBox(width: 4),
                 Text(
-                  '2 participants',
+                  participantLabel,
                   style: TextStyle(fontSize: 13, color: colors.textHint),
                 ),
                 const Spacer(),
