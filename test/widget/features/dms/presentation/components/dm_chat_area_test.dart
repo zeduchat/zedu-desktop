@@ -622,6 +622,17 @@ void main() {
       expect(find.text('<p></p>', findRichText: true), findsNothing);
     });
 
+    testWidgets('marks an edited message (edited) next to its time', (
+      tester,
+    ) async {
+      await pumpChat(tester, [
+        {...message('m1', 'changed'), 'edited': true},
+        message('m2', 'original'),
+      ]);
+
+      expect(find.text('(edited)'), findsOneWidget);
+    });
+
     testWidgets('still shows the text of a normal message', (tester) async {
       await pumpChat(tester, [message('m1', 'hello there')]);
 

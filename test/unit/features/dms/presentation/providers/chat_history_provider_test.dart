@@ -306,6 +306,21 @@ void main() {
       expect(notifier.messages.single['content'], 'edited');
     });
 
+    test('marks the message edited once the edit is saved', () async {
+      when(
+        () => mockRepository.editMessage(
+          any(),
+          content: any(named: 'content'),
+          threadId: any(named: 'threadId'),
+        ),
+      ).thenAnswer((_) async {});
+
+      expect(messageWasEdited(notifier.messages.single), isFalse);
+      await notifier.saveEdit('m1', 'edited');
+
+      expect(messageWasEdited(notifier.messages.single), isTrue);
+    });
+
     test(
       'reverts to the original content when the edit request fails',
       () async {

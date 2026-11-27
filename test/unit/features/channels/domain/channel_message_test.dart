@@ -183,4 +183,16 @@ void main() {
       },
     );
   });
+
+  test('ChannelMessage.fromJson reads whether the message was edited', () {
+    expect(
+      ChannelMessage.fromJson({'message': 'a', 'edited': true}).edited,
+      isTrue,
+    );
+    expect(
+      ChannelMessage.fromJson({'message': 'a', 'edited': false}).edited,
+      isFalse,
+    );
+    expect(ChannelMessage.fromJson({'message': 'a'}).edited, isFalse);
+  });
 }

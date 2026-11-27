@@ -7,4 +7,5 @@ export 'logger.dart';
 export 'email_mask.dart';
 export 'error_handling.dart';
 export 'initials.dart';
+export 'message_edited.dart';
 export 'single_instance.dart';

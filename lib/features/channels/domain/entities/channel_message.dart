@@ -1,3 +1,5 @@
+import 'package:zedu/core/core.dart';
+
 /// A single reaction (emoji) on a channel message, as returned by
 /// `GET /threads/channels/{channel_id}`.
 class ChannelReaction {
@@ -40,6 +42,9 @@ class ChannelMessage {
   final String? userId;
   final List<ChannelReaction> reactions;
 
+  /// Whether the message was changed after it was sent.
+  final bool edited;
+
   const ChannelMessage({
     this.id,
     required this.senderName,
@@ -53,6 +58,7 @@ class ChannelMessage {
     this.threadId,
     this.userId,
     this.reactions = const [],
+    this.edited = false,
   }) : rawContent = rawContent ?? text;
 
   static List<dynamic> mediaFrom(dynamic raw) {
@@ -100,6 +106,7 @@ class ChannelMessage {
         for (final entry in (json['reactions'] as List? ?? const []))
           if (entry is Map<String, dynamic>) ChannelReaction.fromJson(entry),
       ],
+      edited: messageWasEdited(json),
     );
   }
 

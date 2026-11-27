@@ -801,6 +801,15 @@ class ChatHistoryNotifier extends ChangeNotifier {
       if (editingMessageId == messageId) {
         editingMessageId = null;
       }
+      if (_isDisposed) return;
+      // Shows "(edited)" without waiting for the next refresh.
+      messages = messages.map((m) {
+        if (m['id'] == messageId && m['content'] == newContent) {
+          return Map<String, dynamic>.from(m)..['edited'] = true;
+        }
+        return m;
+      }).toList();
+      notifyListeners();
     } catch (e, st) {
       AppLogger.e(
         'Failed to save edit for message $messageId in channel $channelId',
