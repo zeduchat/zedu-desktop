@@ -458,8 +458,81 @@ void main() {
             .widget<TextField>(find.byType(TextField).last)
             .decoration!
             .hintText,
-        startsWith('Message @Bola'),
+        startsWith('Message Bola '),
       );
+    });
+
+    testWidgets('uses the participant username, not one built from the name', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(1200, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final repository = MockDmRepository();
+      when(
+        () => repository.getMessages(any(), page: any(named: 'page')),
+      ).thenAnswer((_) async => []);
+      final storage = MockSecureStorageService();
+      when(() => storage.readData(any())).thenAnswer((_) async => null);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authNotifierProvider.overrideWith(FakeSignedInAuthNotifier.new),
+            dmRepositoryProvider.overrideWithValue(repository),
+            dmDraftStoreProvider.overrideWith(
+              (ref) => DmDraftStore(storage, userId: 'user-1', orgId: 'org-1'),
+            ),
+          ],
+          child: buildTestMaterialApp(
+            Scaffold(
+              body: DmChatArea(
+                conversation: DmConversation(
+                  channelId: 'ada-dm',
+                  username: 'Ada Lovelace',
+                  participantId: 'user-2',
+                  previewMessage: '',
+                  unreadCount: 0,
+                  participants: [
+                    DmParticipant(
+                      userId: 'user-1',
+                      username: 'testuser',
+                      email: 'test@example.com',
+                    ),
+                    DmParticipant(
+                      userId: 'user-2',
+                      username: 'ada',
+                      email: 'ada@example.com',
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final hint = tester
+          .widget<TextField>(find.byType(TextField).last)
+          .decoration!
+          .hintText;
+      expect(hint, startsWith('Message @ada '));
+      expect(hint, isNot(contains('Ada_Lovelace')));
+
+      await tester.tap(find.byTooltip('More options'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('View profile'));
+      await tester.pumpAndSettle();
+
+      final dialog = find.byType(Dialog);
+      expect(
+        find.descendant(of: dialog, matching: find.text('@ada')),
+        findsOneWidget,
+      );
+      expect(find.text('@Ada_Lovelace'), findsNothing);
     });
 
     Map<String, dynamic> message(String id, String content) => {
