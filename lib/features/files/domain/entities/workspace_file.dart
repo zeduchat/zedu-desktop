@@ -80,12 +80,16 @@ class WorkspaceFile {
   }
 }
 
+/// A MIME subtype that reads as an extension, such as `png` in `image/png`.
+final _extensionLikeSubtype = RegExp(r'^[a-z0-9]{1,5}$');
+
 String _fileType(String fileType, String fileName) {
   final type = fileType.toLowerCase();
-  if (type.isNotEmpty) {
-    // Accept a MIME type such as `image/png` as well as a bare extension.
-    return type.contains('/') ? type.split('/').last : type;
-  }
+  if (type.isNotEmpty && !type.contains('/')) return type;
+  // Accept a MIME type such as `image/png`, but not a subtype such as
+  // `svg+xml` or `vnd.openxmlformats-...`: use the name's extension instead.
+  final subtype = type.split('/').last;
+  if (_extensionLikeSubtype.hasMatch(subtype)) return subtype;
   final dot = fileName.lastIndexOf('.');
   return dot == -1 ? '' : fileName.substring(dot + 1).toLowerCase();
 }
