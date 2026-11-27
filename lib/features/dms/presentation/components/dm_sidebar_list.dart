@@ -63,6 +63,7 @@ class _DmSidebarListState extends ConsumerState<DmSidebarList> {
     final textColor = colors.onPrimary.withValues(alpha: 0.9);
     final sort = ref.watch(dmSortProvider);
     final unreadOnly = ref.watch(dmUnreadOnlyProvider);
+    final userId = ref.watch(authNotifierProvider.select((s) => s.user?.id));
 
     return Container(
       color: colors.sidebar,
@@ -230,6 +231,19 @@ class _DmSidebarListState extends ConsumerState<DmSidebarList> {
                                   ),
                                 ),
                               );
+                        // The user's own space stays at the top, as on web
+                        // and mobile (Ziki #2870).
+                        if (filteringList) {
+                          final own = visibleConversations.indexWhere(
+                            (c) => c.isOwnSpaceFor(userId),
+                          );
+                          if (own > 0) {
+                            visibleConversations.insert(
+                              0,
+                              visibleConversations.removeAt(own),
+                            );
+                          }
+                        }
                         if (visibleConversations.isEmpty) {
                           return Center(
                             child: Text(
@@ -277,8 +291,13 @@ class _DmSidebarListState extends ConsumerState<DmSidebarList> {
                               padding: EdgeInsets.zero,
                               itemCount: visibleConversations.length,
                               itemBuilder: (context, index) {
+                                final conversation =
+                                    visibleConversations[index];
                                 return DmListTile(
-                                  conversation: visibleConversations[index],
+                                  conversation: conversation,
+                                  isOwnSpace: conversation.isOwnSpaceFor(
+                                    userId,
+                                  ),
                                 );
                               },
                             ),

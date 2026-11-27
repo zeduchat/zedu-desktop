@@ -32,6 +32,11 @@ class FakeWorkspaceNotifier extends WorkspaceNotifier {
   WorkspaceState build() => const WorkspaceState();
 }
 
+class FakeAuthNotifier extends AuthNotifier {
+  @override
+  AuthState build() => const AuthState(status: AuthStatus.unauthenticated);
+}
+
 class FakeDmListNotifier extends DmListNotifier {
   FakeDmListNotifier(this._conversations);
 
@@ -59,6 +64,7 @@ DmConversation buildConversation({
 Widget buildTileUnderTest(
   DmConversation conversation, {
   DmConversation? selected,
+  bool isOwnSpace = false,
 }) {
   return ProviderScope(
     overrides: [
@@ -74,7 +80,11 @@ Widget buildTileUnderTest(
     child: buildTestMaterialApp(
       Scaffold(
         backgroundColor: _palette.sidebar,
-        body: Column(children: [DmListTile(conversation: conversation)]),
+        body: Column(
+          children: [
+            DmListTile(conversation: conversation, isOwnSpace: isOwnSpace),
+          ],
+        ),
       ),
     ),
   );
@@ -146,6 +156,22 @@ void main() {
     expect(inkWell.mouseCursor, SystemMouseCursors.click);
   });
 
+  testWidgets('own space tile shows (you) after the name (#2870)', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      buildTileUnderTest(
+        buildConversation(username: 'Zed Me'),
+        isOwnSpace: true,
+      ),
+    );
+    expect(find.text('Zed Me (you)'), findsOneWidget);
+
+    await tester.pumpWidget(buildTileUnderTest(buildConversation()));
+    expect(find.text('Ada Okafor'), findsOneWidget);
+    expect(find.text('Ada Okafor (you)'), findsNothing);
+  });
+
   testWidgets('sidebar keeps row ink on a transparent Material', (
     tester,
   ) async {
@@ -163,6 +189,7 @@ void main() {
           dmListProvider.overrideWith(
             () => FakeDmListNotifier([buildConversation()]),
           ),
+          authNotifierProvider.overrideWith(FakeAuthNotifier.new),
         ],
         child: buildTestMaterialApp(const Scaffold(body: DmSidebarList())),
       ),
