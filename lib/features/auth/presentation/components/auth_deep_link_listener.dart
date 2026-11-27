@@ -54,7 +54,10 @@ class _AuthDeepLinkListenerState extends ConsumerState<AuthDeepLinkListener> {
   }
 
   Future<void> _handleUri(Uri uri) async {
-    final token = MagicLinkDeepLinkParser.extractToken(uri);
+    final token = MagicLinkDeepLinkParser.extractToken(
+      uri,
+      trustedWebHosts: trustedWebHosts(locator<AppConfig>()),
+    );
     if (token == null || token == _lastProcessedToken) return;
     // A retry for the same link is only allowed once the current attempt has
     // settled; otherwise the same token would kick off parallel verifications.
