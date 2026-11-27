@@ -43,7 +43,7 @@ void main() {
     tester,
   ) async {
     var saved = false;
-    await openDialog(tester, (_) async {
+    await openDialog(tester, (_, _) async {
       saved = true;
       return null;
     });
@@ -62,7 +62,7 @@ void main() {
     tester,
   ) async {
     ProfileAccount? saved;
-    await openDialog(tester, (account) async {
+    await openDialog(tester, (account, _) async {
       saved = account;
       return null;
     });
@@ -79,7 +79,7 @@ void main() {
     tester,
   ) async {
     ProfileAccount? saved;
-    await openDialog(tester, (account) async {
+    await openDialog(tester, (account, _) async {
       saved = account;
       return null;
     });
@@ -100,7 +100,7 @@ void main() {
     tester,
   ) async {
     final semantics = tester.ensureSemantics();
-    await openDialog(tester, (_) async => null);
+    await openDialog(tester, (_, _) async => null);
 
     final countryField = find.byType(TextFormField).last;
     await tester.ensureVisible(countryField);
@@ -147,7 +147,7 @@ void main() {
     tester,
   ) async {
     ProfileAccount? saved;
-    await openDialog(tester, (account) async {
+    await openDialog(tester, (account, _) async {
       saved = account;
       return null;
     });
@@ -163,7 +163,7 @@ void main() {
   testWidgets('displays the friendly label for the saved IANA timezone', (
     tester,
   ) async {
-    await openDialog(tester, (_) async => null);
+    await openDialog(tester, (_, _) async => null);
 
     expect(find.text('(UTC+01:00) West Central Africa'), findsOneWidget);
   });
@@ -172,7 +172,7 @@ void main() {
     'preserves existing valid IANA value when saved without changing timezone',
     (tester) async {
       ProfileAccount? saved;
-      await openDialog(tester, (account) async {
+      await openDialog(tester, (account, _) async {
         saved = account;
         return null;
       });
@@ -188,7 +188,7 @@ void main() {
     'selecting a timezone persists an IANA identifier, not the dropdown label',
     (tester) async {
       ProfileAccount? saved;
-      await openDialog(tester, (account) async {
+      await openDialog(tester, (account, _) async {
         saved = account;
         return null;
       });
@@ -216,7 +216,7 @@ void main() {
     'maps an older saved display label to its IANA identifier on save',
     (tester) async {
       ProfileAccount? saved;
-      await openDialog(tester, (account) async {
+      await openDialog(tester, (account, _) async {
         saved = account;
         return null;
       }, account.copyWith(timezone: '(UTC+01:00) West Central Africa'));
@@ -234,7 +234,7 @@ void main() {
     tester,
   ) async {
     ProfileAccount? saved;
-    await openDialog(tester, (account) async {
+    await openDialog(tester, (account, _) async {
       saved = account;
       return null;
     }, account.copyWith(timezone: 'Africa/Accra'));
@@ -258,7 +258,7 @@ void main() {
       tester,
     ) async {
       final result = Completer<String?>();
-      await openDialog(tester, (_) => result.future);
+      await openDialog(tester, (_, _) => result.future);
 
       await tester.tap(find.text('Save changes'));
       await tester.pump();
@@ -277,7 +277,7 @@ void main() {
     ) async {
       var calls = 0;
       final result = Completer<String?>();
-      await openDialog(tester, (_) {
+      await openDialog(tester, (_, _) {
         calls++;
         return result.future;
       });
@@ -296,7 +296,7 @@ void main() {
       tester,
     ) async {
       var calls = 0;
-      await openDialog(tester, (_) async {
+      await openDialog(tester, (_, _) async {
         calls++;
         return calls == 1 ? 'Network error. Please try again.' : null;
       });
@@ -322,7 +322,7 @@ void main() {
     testWidgets('Cancel on a changed form asks before discarding', (
       tester,
     ) async {
-      await openDialog(tester, (_) async => null);
+      await openDialog(tester, (_, _) async => null);
 
       await tester.enterText(find.byType(TextFormField).first, 'Ada B');
       await tester.pump();
@@ -356,7 +356,7 @@ void main() {
     testWidgets('Cancel on an unchanged form closes straight away', (
       tester,
     ) async {
-      await openDialog(tester, (_) async => null);
+      await openDialog(tester, (_, _) async => null);
 
       await tester.tap(find.text('Cancel'));
       await tester.pumpAndSettle();
@@ -366,7 +366,7 @@ void main() {
     });
 
     testWidgets('the header close button asks too', (tester) async {
-      await openDialog(tester, (_) async => null);
+      await openDialog(tester, (_, _) async => null);
 
       await tester.enterText(find.byType(TextFormField).first, 'Changed');
       await tester.pump();
@@ -378,7 +378,7 @@ void main() {
     });
 
     testWidgets('a scrim tap asks before discarding', (tester) async {
-      await openDialog(tester, (_) async => null);
+      await openDialog(tester, (_, _) async => null);
 
       await tester.enterText(find.byType(TextFormField).first, 'Changed');
       await tester.pump();
@@ -390,7 +390,7 @@ void main() {
     });
 
     testWidgets('a scrim tap still closes an unchanged form', (tester) async {
-      await openDialog(tester, (_) async => null);
+      await openDialog(tester, (_, _) async => null);
 
       await tester.tapAt(const Offset(5, 5));
       await tester.pumpAndSettle();
@@ -400,33 +400,20 @@ void main() {
     });
   });
 
-  testWidgets('photo buttons are disabled and say they are coming soon', (
+  testWidgets('photo buttons are enabled now that upload works (Ziki #12421)', (
     tester,
   ) async {
-    await openDialog(tester, (_) async => null);
+    // The account has no photo, so only Upload photo shows; Remove photo
+    // appears once there is a photo (edit_profile_dialog_photo_test.dart).
+    await openDialog(tester, (_, _) async => null);
 
-    for (final label in ['Upload photo', 'Remove photo']) {
-      final button = find.ancestor(
-        of: find.text(label),
-        matching: find.byWidgetPredicate((w) => w is TextButton),
-      );
-      expect(button, findsOneWidget, reason: label);
-      expect(
-        tester.widget<TextButton>(button).onPressed,
-        isNull,
-        reason: '$label should be disabled',
-      );
-      expect(
-        find.ancestor(of: button, matching: find.byType(Tooltip)),
-        findsOneWidget,
-        reason: label,
-      );
-    }
-    expect(find.byTooltip('Coming soon'), findsNWidgets(2));
-
-    // Tapping a disabled button keeps the dialog open and does nothing.
-    await tester.tap(find.text('Upload photo'), warnIfMissed: false);
-    await tester.pumpAndSettle();
-    expect(find.byType(Dialog), findsOneWidget);
+    final upload = find.ancestor(
+      of: find.text('Upload photo'),
+      matching: find.byWidgetPredicate((w) => w is TextButton),
+    );
+    expect(upload, findsOneWidget);
+    expect(tester.widget<TextButton>(upload).onPressed, isNotNull);
+    expect(find.text('Remove photo'), findsNothing);
+    expect(find.byTooltip('Coming soon'), findsNothing);
   });
 }

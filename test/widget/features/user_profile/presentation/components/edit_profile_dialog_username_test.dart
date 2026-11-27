@@ -43,7 +43,7 @@ void main() {
         tester,
       ) async {
         ProfileAccount? saved;
-        await openDialog(tester, (account) async {
+        await openDialog(tester, (account, _) async {
           saved = account;
           return null;
         });
@@ -62,7 +62,7 @@ void main() {
       'saves a nonempty username with surrounding whitespace trimmed',
       (tester) async {
         ProfileAccount? saved;
-        await openDialog(tester, (account) async {
+        await openDialog(tester, (account, _) async {
           saved = account;
           return null;
         });

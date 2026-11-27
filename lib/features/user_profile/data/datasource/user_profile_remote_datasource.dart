@@ -6,6 +6,12 @@ import 'package:zedu/features/features.dart';
 abstract interface class UserProfileRemoteDataSource {
   Future<ProfileAccountModel> getAccount();
   Future<ProfileAccountModel> updateAccount(ProfileAccount account);
+
+  /// Uploads [filePath] as the profile photo.
+  Future<void> uploadAvatar(String filePath);
+
+  /// Removes the profile photo.
+  Future<void> removeAvatar();
   Future<void> deleteAccount();
   Future<NotificationPreferencesModel> getNotificationPreferences({
     required String? orgId,
@@ -101,6 +107,29 @@ class UserProfileRemoteDataSourceImpl implements UserProfileRemoteDataSource {
       data: FormData.fromMap(fields),
     );
     return ProfileAccountModel.fromAccount(account);
+  }
+
+  @override
+  Future<void> uploadAvatar(String filePath) async {
+    if (_config.usesMockData) return;
+    // Same multipart part as Zedu web's Edit profile (`avatar_file` on
+    // PATCH /profile). The other fields are left out so they aren't changed.
+    final fileName = filePath.split(RegExp(r'[\\/]')).last;
+    await _apiBaseService.patch<Map<String, dynamic>>(
+      path: '/profile',
+      data: FormData.fromMap({
+        'avatar_file': await MultipartFile.fromFile(
+          filePath,
+          filename: fileName,
+        ),
+      }),
+    );
+  }
+
+  @override
+  Future<void> removeAvatar() async {
+    if (_config.usesMockData) return;
+    await _apiBaseService.delete<Map<String, dynamic>>(path: '/profile/image');
   }
 
   @override

@@ -55,12 +55,13 @@ class ProfileAccount {
     String? title,
     String? namePronunciation,
     String? country,
+    bool clearAvatarUrl = false,
   }) {
     return ProfileAccount(
       name: name ?? this.name,
       email: email ?? this.email,
       timezone: timezone ?? this.timezone,
-      avatarUrl: avatarUrl ?? this.avatarUrl,
+      avatarUrl: clearAvatarUrl ? null : avatarUrl ?? this.avatarUrl,
       displayName: displayName ?? this.displayName,
       username: username ?? this.username,
       phoneNumber: phoneNumber ?? this.phoneNumber,

@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:zedu/core/core.dart';
 import 'package:zedu/features/features.dart';
 
@@ -48,6 +50,15 @@ String normalizeProfileTimezone(String saved) {
   return value;
 }
 
+/// The label shown for a saved timezone ("(UTC+01:00) West Central Africa"),
+/// the saved value itself when it isn't one of the listed zones, or an
+/// empty string when none is saved.
+String profileTimezoneLabel(String saved) {
+  if (saved.trim().isEmpty) return '';
+  final id = normalizeProfileTimezone(saved);
+  return _kTimezones[id] ?? saved.trim();
+}
+
 String _canonicalCountryName(String value) {
   final trimmedValue = value.trim();
   return kCountries.firstWhere(
@@ -56,9 +67,25 @@ String _canonicalCountryName(String value) {
   );
 }
 
-/// Saves the edited profile and returns an error message, or null when the
-/// save succeeded.
-typedef EditProfileSave = Future<String?> Function(ProfileAccount account);
+/// Saves the edited profile and the photo change, and returns an error
+/// message, or null when the save succeeded.
+typedef EditProfileSave =
+    Future<String?> Function(ProfileAccount account, ProfilePhotoEdit photo);
+
+/// Photo types the server accepts, the same as Zedu web.
+const List<String> kProfilePhotoExtensions = ['jpg', 'jpeg', 'png'];
+
+/// Lets the user pick a profile photo; returns its path, or null if they
+/// cancelled. Replaceable in tests.
+@visibleForTesting
+Future<String?> Function() pickProfilePhoto = () async {
+  final result = await FilePicker.pickFiles(
+    type: FileType.custom,
+    allowedExtensions: kProfilePhotoExtensions,
+    dialogTitle: 'Choose a profile photo',
+  );
+  return result?.files.single.path;
+};
 
 /// Opens the editor. It stays open while [onSave] runs and closes only when
 /// the save succeeds; on failure it keeps the draft and shows the error.
@@ -103,6 +130,31 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
   String? _saveError;
   bool _confirmingDiscard = false;
 
+  /// The photo change made in this dialog, saved with the rest of the form.
+  ProfilePhotoEdit _photo = ProfilePhotoEdit.unchanged;
+
+  /// Whether a photo is shown: a newly picked one, or the saved one unless
+  /// it was removed.
+  bool get _hasPhoto =>
+      _photo.filePath != null ||
+      (!_photo.remove && (widget.account.avatarUrl ?? '').trim().isNotEmpty);
+
+  Future<void> _pickPhoto() async {
+    final path = await pickProfilePhoto();
+    if (!mounted || path == null || path.isEmpty) return;
+    final extension = path.split('.').last.toLowerCase();
+    if (!kProfilePhotoExtensions.contains(extension)) {
+      setState(() => _saveError = 'Choose a JPG or PNG image');
+      return;
+    }
+    setState(() {
+      _photo = ProfilePhotoEdit.upload(path);
+      _saveError = null;
+    });
+  }
+
+  void _removePhoto() => setState(() => _photo = ProfilePhotoEdit.removed);
+
   @override
   void initState() {
     super.initState();
@@ -138,7 +190,8 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
   bool get _isDirty {
     final account = widget.account;
     String norm(String value) => value.trim();
-    return norm(nameCtrl.text) != norm(account.name) ||
+    return !_photo.isUnchanged ||
+        norm(nameCtrl.text) != norm(account.name) ||
         norm(displayNameCtrl.text) != norm(account.displayName) ||
         norm(usernameCtrl.text) != norm(account.username) ||
         norm(emailCtrl.text) != norm(account.email) ||
@@ -207,6 +260,7 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
         timezone: selectedTimezone,
         country: canonicalCountry,
       ),
+      _photo,
     );
     // Closed with Cancel while saving: nothing left to update or pop.
     if (!mounted) return;
@@ -577,59 +631,54 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
                             const SizedBox(height: 12),
                             Center(
                               child: Container(
+                                key: const ValueKey('edit_profile_photo'),
                                 width: 160,
                                 height: 160,
+                                clipBehavior: Clip.antiAlias,
                                 decoration: BoxDecoration(
                                   color: colors.accent.withValues(alpha: 0.15),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
-                                child: Icon(
-                                  Icons.person,
-                                  size: 80,
-                                  color: colors.accent,
+                                child: _PhotoPreview(
+                                  photo: _photo,
+                                  savedUrl: widget.account.avatarUrl,
                                 ),
                               ),
                             ),
                             const SizedBox(height: 12),
-                            // Photo upload isn't supported yet, so both
-                            // buttons are disabled and say why (Ziki #117).
                             Center(
-                              child: Tooltip(
-                                message: 'Coming soon',
-                                child: TextButton.icon(
-                                  onPressed: null,
-                                  icon: Icon(
-                                    Icons.upload_outlined,
-                                    size: 16,
-                                    color: colors.textHint,
-                                  ),
-                                  label: Text(
-                                    'Upload photo',
-                                    style: context.textTheme.bodySmall
-                                        ?.copyWith(
-                                          color: colors.textHint,
-                                          fontWeight: FontWeight.w500,
-                                        ),
+                              child: TextButton.icon(
+                                key: const ValueKey('edit_profile_upload'),
+                                onPressed: _saving ? null : _pickPhoto,
+                                icon: Icon(
+                                  Icons.upload_outlined,
+                                  size: 16,
+                                  color: colors.primary,
+                                ),
+                                label: Text(
+                                  _hasPhoto ? 'Change photo' : 'Upload photo',
+                                  style: context.textTheme.bodySmall?.copyWith(
+                                    color: colors.primary,
+                                    fontWeight: FontWeight.w500,
                                   ),
                                 ),
                               ),
                             ),
-                            Center(
-                              child: Tooltip(
-                                message: 'Coming soon',
+                            if (_hasPhoto)
+                              Center(
                                 child: TextButton(
-                                  onPressed: null,
+                                  key: const ValueKey('edit_profile_remove'),
+                                  onPressed: _saving ? null : _removePhoto,
                                   child: Text(
                                     'Remove photo',
                                     style: context.textTheme.bodySmall
                                         ?.copyWith(
-                                          color: colors.textHint,
+                                          color: colors.error,
                                           fontWeight: FontWeight.w500,
                                         ),
                                   ),
                                 ),
                               ),
-                            ),
                           ],
                         ),
                       ),
@@ -686,6 +735,36 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
         if (!didPop) _maybeClose();
       },
       child: dialog,
+    );
+  }
+}
+
+/// The photo the dialog shows: a newly picked file, the saved photo, or a
+/// placeholder when there is none (or it was removed).
+class _PhotoPreview extends StatelessWidget {
+  const _PhotoPreview({required this.photo, required this.savedUrl});
+
+  final ProfilePhotoEdit photo;
+  final String? savedUrl;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    final placeholder = Icon(Icons.person, size: 80, color: colors.accent);
+    final filePath = photo.filePath;
+    if (filePath != null) {
+      return Image.file(
+        File(filePath),
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => placeholder,
+      );
+    }
+    final url = savedUrl?.trim() ?? '';
+    if (photo.remove || url.isEmpty) return placeholder;
+    return Image.network(
+      url,
+      fit: BoxFit.cover,
+      errorBuilder: (_, _, _) => placeholder,
     );
   }
 }

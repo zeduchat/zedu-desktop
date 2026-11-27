@@ -65,8 +65,23 @@ class _UserProfileViewState extends ConsumerState<UserProfileView> {
         authenticatedUser: authenticatedUser,
         notificationsKey: _notificationsKey,
         workspaceName: workspaceName,
+        onSaveAccount: _saveAccount,
       ),
     );
+  }
+
+  /// Saves the Edit profile dialog and returns the error to show in it, or
+  /// null when the save succeeded.
+  Future<String?> _saveAccount(
+    ProfileAccount account,
+    ProfilePhotoEdit photo,
+  ) async {
+    await ref
+        .read(userProfileNotifierProvider.notifier)
+        .updateAccount(account, photo: photo);
+    // updateAccount clears the error when it starts and sets it on failure.
+    if (!mounted) return null;
+    return ref.read(userProfileNotifierProvider).error;
   }
 }
 
@@ -77,6 +92,7 @@ class _ProfileContent extends StatelessWidget {
     required this.authenticatedUser,
     required this.notificationsKey,
     required this.workspaceName,
+    required this.onSaveAccount,
   });
 
   final UserProfileState state;
@@ -84,6 +100,7 @@ class _ProfileContent extends StatelessWidget {
   final User? authenticatedUser;
   final GlobalKey<NotificationsSectionState> notificationsKey;
   final String? workspaceName;
+  final EditProfileSave onSaveAccount;
 
   static const padding = EdgeInsets.fromLTRB(28, 32, 40, 48);
   static const maxContentWidth = 1000.0;
@@ -120,8 +137,13 @@ class _ProfileContent extends StatelessWidget {
                 authenticatedUser,
               ),
               isSaving: state.isSaving,
-              onSave: notifier.updateAccount,
+              onSave: onSaveAccount,
               onDelete: notifier.deleteAccount,
+              status: authenticatedUser?.status,
+              onEditStatus: () => showDialog<void>(
+                context: context,
+                builder: (_) => const SetStatusDialog(),
+              ),
             ),
             UserProfileSection.notifications => const SizedBox.shrink(),
             UserProfileSection.desktop => DesktopSection(

@@ -5,7 +5,7 @@ import 'package:zedu/features/features.dart';
 
 import '../../../../../../helpers/helpers.dart';
 
-/// Renders Settings > Your Account Information at a fixed size so the section
+/// Renders Settings > Account at a fixed size so the section
 /// can be captured as a golden image for the pull request evidence.
 ///
 /// The file only depends on [AccountSection], so it also runs on the
@@ -89,7 +89,7 @@ Widget _buildAccountSection() {
             username: 'adaeze',
           ),
           isSaving: false,
-          onSave: (_) {},
+          onSave: (_, _) async => null,
           onDelete: () async {},
         ),
       ),
@@ -149,8 +149,11 @@ void main() {
     await tester.pumpWidget(_buildAccountSection());
     await tester.pumpAndSettle();
 
-    expect(find.text('Your Account Information'), findsOneWidget);
-    expect(find.text('Adaeze Okonkwo'), findsOneWidget);
+    expect(find.text('Personal details'), findsOneWidget);
+    expect(
+      find.text('Adaeze Okonkwo'),
+      findsNWidgets(2),
+    ); // header + Display name
     expect(tester.takeException(), isNull);
 
     await expectLater(

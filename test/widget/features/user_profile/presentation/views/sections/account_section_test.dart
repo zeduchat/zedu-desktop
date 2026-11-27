@@ -16,7 +16,7 @@ Future<void> _pump(WidgetTester tester, ProfileAccount account) async {
           child: AccountSection(
             account: account,
             isSaving: false,
-            onSave: (_) {},
+            onSave: (_, _) async => null,
             onDelete: () async {},
           ),
         ),
@@ -80,14 +80,15 @@ void main() {
   testWidgets('shows the saved username as the handle', (tester) async {
     await _pump(tester, account.copyWith(username: 'CountessAda'));
 
-    expect(find.text('@CountessAda'), findsOneWidget);
+    // The header and the Personal details Username row, as on web.
+    expect(find.text('@CountessAda'), findsNWidgets(2));
     expect(find.text('@adalovelace'), findsNothing);
   });
 
   testWidgets('trims the saved username', (tester) async {
     await _pump(tester, account.copyWith(username: '  ada_l '));
 
-    expect(find.text('@ada_l'), findsOneWidget);
+    expect(find.text('@ada_l'), findsNWidgets(2));
   });
 
   testWidgets('falls back to the name when there is no username', (
@@ -118,7 +119,7 @@ void main() {
                 child: AccountSection(
                   account: account.copyWith(username: 'CountessAda'),
                   isSaving: false,
-                  onSave: (_) {},
+                  onSave: (_, _) async => null,
                   onDelete: () async {},
                 ),
               ),
@@ -128,7 +129,7 @@ void main() {
       ),
     );
 
-    final handleText = tester.widget<Text>(find.text('@CountessAda'));
+    final handleText = tester.widget<Text>(find.text('@CountessAda').first);
     expect(
       handleText.style?.color,
       equals(sectionContext!.colors.textSecondary),
@@ -152,5 +153,135 @@ void main() {
       (box.decoration! as BoxDecoration).color,
       AppPalette.light.primaryBg,
     );
+  });
+
+  group('matches the web Account page (Ziki #12421)', () {
+    Future<void> pumpFull(
+      WidgetTester tester, {
+      ProfileAccount? profile,
+      UserStatus? status,
+      VoidCallback? onEditStatus,
+      Size size = const Size(1400, 1000),
+    }) async {
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pumpWidget(
+        buildTestMaterialApp(
+          Scaffold(
+            body: SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: AccountSection(
+                account: profile ?? account,
+                isSaving: false,
+                onSave: (_, _) async => null,
+                onDelete: () async {},
+                status: status,
+                onEditStatus: onEditStatus,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    testWidgets('shows the header, profile card and Personal details rows', (
+      tester,
+    ) async {
+      await pumpFull(
+        tester,
+        profile: account.copyWith(
+          displayName: 'Ada',
+          username: 'ada',
+          title: 'Engineer',
+        ),
+      );
+
+      expect(find.text('Account'), findsOneWidget);
+      expect(
+        find.text('Manage how you appear to others and your sign-in details.'),
+        findsOneWidget,
+      );
+      expect(find.text('Change photo'), findsOneWidget);
+      expect(find.text('Edit profile'), findsOneWidget);
+      expect(find.text('Personal details'), findsOneWidget);
+      for (final label in [
+        'Display name',
+        'Username',
+        'Title',
+        'Email address',
+        'Phone number',
+        'Status',
+        'Time zone',
+      ]) {
+        expect(find.text(label), findsOneWidget, reason: label);
+      }
+      expect(find.text('Engineer'), findsOneWidget);
+      expect(find.text('ada@zedu.test'), findsOneWidget);
+      expect(find.text('(UTC+01:00) West Central Africa'), findsOneWidget);
+      // Display name, Title, Phone number and Time zone are editable.
+      expect(find.text('Edit'), findsNWidgets(4));
+      expect(find.text('Your Account Information'), findsNothing);
+    });
+
+    testWidgets('shows "Not set" for empty fields and no Username row '
+        'without a username', (tester) async {
+      await pumpFull(tester);
+
+      expect(find.text('Not set'), findsNWidgets(2)); // Title, Phone number
+      expect(find.text('Username'), findsNothing);
+      expect(find.text('No status set'), findsOneWidget);
+      expect(find.text('Set a status'), findsNothing); // no handler given
+    });
+
+    testWidgets('the Status row shows the status and opens the status editor', (
+      tester,
+    ) async {
+      var opened = 0;
+      await pumpFull(
+        tester,
+        status: const UserStatus(emoji: '🌴', text: 'On leave'),
+        onEditStatus: () => opened++,
+      );
+
+      expect(find.text('🌴 On leave'), findsOneWidget);
+      await tester.tap(find.text('Update status'));
+      expect(opened, 1);
+    });
+
+    testWidgets('Edit profile, Change photo and each Edit open the editor', (
+      tester,
+    ) async {
+      await pumpFull(tester);
+
+      for (final finder in [
+        find.text('Edit profile'),
+        find.text('Change photo'),
+        find.byKey(const ValueKey('account_action_Title')),
+        find.byKey(const ValueKey('account_action_Time zone')),
+      ]) {
+        await tester.tap(finder);
+        await tester.pumpAndSettle();
+        expect(find.text('Edit your profile'), findsOneWidget);
+        await tester.tap(find.byTooltip('Close'));
+        await tester.pumpAndSettle();
+        expect(find.text('Edit your profile'), findsNothing);
+      }
+    });
+
+    testWidgets('lays out without overflow in a narrow window', (tester) async {
+      await pumpFull(
+        tester,
+        profile: account.copyWith(
+          displayName: 'A very long display name for a narrow window',
+          username: 'a_rather_long_username_too',
+        ),
+        size: const Size(420, 1400),
+      );
+
+      expect(tester.takeException(), isNull);
+      expect(find.text('Delete my account'), findsOneWidget);
+    });
   });
 }

@@ -81,8 +81,8 @@ class _DmChatAreaState extends ConsumerState<DmChatArea> {
       return;
     }
 
-    await showEditProfileDialog(context, account, (updated) async {
-      await notifier.updateAccount(updated);
+    await showEditProfileDialog(context, account, (updated, photo) async {
+      await notifier.updateAccount(updated, photo: photo);
       // updateAccount clears the error when it starts and sets it on failure.
       return ref.read(userProfileNotifierProvider).error;
     });

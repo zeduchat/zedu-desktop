@@ -43,7 +43,13 @@ class UserProfileNotifier extends Notifier<UserProfileState> {
     );
   }
 
-  Future<void> updateAccount(ProfileAccount account) async {
+  /// Saves the edited [account] fields and applies [photo] (a new photo to
+  /// upload, or removing the current one), then refreshes the signed-in user
+  /// so the rest of the app (rail avatar, user menu) shows the change at once.
+  Future<void> updateAccount(
+    ProfileAccount account, {
+    ProfilePhotoEdit photo = ProfilePhotoEdit.unchanged,
+  }) async {
     state = state.copyWith(
       isSaving: true,
       clearError: true,
@@ -51,20 +57,70 @@ class UserProfileNotifier extends Notifier<UserProfileState> {
     );
     final current = state.account ?? ProfileAccount.empty();
     final changes = _changedFields(account, current);
-    final result = await _repository.updateAccount(changes);
-    switch (result) {
-      case Success<ProfileAccount>():
-        state = state.copyWith(
-          account: _savedAccount(state.account ?? current, changes),
-          isSaving: false,
-          successMessage: 'Account information saved successfully.',
-        );
-      case Failure<ProfileAccount>():
-        state = state.copyWith(
-          isSaving: false,
-          error: result.error.friendlyMessage,
-        );
+    // A photo-only change has no fields to send: PATCH /profile is skipped
+    // so an empty form isn't posted.
+    if (photo.isUnchanged || _hasFieldChanges(changes)) {
+      final result = await _repository.updateAccount(changes);
+      if (result case Failure<ProfileAccount>(:final error)) {
+        state = state.copyWith(isSaving: false, error: error.friendlyMessage);
+        return;
+      }
     }
+    var saved = _savedAccount(state.account ?? current, changes);
+
+    if (!photo.isUnchanged) {
+      final filePath = photo.filePath;
+      final photoResult = filePath != null
+          ? await _repository.uploadAvatar(filePath)
+          : await _repository.removeAvatar();
+      if (photoResult case Failure<void>(:final error)) {
+        state = state.copyWith(
+          account: saved,
+          isSaving: false,
+          error: filePath != null
+              ? 'Your details were saved, but the photo could not be uploaded. '
+                    '${error.friendlyMessage}'
+              : 'Your details were saved, but the photo could not be removed. '
+                    '${error.friendlyMessage}',
+        );
+        return;
+      }
+      // The server names the uploaded photo, so read its new URL back.
+      final fresh = await _repository.getAccount();
+      saved = switch (fresh) {
+        Success<ProfileAccount>(:final value) => saved.copyWith(
+          avatarUrl: value.avatarUrl,
+          clearAvatarUrl: (value.avatarUrl ?? '').trim().isEmpty,
+        ),
+        Failure<ProfileAccount>() =>
+          filePath != null ? saved : saved.copyWith(clearAvatarUrl: true),
+      };
+    }
+
+    state = state.copyWith(
+      account: saved,
+      isSaving: false,
+      successMessage: 'Account information saved successfully.',
+    );
+    await _refreshSignedInUser();
+  }
+
+  /// Whether [changes] has a field PATCH /profile sends.
+  bool _hasFieldChanges(ProfileAccount changes) => [
+    changes.name,
+    changes.displayName,
+    changes.username,
+    changes.phoneNumber,
+    changes.title,
+    changes.timezone,
+    changes.namePronunciation,
+  ].any((value) => value != kUnchangedField);
+
+  /// Reloads the signed-in user, whose name and photo the rail and user menu
+  /// show. Skipped when nobody is signed in (the auth provider isn't alive).
+  Future<void> _refreshSignedInUser() async {
+    if (!ref.mounted || !ref.exists(authNotifierProvider)) return;
+    await ref.read(authNotifierProvider.notifier).refreshCurrentUser();
   }
 
   /// Keeps only the fields the user edited. Unchanged fields are set to
