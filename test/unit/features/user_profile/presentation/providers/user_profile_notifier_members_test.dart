@@ -118,4 +118,84 @@ void main() {
       },
     );
   });
+
+  group('UserProfileNotifier.load team members error (Ziki #2918)', () {
+    late MockUserProfileRepository repo;
+
+    setUp(() {
+      repo = MockUserProfileRepository();
+      final storage = MockSecureStorageService();
+      locator.registerSingleton<SecureStorageService>(storage);
+      locator.registerSingleton<AppConfig>(
+        const AppConfig(apiBaseUrl: '', usesMockData: false),
+      );
+      when(() => storage.readData(any())).thenAnswer((_) async => null);
+      when(() => repo.getAccount()).thenAnswer((_) => _failed());
+      when(
+        () => repo.getSecuritySessions(userId: any(named: 'userId')),
+      ).thenAnswer((_) => _failed());
+      when(
+        () => repo.getRolesAndPermissions(orgId: any(named: 'orgId')),
+      ).thenAnswer((_) => _failed());
+      when(() => repo.getBillingInfo()).thenAnswer((_) => _failed());
+      when(
+        () => repo.getNotificationPreferences(orgId: any(named: 'orgId')),
+      ).thenAnswer((_) => _failed());
+      when(
+        () => repo.getOrganization(orgId: any(named: 'orgId')),
+      ).thenAnswer((_) => _failed());
+    });
+
+    tearDown(() async {
+      await locator.reset();
+    });
+
+    Future<ProviderContainer> loaded() async {
+      final container = ProviderContainer(
+        overrides: [
+          userProfileRepositoryProvider.overrideWithValue(repo),
+          workspaceProvider.overrideWith(() => _TestWorkspaceNotifier('org-1')),
+        ],
+      );
+      addTearDown(container.dispose);
+      container.listen(userProfileNotifierProvider, (_, _) {});
+      await pumpEventQueue();
+      return container;
+    }
+
+    test('a failed members request sets teamMembersError', () async {
+      when(() => repo.getTeamMembers(orgId: any(named: 'orgId'))).thenAnswer(
+        (_) async => const Failure<List<TeamMember>>(
+          ApiFailure(message: 'No connection', kind: ApiFailureKind.network),
+        ),
+      );
+
+      final container = await loaded();
+      final state = container.read(userProfileNotifierProvider);
+
+      expect(state.teamMembers, isEmpty);
+      expect(state.teamMembersError, isNotNull);
+    });
+
+    test('a successful retry clears teamMembersError', () async {
+      var fail = true;
+      when(() => repo.getTeamMembers(orgId: any(named: 'orgId'))).thenAnswer(
+        (_) async => fail
+            ? const Failure<List<TeamMember>>(ApiFailure(message: 'Down'))
+            : const Success<List<TeamMember>>([_alice]),
+      );
+      final container = await loaded();
+      expect(
+        container.read(userProfileNotifierProvider).teamMembersError,
+        isNotNull,
+      );
+
+      fail = false;
+      await container.read(userProfileNotifierProvider.notifier).load();
+      final state = container.read(userProfileNotifierProvider);
+
+      expect(state.teamMembersError, isNull);
+      expect(state.teamMembers, [_alice]);
+    });
+  });
 }

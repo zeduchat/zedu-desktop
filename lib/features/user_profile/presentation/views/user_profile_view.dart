@@ -147,6 +147,8 @@ class _ProfileContent extends StatelessWidget {
                     ),
             UserProfileSection.userManagement => UserManagementSection(
               members: state.teamMembers,
+              membersError: state.teamMembersError,
+              onRetry: notifier.load,
               isSaving: state.isSaving,
               onInvite: notifier.inviteMember,
               onUpdate: notifier.updateMember,

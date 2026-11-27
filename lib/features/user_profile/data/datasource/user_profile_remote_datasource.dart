@@ -462,29 +462,28 @@ class UserProfileRemoteDataSourceImpl implements UserProfileRemoteDataSource {
     // back to another organisation's members (Ziki #1452).
     if (orgId == null || orgId.isEmpty) return [];
 
-    try {
-      final response = await _apiBaseService.get<Map<String, dynamic>>(
-        path: '/organisations/$orgId/users',
-      );
-      final data = response.data['data'] as List<dynamic>?;
-      if (data == null) return [];
+    // A failed request is reported (ApiBaseService throws an ApiFailure)
+    // rather than turned into an empty team, so the screen can tell "no
+    // members" apart from "couldn't load them" (Ziki #2918).
+    final response = await _apiBaseService.get<Map<String, dynamic>>(
+      path: '/organisations/$orgId/users',
+    );
+    final data = response.data['data'] as List<dynamic>?;
+    if (data == null) return [];
 
-      return data.cast<Map<String, dynamic>>().map((user) {
-        // Map backend user to TeamMemberModel
-        return TeamMemberModel(
-          id: user['id'] as String? ?? '',
-          email: user['email'] as String? ?? '',
-          role: user['role'] as String? ?? 'User',
-          dateJoined: user['created_at'] as String? ?? '',
-          // Pending invites and deactivated members come back here too.
-          status: TeamMemberModel.statusFromJson(user),
-          name: _displayName(user),
-          avatarUrl: user['avatar_url'] as String?,
-        );
-      }).toList();
-    } catch (e) {
-      return [];
-    }
+    return data.cast<Map<String, dynamic>>().map((user) {
+      // Map backend user to TeamMemberModel
+      return TeamMemberModel(
+        id: user['id'] as String? ?? '',
+        email: user['email'] as String? ?? '',
+        role: user['role'] as String? ?? 'User',
+        dateJoined: user['created_at'] as String? ?? '',
+        // Pending invites and deactivated members come back here too.
+        status: TeamMemberModel.statusFromJson(user),
+        name: _displayName(user),
+        avatarUrl: user['avatar_url'] as String?,
+      );
+    }).toList();
   }
 
   @override
