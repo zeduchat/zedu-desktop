@@ -18,26 +18,31 @@ class _FakeAuthNotifier extends AuthNotifier {
   }
 }
 
-class _FakeUserProfileNotifier extends UserProfileNotifier {
-  final List<TeamMember> _members;
-  _FakeUserProfileNotifier(this._members);
-
+class _FakeWorkspaceNotifier extends WorkspaceNotifier {
   @override
-  UserProfileState build() {
-    return UserProfileState(isLoading: false, teamMembers: _members);
-  }
+  WorkspaceState build() => const WorkspaceState(
+    selectedWorkspace: Workspace(id: 'org-1', name: 'Workspace A', avatar: ''),
+  );
 }
 
-TeamMember _member(String id, String name) => TeamMember(
-  id: id,
-  email: '${name.toLowerCase()}@zedu.chat',
-  role: 'member',
-  dateJoined: '2026-01-01',
-  status: TeamMemberStatus.active,
-  name: name,
-);
+/// The workspace's members, as the new-message page loads them.
+class _FakePeopleRepository implements PeopleRepository {
+  _FakePeopleRepository(this._members);
 
-Future<void> _pumpView(WidgetTester tester, List<TeamMember> members) async {
+  final List<OrgMember> _members;
+
+  @override
+  Future<Result<MembersPage>> fetchMembers({
+    required String orgId,
+    int page = 1,
+    String search = '',
+  }) async => Success(MembersPage(members: _members));
+}
+
+OrgMember _member(String id, String name) =>
+    OrgMember(id: id, email: '${name.toLowerCase()}@zedu.chat', name: name);
+
+Future<void> _pumpView(WidgetTester tester, List<OrgMember> members) async {
   tester.view.physicalSize = const Size(1400, 1000);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
@@ -45,8 +50,9 @@ Future<void> _pumpView(WidgetTester tester, List<TeamMember> members) async {
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
-        userProfileNotifierProvider.overrideWith(
-          () => _FakeUserProfileNotifier(members),
+        workspaceProvider.overrideWith(_FakeWorkspaceNotifier.new),
+        peopleRepositoryProvider.overrideWithValue(
+          _FakePeopleRepository(members),
         ),
         // The view filters the signed-in user out of its suggestions.
         authNotifierProvider.overrideWith(_FakeAuthNotifier.new),
@@ -62,45 +68,22 @@ final _desktopPointer = TargetPlatformVariant.only(TargetPlatform.macOS);
 
 void main() {
   final testMembers = [
-    const TeamMember(
-      id: 'member-1',
-      name: '',
-      email: 'emptyname@zedu.test',
-      role: 'Member',
-      dateJoined: 'Jan 1, 2026',
-      status: TeamMemberStatus.active,
-    ),
-    const TeamMember(
-      id: 'member-2',
-      name: '   ',
-      email: 'whitespace@zedu.test',
-      role: 'Member',
-      dateJoined: 'Jan 1, 2026',
-      status: TeamMemberStatus.active,
-    ),
-    const TeamMember(
-      id: 'member-3',
-      name: null,
-      email: 'nullname@zedu.test',
-      role: 'Member',
-      dateJoined: 'Jan 1, 2026',
-      status: TeamMemberStatus.active,
-    ),
-    const TeamMember(
+    const OrgMember(id: 'member-1', name: '', email: 'emptyname@zedu.test'),
+    const OrgMember(id: 'member-2', name: '   ', email: 'whitespace@zedu.test'),
+    const OrgMember(id: 'member-3', name: '', email: 'nullname@zedu.test'),
+    const OrgMember(
       id: 'member-4',
       name: 'Alice Cooper',
       email: 'alice@zedu.test',
-      role: 'Admin',
-      dateJoined: 'Jan 1, 2026',
-      status: TeamMemberStatus.active,
     ),
   ];
 
-  Widget buildWidget({List<TeamMember>? members, User? signedInUser}) {
+  Widget buildWidget({List<OrgMember>? members, User? signedInUser}) {
     return ProviderScope(
       overrides: [
-        userProfileNotifierProvider.overrideWith(
-          () => _FakeUserProfileNotifier(members ?? testMembers),
+        workspaceProvider.overrideWith(_FakeWorkspaceNotifier.new),
+        peopleRepositoryProvider.overrideWithValue(
+          _FakePeopleRepository(members ?? testMembers),
         ),
         authNotifierProvider.overrideWith(
           () => _FakeAuthNotifier(signedInUser),

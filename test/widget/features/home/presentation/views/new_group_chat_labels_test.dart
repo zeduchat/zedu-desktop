@@ -23,6 +23,8 @@ void main() {
           userProfileNotifierProvider.overrideWith(
             _FakeUserProfileNotifier.new,
           ),
+          // No workspace, so the page has no members to load.
+          currentOrgIdProvider.overrideWithValue(''),
         ],
         child: buildTestMaterialApp(const Scaffold(body: NewGroupChatView())),
       ),
