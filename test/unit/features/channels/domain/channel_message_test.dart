@@ -183,4 +183,59 @@ void main() {
       },
     );
   });
+
+  group('system notices', () {
+    const joinNotice =
+        '<p><span class="mention" data-type="mention" data-id="u-1" '
+        'data-label="mimi" data-mention-suggestion-char="@">@mimi</span> '
+        'joined this channel. <span class="mention" data-type="mention" '
+        'data-id="u-2" data-label="ada_l" '
+        'data-mention-suggestion-char="@">@ada_l</span> and 5 others also '
+        'joined.</p><p></p>';
+
+    test('fromJson reads the type', () {
+      final notice = ChannelMessage.fromJson({
+        'thread_id': 't-1',
+        'type': 'system',
+        'message': joinNotice,
+      });
+      final message = ChannelMessage.fromJson({
+        'thread_id': 't-2',
+        'type': 'thread',
+        'message': 'hi',
+      });
+
+      expect(notice.type, 'system');
+      expect(notice.isSystem, isTrue);
+      expect(message.isSystem, isFalse);
+      expect(ChannelMessage.fromJson({'message': 'hi'}).isSystem, isFalse);
+    });
+
+    test('noticeParts splits out the named people without the @', () {
+      final parts = ChannelMessage.fromJson({
+        'type': 'system',
+        'message': joinNotice,
+      }).noticeParts;
+
+      expect(
+        [for (final p in parts) (p.text, p.isMention, p.userId)],
+        [
+          ('mimi', true, 'u-1'),
+          (' joined this channel. ', false, null),
+          ('ada_l', true, 'u-2'),
+          (' and 5 others also joined.', false, null),
+        ],
+      );
+    });
+
+    test('noticeParts is the whole text when nobody is named', () {
+      final parts = const ChannelMessage(
+        senderName: 'system',
+        text: 'Channel renamed',
+      ).noticeParts;
+
+      expect(parts.single.text, 'Channel renamed');
+      expect(parts.single.isMention, isFalse);
+    });
+  });
 }

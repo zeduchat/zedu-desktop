@@ -98,29 +98,49 @@ class ChannelMessageList extends ConsumerWidget {
         }
         final message = messages[index];
         // Only the sender's own, already sent messages can be changed.
-        final own = isMine(message);
-        final tile = ChannelMessageTile(
-          channelId: channelId,
-          message: message,
-          saveAction:
-              message.status == null && (message.threadId ?? message.id) != null
-              ? SaveLaterButton(
-                  channelId: channelId,
-                  threadId: message.threadId ?? message.id!,
-                )
-              : null,
-          onRetry: message.id != null
-              ? () => ref
-                    .read(chatHistoryProvider(channelId))
-                    .retryMessage(message.id!)
-              : null,
-          onEdit: own
-              ? () => _editChannelMessage(context, ref, channelId, message)
-              : null,
-          onDelete: own
-              ? () => _deleteChannelMessage(context, ref, channelId, message)
-              : null,
-        );
+        final own = !message.isSystem && isMine(message);
+        final tile = message.isSystem
+            ? ChannelSystemNotice(
+                message: message,
+                onMentionTap: (person) {
+                  final userId = person.userId;
+                  if (userId == null) return;
+                  openMemberChat(
+                    context,
+                    ref,
+                    OrgMember(id: userId, username: person.text),
+                  );
+                },
+              )
+            : ChannelMessageTile(
+                channelId: channelId,
+                message: message,
+                saveAction:
+                    message.status == null &&
+                        (message.threadId ?? message.id) != null
+                    ? SaveLaterButton(
+                        channelId: channelId,
+                        threadId: message.threadId ?? message.id!,
+                      )
+                    : null,
+                onRetry: message.id != null
+                    ? () => ref
+                          .read(chatHistoryProvider(channelId))
+                          .retryMessage(message.id!)
+                    : null,
+                onEdit: own
+                    ? () =>
+                          _editChannelMessage(context, ref, channelId, message)
+                    : null,
+                onDelete: own
+                    ? () => _deleteChannelMessage(
+                        context,
+                        ref,
+                        channelId,
+                        message,
+                      )
+                    : null,
+              );
         // Newest first, so the next index is the older neighbour. A day
         // starts at the oldest message or where the older one is another day.
         final time = message.createdAt;

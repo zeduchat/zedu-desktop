@@ -861,4 +861,36 @@ void main() {
     expect(find.text('Optimistic message'), findsOneWidget);
     expect(find.byIcon(Icons.add_reaction_outlined), findsNothing);
   });
+
+  testWidgets('shows a system notice as a slim line without an avatar', (
+    tester,
+  ) async {
+    stubPage(
+      1,
+      _page([
+        ChannelMessage.fromJson({
+          'thread_id': 't-2',
+          'type': 'system',
+          'full_name': 'mimi',
+          'message':
+              '<p><span class="mention" data-type="mention" data-id="u-1" '
+              'data-label="mimi">@mimi</span> joined this channel</p>',
+        }),
+        const ChannelMessage(id: 't-1', senderName: 'Ada', text: 'hello'),
+      ]),
+    );
+    await pumpList(tester);
+
+    final notice = find.byType(ChannelSystemNotice);
+    expect(notice, findsOneWidget);
+    expect(find.text('mimi joined this channel'), findsOneWidget);
+    expect(find.textContaining('@mimi'), findsNothing);
+    expect(
+      find.descendant(of: notice, matching: find.byType(CircleAvatar)),
+      findsNothing,
+    );
+    // The normal message still gets the full tile.
+    expect(find.byType(ChannelMessageTile), findsOneWidget);
+    expect(find.byType(CircleAvatar), findsOneWidget);
+  });
 }

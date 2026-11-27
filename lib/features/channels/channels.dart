@@ -17,6 +17,7 @@ export 'presentation/widgets/archived_channel_list.dart';
 export 'presentation/widgets/channel_export_dialog.dart';
 export 'presentation/widgets/channel_message_list.dart';
 export 'presentation/widgets/channel_row_actions.dart';
+export 'presentation/widgets/channel_system_notice.dart';
 export 'presentation/widgets/create_channel_modal.dart';
 export 'presentation/widgets/edit_channel_modal.dart';
 export 'presentation/views/channel_directory_view.dart';
