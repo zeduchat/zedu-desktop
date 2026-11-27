@@ -50,15 +50,15 @@ class UserModel {
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
     return UserModel(
-      id: json['id'] as String,
+      id: json['id'] as String? ?? json['user_id'] as String,
       firstName: json['first_name'] as String? ?? '',
       lastName: json['last_name'] as String? ?? '',
       fullname: json['fullname'] as String? ?? '',
-      email: json['email'] as String,
+      email: json['email'] as String? ?? '',
       phone: json['phone'] as String? ?? '',
       username: json['username'] as String? ?? '',
-      isVerified: json['is_verified'] as bool,
-      isOnboarded: json['is_onboarded'] as bool,
+      isVerified: json['is_verified'] as bool? ?? false,
+      isOnboarded: json['is_onboarded'] as bool? ?? false,
       createdAt: parseApiTimestampOrEpoch(json['created_at']),
       updatedAt: parseApiTimestampOrEpoch(json['updated_at']),
       avatarUrl: json['avatar_url'] as String? ?? '',
@@ -67,14 +67,14 @@ class UserModel {
           json['current_organisation_slug'] as String? ?? '',
       defaultAvatarUrl: json['default_avatar_url'] as String? ?? '',
       expiresIn: parseApiTimestampOrEpoch(json['expires_in']),
-      isActive: json['is_active'] as bool,
-      online: json['online'] as bool,
+      isActive: json['is_active'] as bool? ?? false,
+      online: json['online'] as bool? ?? false,
       organisation: OrganisationModel.fromJson(
         (json['organisation'] is Map<String, dynamic>
             ? json['organisation'] as Map<String, dynamic>
             : <String, dynamic>{}),
       ),
-      profileUpdated: json['profile_updated'] as bool,
+      profileUpdated: json['profile_updated'] as bool? ?? false,
       userId: json['user_id'] as String? ?? json['id'] as String,
     );
   }

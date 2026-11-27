@@ -81,5 +81,33 @@ void main() {
 
       expect(UserModel.fromJson(json).userId, json['id']);
     });
+
+    test('defaults missing or null bools and email instead of throwing', () {
+      final json = _userJson()
+        ..remove('is_verified')
+        ..remove('is_onboarded')
+        ..['is_active'] = null
+        ..remove('online')
+        ..['profile_updated'] = null
+        ..remove('email');
+
+      final user = UserModel.fromJson(json);
+
+      expect(user.isVerified, isFalse);
+      expect(user.isOnboarded, isFalse);
+      expect(user.isActive, isFalse);
+      expect(user.online, isFalse);
+      expect(user.profileUpdated, isFalse);
+      expect(user.email, '');
+    });
+
+    test('falls back to user_id when id is missing', () {
+      final json = _userJson()..remove('id');
+
+      final user = UserModel.fromJson(json);
+
+      expect(user.id, json['user_id']);
+      expect(user.userId, json['user_id']);
+    });
   });
 }
