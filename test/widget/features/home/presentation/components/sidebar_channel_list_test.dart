@@ -57,7 +57,89 @@ class SwitchingChannelNotifier extends ChannelNotifier {
   }
 }
 
+class _MockChannelRepository extends Mock implements ChannelRepository {}
+
 void main() {
+  group('SidebarChannelList unread badges', () {
+    late ProviderContainer container;
+
+    // The real ChannelNotifier, so opening a channel clears its count the
+    // way it does in the app.
+    Future<void> pumpUnread(WidgetTester tester) async {
+      final repository = _MockChannelRepository();
+      when(() => repository.fetchChannels(any())).thenAnswer(
+        (_) async => Success<List<Channel>>([
+          _channel('general').copyWith(unreadCount: 4),
+          _channel('random').copyWith(unreadCount: 3),
+          _channel('busy').copyWith(unreadCount: 150),
+          _channel('quiet'),
+        ]),
+      );
+      container = ProviderContainer(
+        overrides: [
+          channelRepositoryProvider.overrideWithValue(repository),
+          workspaceProvider.overrideWith(FakeWorkspaceNotifier.new),
+        ],
+      );
+      addTearDown(container.dispose);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: buildTestMaterialApp(
+            const Scaffold(body: SidebarChannelList()),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    Finder badgeOf(String name) => find.descendant(
+      of: find.ancestor(of: find.text(name), matching: find.byType(Row)),
+      matching: find.byKey(const Key('sidebar-channel-unread-badge')),
+    );
+
+    testWidgets('shows the count on channels with unread messages only', (
+      tester,
+    ) async {
+      await pumpUnread(tester);
+
+      expect(find.text('3'), findsOneWidget);
+      expect(badgeOf('random'), findsOneWidget);
+      expect(find.text('99+'), findsOneWidget);
+      expect(badgeOf('quiet'), findsNothing);
+      // general is open on start, so it has been read.
+      expect(badgeOf('general'), findsNothing);
+      expect(find.text('4'), findsNothing);
+      expect(
+        tester.widget<Text>(find.text('random')).style?.fontWeight,
+        FontWeight.w600,
+      );
+      expect(tester.widget<Text>(find.text('quiet')).style?.fontWeight, isNull);
+    });
+
+    testWidgets('opening a channel clears its badge for good', (tester) async {
+      await pumpUnread(tester);
+      expect(badgeOf('random'), findsOneWidget);
+
+      await tester.tap(find.text('random'));
+      await tester.pumpAndSettle();
+      expect(badgeOf('random'), findsNothing);
+
+      await tester.tap(find.text('quiet'));
+      await tester.pumpAndSettle();
+      expect(badgeOf('random'), findsNothing);
+      expect(
+        container
+            .read(channelProvider)
+            .value!
+            .firstWhere((c) => c.name == 'random')
+            .unreadCount,
+        0,
+      );
+      expect(badgeOf('busy'), findsOneWidget);
+    });
+  });
+
   group('SidebarChannelList', () {
     late ProviderContainer container;
 

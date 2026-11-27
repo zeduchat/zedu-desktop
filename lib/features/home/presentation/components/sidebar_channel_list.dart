@@ -37,6 +37,7 @@ class SidebarChannelList extends ConsumerWidget {
           for (final channel in channels)
             _SidebarChannelItem(
               label: channel.name,
+              unreadCount: channel.unreadCount,
               selected:
                   activeChat.type == ActiveChatType.channel &&
                   (activeChat.channelId == channel.id ||
@@ -56,6 +57,7 @@ class SidebarChannelList extends ConsumerWidget {
 
 class _SidebarChannelItem extends StatelessWidget {
   final String label;
+  final int unreadCount;
   final bool selected;
   final VoidCallback onTap;
 
@@ -64,6 +66,7 @@ class _SidebarChannelItem extends StatelessWidget {
 
   const _SidebarChannelItem({
     required this.label,
+    required this.unreadCount,
     required this.selected,
     required this.onTap,
     required this.onSecondaryTap,
@@ -73,6 +76,8 @@ class _SidebarChannelItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.colors;
     final borderRadius = BorderRadius.circular(6);
+    // The open channel is being read, so it never shows a badge.
+    final hasUnread = unreadCount > 0 && !selected;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
@@ -122,7 +127,7 @@ class _SidebarChannelItem extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 12),
-                    Flexible(
+                    Expanded(
                       child: Text(
                         label,
                         maxLines: 1,
@@ -130,10 +135,39 @@ class _SidebarChannelItem extends StatelessWidget {
                         style: TextStyle(
                           color: colors.onPrimary,
                           fontSize: 15,
-                          fontWeight: selected ? FontWeight.w600 : null,
+                          fontWeight: selected || hasUnread
+                              ? FontWeight.w600
+                              : null,
                         ),
                       ),
                     ),
+                    if (hasUnread) ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        key: const Key('sidebar-channel-unread-badge'),
+                        constraints: const BoxConstraints(
+                          minWidth: 20,
+                          minHeight: 20,
+                        ),
+                        alignment: Alignment.center,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: colors.accent,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          unreadCount.unreadBadgeText,
+                          style: TextStyle(
+                            color: colors.textPrimary,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
