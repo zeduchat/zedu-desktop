@@ -6,6 +6,9 @@ import 'package:zedu/features/features.dart';
 abstract interface class UserProfileRemoteDataSource {
   Future<ProfileAccountModel> getAccount();
   Future<ProfileAccountModel> updateAccount(ProfileAccount account);
+
+  /// Uploads a new profile photo or removes the current one.
+  Future<void> updateAvatar(ProfileAvatarChange change);
   Future<void> deleteAccount();
   Future<NotificationPreferencesModel> getNotificationPreferences({
     required String? orgId,
@@ -101,6 +104,29 @@ class UserProfileRemoteDataSourceImpl implements UserProfileRemoteDataSource {
       data: FormData.fromMap(fields),
     );
     return ProfileAccountModel.fromAccount(account);
+  }
+
+  @override
+  Future<void> updateAvatar(ProfileAvatarChange change) async {
+    if (_config.usesMockData) return;
+    if (change.isRemoval) {
+      await _apiBaseService.delete<Map<String, dynamic>>(
+        path: '/profile/image',
+      );
+      return;
+    }
+    // zedu-be reads the photo from the `avatar_file` part of PATCH /profile
+    // and ignores it unless the part's type is image/png or image/jpeg.
+    await _apiBaseService.patch<Map<String, dynamic>>(
+      path: '/profile',
+      data: FormData.fromMap({
+        'avatar_file': MultipartFile.fromBytes(
+          change.bytes!,
+          filename: change.fileName,
+          contentType: DioMediaType.parse(change.mimeType),
+        ),
+      }),
+    );
   }
 
   @override
