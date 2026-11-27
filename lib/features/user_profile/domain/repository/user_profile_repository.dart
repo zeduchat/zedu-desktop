@@ -18,6 +18,13 @@ abstract interface class UserProfileRepository {
   Future<Result<List<SecuritySession>>> getSecuritySessions({
     required String userId,
   });
+
+  /// One page of the user's sign-in history, newest first.
+  Future<Result<LoginAuditPage>> getLoginAudit({
+    required String userId,
+    int page = 1,
+    int limit = 10,
+  });
   Future<Result<void>> changePassword({
     required String currentPassword,
     required String newPassword,
