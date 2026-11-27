@@ -28,6 +28,11 @@ class _FakeUserProfileNotifier extends UserProfileNotifier {
   }
 }
 
+class _NoChannelsNotifier extends ChannelNotifier {
+  @override
+  Future<List<Channel>> build() async => const [];
+}
+
 TeamMember _member(String id, String name) => TeamMember(
   id: id,
   email: '${name.toLowerCase()}@zedu.chat',
@@ -48,6 +53,7 @@ Future<void> _pumpView(WidgetTester tester, List<TeamMember> members) async {
         userProfileNotifierProvider.overrideWith(
           () => _FakeUserProfileNotifier(members),
         ),
+        channelProvider.overrideWith(_NoChannelsNotifier.new),
         // The view filters the signed-in user out of its suggestions.
         authNotifierProvider.overrideWith(_FakeAuthNotifier.new),
       ],
@@ -102,6 +108,7 @@ void main() {
         userProfileNotifierProvider.overrideWith(
           () => _FakeUserProfileNotifier(members ?? testMembers),
         ),
+        channelProvider.overrideWith(_NoChannelsNotifier.new),
         authNotifierProvider.overrideWith(
           () => _FakeAuthNotifier(signedInUser),
         ),
